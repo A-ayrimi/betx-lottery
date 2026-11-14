@@ -11,10 +11,18 @@ import { useWallet } from "./WalletProvider";
 import { useI18n } from "@/i18n/client";
 
 export function Header() {
-  const { state, connect, logout, setToast, pendingRef } = useApp();
+  const {
+    state,
+    connect,
+    logout,
+    setToast,
+    pendingRef,
+    walletConnectOpen,
+    openWalletConnect,
+    closeWalletConnect,
+  } = useApp();
   const { address: connectedAddress } = useWallet();
   const { d, href } = useI18n();
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ username: "", telegram: "", referral: "", accept: false });
   const [walletBalance, setWalletBalance] = useState<{
@@ -71,7 +79,7 @@ export function Header() {
 
   const openModal = () => {
     setForm((f) => ({ ...f, referral: f.referral || pendingRef }));
-    setOpen(true);
+    openWalletConnect();
   };
 
   const submitDemo = async (e: React.FormEvent) => {
@@ -79,7 +87,7 @@ export function Header() {
     setBusy(true);
     const ok = await connect(form.username, form.telegram, form.referral, form.accept);
     setBusy(false);
-    if (ok) setOpen(false);
+    if (ok) closeWalletConnect();
   };
 
   return (
@@ -161,13 +169,13 @@ export function Header() {
       </header>
 
       <AnimatePresence>
-        {open ? (
+        {walletConnectOpen ? (
           <motion.div
             className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-[#04100c]/85 px-4 py-8 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setOpen(false)}
+            onClick={closeWalletConnect}
           >
             <motion.div
               initial={{ opacity: 0, y: 26, scale: 0.96 }}
@@ -202,7 +210,7 @@ export function Header() {
                 ) : null}
 
                 <div className="mt-4">
-                  <WalletList acceptTerms={form.accept} onDone={() => setOpen(false)} />
+                  <WalletList acceptTerms={form.accept} onDone={closeWalletConnect} />
                 </div>
 
                 {!user && botStart ? (
@@ -269,7 +277,7 @@ export function Header() {
 
                 <button
                   onClick={() => {
-                    setOpen(false);
+                    closeWalletConnect();
                     if (!user) setToast(d.header.guestToast);
                   }}
                   className="focus-ring mt-3 w-full rounded-xl px-6 py-2.5 text-xs text-mint transition-colors hover:text-white"

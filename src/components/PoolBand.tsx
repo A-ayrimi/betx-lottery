@@ -9,7 +9,7 @@ import { GoldDollars3D } from "./GoldDollars3D";
 import { burstDollars, burstFrom } from "@/lib/dollarFx";
 
 export function PoolBand() {
-  const { state, buy, setToast } = useApp();
+  const { state, buy, setToast, openWalletConnect } = useApp();
   const { d, t, n, ago, dir } = useI18n();
   const barRef = useRef<HTMLDivElement>(null);
   const lastSold = useRef<number | null>(null);
@@ -37,7 +37,7 @@ export function PoolBand() {
 
   const purchase = async (count: number, btn?: HTMLElement) => {
     if (!state?.user) {
-      setToast(d.pool.needLogin);
+      openWalletConnect();
       return;
     }
     const tickets = Math.min(count, remaining);
@@ -55,8 +55,12 @@ export function PoolBand() {
       return;
     }
     setBusy(true);
-    const res = await buy(count);
-    setBusy(false);
+    let res;
+    try {
+      res = await buy(count);
+    } finally {
+      setBusy(false);
+    }
     if (res === "insufficient") {
       goToWallet();
       return;
@@ -137,10 +141,24 @@ export function PoolBand() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-40px" }}
                   transition={{ duration: 0.4, delay: Math.min(index * 0.022, 0.5) }}
+                  role={!filled ? "button" : undefined}
+                  tabIndex={!filled ? 0 : undefined}
+                  aria-label={!filled ? `${d.pool.open} ${n(index)}` : undefined}
+                  onClick={!filled ? (e) => void purchase(1, e.currentTarget) : undefined}
+                  onKeyDown={
+                    !filled
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            void purchase(1, e.currentTarget);
+                          }
+                        }
+                      : undefined
+                  }
                   className={`perf relative flex h-[104px] flex-col justify-between overflow-hidden rounded-[10px] px-2.5 py-2.5 ${
                     filled
                       ? "stub-fill text-[#161206]"
-                      : `border border-dashed border-rule bg-white/[0.02] text-mint ${index === sold + 1 ? "stub-next" : ""}`
+                      : `cursor-pointer border border-dashed border-rule bg-white/[0.02] text-mint transition-colors hover:border-neon/60 hover:bg-neon/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon ${index === sold + 1 ? "stub-next" : ""}`
                   } ${ticket && ticket.id > initialMaxId ? "flash" : ""}`}
                 >
                   <div className="flex items-start justify-between">

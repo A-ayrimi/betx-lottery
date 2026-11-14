@@ -9,7 +9,7 @@ import { WHEEL_SECTORS } from "@/lib/wheel";
 import { burstFrom } from "@/lib/dollarFx";
 
 export function Wheel() {
-  const { state, spin, setToast, refresh } = useApp();
+  const { state, spin, setToast, openWalletConnect, refresh } = useApp();
   const { d, t, n } = useI18n();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -53,7 +53,11 @@ export function Wheel() {
   const doSpin = async () => {
     if (spinning) return;
     if (!user) {
-      setToast(d.wheel.needLogin);
+      openWalletConnect();
+      return;
+    }
+    if (!canSpin) {
+      setToast(d.wheel.nextTomorrow);
       return;
     }
     setSpinning(true);
@@ -108,8 +112,13 @@ export function Wheel() {
             </svg>
           </div>
 
-          <div
-            className="wheel-shadow relative aspect-square w-full rounded-full"
+          <button
+            type="button"
+            onClick={() => void doSpin()}
+            disabled={spinning}
+            aria-label={d.wheel.spinBtn}
+            aria-disabled={!canSpin}
+            className={`wheel-shadow focus-ring relative aspect-square w-full rounded-full border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-70 ${!canSpin ? "cursor-not-allowed opacity-70" : ""}`}
             style={{
               transition: spinning ? "transform 4200ms cubic-bezier(0.12,0.72,0.06,1)" : "none",
               transform: `rotate(${rotation}deg)`,
@@ -127,9 +136,10 @@ export function Wheel() {
                 const r = 96;
                 const cx = 100;
                 const cy = 100;
+                const svgNumber = (value: number) => Number(value.toFixed(3));
                 const p = (deg: number) => [
-                  cx + r * Math.sin((deg * Math.PI) / 180),
-                  cy - r * Math.cos((deg * Math.PI) / 180),
+                  svgNumber(cx + r * Math.sin((deg * Math.PI) / 180)),
+                  svgNumber(cy - r * Math.cos((deg * Math.PI) / 180)),
                 ];
                 const [x0, y0] = p(s.a0);
                 const [x1, y1] = p(s.a1);
@@ -164,12 +174,13 @@ export function Wheel() {
               <circle cx="100" cy="100" r="88" fill="none" stroke="#0b1512" strokeWidth="1.5" />
               <circle cx="100" cy="100" r="30" fill="url(#wheel-hub)" stroke="#E9C46A" strokeWidth="2" />
             </svg>
-          </div>
+          </button>
 
           <button
             onClick={doSpin}
-            disabled={spinning || !canSpin}
-            className="btn-foil focus-ring absolute left-1/2 top-1/2 z-10 h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 rounded-full text-base font-black disabled:opacity-70"
+            disabled={spinning}
+            aria-disabled={!canSpin}
+            className={`btn-foil focus-ring absolute left-1/2 top-1/2 z-10 h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 rounded-full text-base font-black disabled:opacity-70 ${!canSpin ? "cursor-not-allowed opacity-70" : ""}`}
           >
             {spinning ? "..." : canSpin ? d.wheel.spin : d.wheel.tomorrow}
           </button>
@@ -206,8 +217,9 @@ export function Wheel() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
               onClick={doSpin}
-              disabled={spinning || !canSpin}
-              className="btn-neon focus-ring rounded-2xl px-8 py-4 text-base font-bold disabled:opacity-55"
+              disabled={spinning}
+              aria-disabled={!canSpin}
+              className={`btn-neon focus-ring rounded-2xl px-8 py-4 text-base font-bold disabled:opacity-55 ${!canSpin ? "cursor-not-allowed opacity-55" : ""}`}
             >
               {spinning
                 ? d.wheel.spinning

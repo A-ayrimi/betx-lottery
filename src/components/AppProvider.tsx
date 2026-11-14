@@ -25,8 +25,11 @@ interface Ctx {
   toast: string | null;
   draw: DrawResult | null;
   pendingRef: string;
+  walletConnectOpen: boolean;
   setDraw: (d: DrawResult | null) => void;
   setToast: (t: string | null) => void;
+  openWalletConnect: () => void;
+  closeWalletConnect: () => void;
   refresh: () => Promise<void>;
   connect: (username: string, telegram: string, referral: string, acceptTerms: boolean) => Promise<boolean>;
   account: (body: Record<string, unknown>) => Promise<boolean>;
@@ -59,8 +62,12 @@ export function AppProvider({
   const [loading, setLoading] = useState(!initialState);
   const [toast, setToast] = useState<string | null>(null);
   const [draw, setDraw] = useState<DrawResult | null>(null);
+  const [walletConnectOpen, setWalletConnectOpen] = useState(false);
   const pendingRef = useStored("betx_ref", "") ?? "";
   const { d, t } = useI18n();
+
+  const openWalletConnect = useCallback(() => setWalletConnectOpen(true), []);
+  const closeWalletConnect = useCallback(() => setWalletConnectOpen(false), []);
 
   const refresh = useCallback(async () => {
     try {
@@ -178,7 +185,13 @@ export function AppProvider({
 
   const buy = useCallback(
     async (count: number) => {
-      const json = await post("/api/tickets/buy", { count });
+      let json;
+      try {
+        json = await post("/api/tickets/buy", { count });
+      } catch {
+        setToast(d.toast.buyFail);
+        return null;
+      }
       if (!json.ok) {
         setToast(json.error || d.toast.buyFail);
         return json.code === "insufficient" ? "insufficient" : null;
@@ -195,7 +208,13 @@ export function AppProvider({
   );
 
   const spin = useCallback(async () => {
-    const json = await post("/api/wheel/spin");
+    let json;
+    try {
+      json = await post("/api/wheel/spin");
+    } catch {
+      setToast(d.toast.spinFail);
+      return { ok: false as const, error: d.toast.spinFail };
+    }
     if (!json.ok) {
       setToast(json.error || d.toast.spinFail);
       return { ok: false as const, error: json.error };
@@ -242,8 +261,11 @@ export function AppProvider({
       toast,
       draw,
       pendingRef,
+      walletConnectOpen,
       setDraw,
       setToast,
+      openWalletConnect,
+      closeWalletConnect,
       refresh,
       connect,
       account,
@@ -253,7 +275,24 @@ export function AppProvider({
       deposit,
       withdraw,
     }),
-    [state, loading, toast, draw, pendingRef, refresh, connect, account, logout, buy, spin, deposit, withdraw],
+    [
+      state,
+      loading,
+      toast,
+      draw,
+      pendingRef,
+      walletConnectOpen,
+      openWalletConnect,
+      closeWalletConnect,
+      refresh,
+      connect,
+      account,
+      logout,
+      buy,
+      spin,
+      deposit,
+      withdraw,
+    ],
   );
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
