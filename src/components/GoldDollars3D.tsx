@@ -54,12 +54,12 @@ export function GoldDollars3D({
 
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
+        if (entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.12)) {
           io.disconnect();
           void start();
         }
       },
-      { rootMargin: "200px" },
+      { threshold: 0.12 },
     );
     io.observe(host);
 

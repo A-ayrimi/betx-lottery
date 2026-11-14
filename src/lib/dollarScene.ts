@@ -90,6 +90,7 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const lite = window.matchMedia("(max-width: 640px), (pointer: coarse)").matches;
   const software = detectSoftwareGL();
+  let staticMode = reduced || software || document.documentElement.dataset.perf === "low";
   // no GPU → fewer, cheaper instances (hardware GPUs keep the full count)
   const count = Math.max(6, Math.round((lite ? opts.count * 0.5 : opts.count) * (software ? 0.55 : 1)));
 
@@ -117,7 +118,7 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
   host.appendChild(canvas);
 
   const scene = new Scene();
-  const pmrem = software ? null : new PMREMGenerator(renderer);
+  const pmrem = software || lite ? null : new PMREMGenerator(renderer);
   const envTex = pmrem ? pmrem.fromScene(new RoomEnvironment(), 0.04).texture : null;
   if (envTex) scene.environment = envTex;
   scene.fog = new Fog(0x060a09, 12.5, 31); // far dollars sink into the dark backdrop
@@ -141,9 +142,9 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
   const geometry = dollarGeometry(lite);
   const material = new MeshStandardMaterial({
     color: 0xffcf6e, // richer gold so it still reads behind the dark scrim
-    metalness: software ? 0.35 : 1,
-    roughness: software ? 0.5 : 0.17, // tighter highlights = visibly shinier
-    envMapIntensity: software ? 0 : 1.9,
+    metalness: software || lite ? 0.45 : 1,
+    roughness: software || lite ? 0.4 : 0.17, // tighter highlights = visibly shinier
+    envMapIntensity: envTex ? 1.9 : 0,
   });
   const mesh = new InstancedMesh(geometry, material, count);
   mesh.instanceMatrix.setUsage(DynamicDrawUsage);
@@ -212,6 +213,10 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
     }
     mesh.instanceMatrix.needsUpdate = true;
   };
+  const renderStatic = () => {
+    place();
+    renderer.render(scene, camera);
+  };
 
   const resize = () => {
     const w = Math.max(1, host.clientWidth);
@@ -221,10 +226,7 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
-    if (reduced) {
-      place();
-      renderer.render(scene, camera);
-    }
+    if (staticMode) renderStatic();
   };
   resize();
   const ro = new ResizeObserver(resize);
@@ -245,6 +247,7 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
   let last = performance.now();
   let onScreen = true;
   let lost = false;
+  const minFrameInterval = lite ? 1000 / 30 : 0;
   let frameMs = 0;
   let frameCount = 0;
   let windowStart = performance.now();
@@ -256,11 +259,9 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
     resize();
   };
 
-  const MIN_FRAME_MS = software ? 80 : 0; // ~12fps governor when there is no GPU
-
   const frame = (now: number) => {
     raf = 0;
-    if (MIN_FRAME_MS && now - last < MIN_FRAME_MS) {
+    if (minFrameInterval && now - last < minFrameInterval) {
       schedule();
       return;
     }
@@ -305,7 +306,7 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
     schedule();
   };
   const schedule = () => {
-    if (reduced || lost || raf || !onScreen || document.visibilityState !== "visible") return;
+    if (staticMode || lost || raf || !onScreen || document.visibilityState !== "visible") return;
     raf = requestAnimationFrame(frame);
   };
   const wake = () => {
@@ -313,12 +314,32 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
     schedule();
   };
 
-  const io = new IntersectionObserver((entries) => {
-    onScreen = entries.some((e) => e.isIntersecting);
-    if (onScreen) wake();
-  });
+  const io = new IntersectionObserver(
+    (entries) => {
+      onScreen = entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.12);
+      if (onScreen) wake();
+    },
+    { threshold: 0.12 },
+  );
   io.observe(host);
   document.addEventListener("visibilitychange", wake);
+  const perfObserver = new MutationObserver(() => {
+    const nextStaticMode =
+      reduced || software || document.documentElement.dataset.perf === "low";
+    if (nextStaticMode === staticMode) return;
+    staticMode = nextStaticMode;
+    if (staticMode) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      renderStatic();
+    } else {
+      wake();
+    }
+  });
+  perfObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-perf"],
+  });
 
   const onLost = (e: Event) => {
     e.preventDefault();
@@ -328,9 +349,8 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
   };
   canvas.addEventListener("webglcontextlost", onLost);
 
-  if (reduced) {
-    place();
-    renderer.render(scene, camera);
+  if (staticMode) {
+    renderStatic();
   } else {
     wake();
   }
@@ -339,6 +359,7 @@ export function createDollarScene(host: HTMLElement, opts: DollarSceneOptions): 
     cancelAnimationFrame(raf);
     io.disconnect();
     ro.disconnect();
+    perfObserver.disconnect();
     document.removeEventListener("visibilitychange", wake);
     parallaxHost?.removeEventListener("pointermove", onMove);
     canvas.removeEventListener("webglcontextlost", onLost);

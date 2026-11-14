@@ -5,6 +5,7 @@ import { useApp } from "./AppProvider";
 import { useWallet, walletErrorMessage } from "./WalletProvider";
 import { useI18n } from "@/i18n/client";
 import { writeStored } from "@/lib/useStored";
+import { money } from "@/lib/format";
 
 async function post(url: string, body: unknown) {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -105,16 +106,36 @@ export function SoonBadge({ label }: { label: string }) {
   );
 }
 
-export function AddressChip({ address, onClick }: { address: string; onClick?: () => void }) {
+export function AddressChip({
+  address,
+  usdt,
+  trx,
+  balanceLabel,
+  onClick,
+}: {
+  address: string;
+  usdt: number | null;
+  trx: number | null;
+  balanceLabel: string;
+  onClick?: () => void;
+}) {
+  const usdtText = usdt === null ? "—" : money(usdt);
+  const trxText = trx === null ? "—" : money(trx);
   return (
     <button
       onClick={onClick}
-      className="focus-ring flex items-center gap-2 rounded-full border border-neon/30 bg-neon/[0.07] px-3 py-2"
-      title={address}
+      className="focus-ring flex items-center gap-2 rounded-full border border-neon/30 bg-neon/[0.07] px-3 py-1.5"
+      title={`${address}\n${balanceLabel}: ${usdtText} USDT · ${trxText} TRX`}
+      aria-label={`${address}, ${balanceLabel}: ${usdtText} USDT, ${trxText} TRX`}
     >
       <span className="h-2 w-2 rounded-full bg-neon-2 shadow-[0_0_10px_2px_rgba(53,255,176,0.7)]" />
-      <span dir="ltr" className="font-display text-xs font-bold text-white">
-        {address.slice(0, 4)}…{address.slice(-4)}
+      <span className="flex flex-col items-start leading-tight">
+        <span dir="ltr" className="font-display text-[11px] font-bold text-white">
+          {address.slice(0, 4)}…{address.slice(-4)}
+        </span>
+        <span dir="ltr" className="font-display tnum whitespace-nowrap text-[9px] text-neon-2">
+          {usdtText} USDT · {trxText} TRX
+        </span>
       </span>
     </button>
   );

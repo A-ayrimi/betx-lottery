@@ -1,20 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Logo } from "./Logo";
 import { useApp } from "./AppProvider";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { AddressChip, SoonBadge, WalletList } from "./WalletConnect";
 import { AnimatedMoney } from "./AnimatedMoney";
+import { useWallet } from "./WalletProvider";
 import { useI18n } from "@/i18n/client";
 
 export function Header() {
   const { state, connect, logout, setToast, pendingRef } = useApp();
+  const { address: connectedAddress } = useWallet();
   const { d, href } = useI18n();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ username: "", telegram: "", referral: "", accept: false });
+  const [walletBalance, setWalletBalance] = useState<{
+    address: string;
+    balances: { usdt: number; trx: number } | null;
+  } | null>(null);
 
   const NAV = [
     { href: "#pool", label: d.nav.pool },
@@ -26,11 +32,42 @@ export function Header() {
   ];
 
   const user = state?.user ?? null;
+  const walletAddress = connectedAddress;
+  const walletMatchesAccount = !connectedAddress || connectedAddress === user?.walletAddress;
+  const walletBalances =
+    walletMatchesAccount && walletBalance?.address === walletAddress ? walletBalance.balances : null;
   const live = Boolean(state?.config.live);
   const tronOnly = state?.config.tronOnly !== false;
   const testnet = state?.config.tron.network && state.config.tron.network !== "mainnet";
   const bot = state?.config.botUsername;
   const botStart = bot ? `https://t.me/${bot}${pendingRef ? `?start=ref_${pendingRef}` : ""}` : null;
+
+  useEffect(() => {
+    if (!walletAddress || !user?.walletAddress || user.walletAddress !== walletAddress) {
+      return;
+    }
+
+    let active = true;
+    const loadBalances = async () => {
+      try {
+        const response = await fetch("/api/wallet/info", { cache: "no-store" });
+        const result = await response.json().catch(() => null);
+        if (!active) return;
+        const balances =
+          response.ok && result?.ok && result.address === walletAddress ? result.balances : null;
+        setWalletBalance({ address: walletAddress, balances });
+      } catch {
+        if (active) setWalletBalance({ address: walletAddress, balances: null });
+      }
+    };
+
+    void loadBalances();
+    const interval = window.setInterval(() => void loadBalances(), 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [walletAddress, user?.walletAddress]);
 
   const openModal = () => {
     setForm((f) => ({ ...f, referral: f.referral || pendingRef }));
@@ -73,11 +110,19 @@ export function Header() {
 
             {user ? (
               <div className="flex items-center gap-2">
-                <span dir="ltr" className="hidden font-display tnum text-sm font-bold text-white sm:inline">
-                  <AnimatedMoney value={user.balance} />
-                </span>
-                {user.walletAddress ? (
-                  <AddressChip address={user.walletAddress} onClick={() => (window.location.hash = "wallet")} />
+                {walletMatchesAccount ? (
+                  <span dir="ltr" className="hidden font-display tnum text-sm font-bold text-white sm:inline">
+                    <AnimatedMoney value={user.balance} />
+                  </span>
+                ) : null}
+                {walletAddress ? (
+                  <AddressChip
+                    address={walletAddress}
+                    usdt={walletBalances?.usdt ?? null}
+                    trx={walletBalances?.trx ?? null}
+                    balanceLabel={d.wc.walletBalance}
+                    onClick={() => (window.location.hash = "wallet")}
+                  />
                 ) : (
                   <button onClick={openModal} className="btn-neon focus-ring rounded-full px-4 py-2 text-xs font-bold">
                     {d.wc.linkWallet}
@@ -90,6 +135,14 @@ export function Header() {
                   {d.header.logout}
                 </button>
               </div>
+            ) : walletAddress ? (
+              <AddressChip
+                address={walletAddress}
+                usdt={walletBalances?.usdt ?? null}
+                trx={walletBalances?.trx ?? null}
+                balanceLabel={d.wc.walletBalance}
+                onClick={openModal}
+              />
             ) : (
               <button
                 onClick={openModal}

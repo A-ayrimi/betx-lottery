@@ -85,6 +85,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
               .then(() => {
                 if (!alive || !prev.address) return;
                 prev.on("accountsChanged", (addr: string) => setAddress(addr || null));
+                prev.on("disconnect", () => {
+                  setAddress(null);
+                  setAdapterName(null);
+                });
                 setAdapterName(prev.name);
                 setAddress(prev.address);
               })

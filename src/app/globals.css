@@ -36,7 +36,6 @@ body {
     radial-gradient(1100px 520px at 82% -10%, rgba(16, 226, 142, 0.16), transparent 62%),
     radial-gradient(760px 420px at 12% 12%, rgba(233, 196, 106, 0.08), transparent 60%),
     linear-gradient(180deg, #060a09 0%, #07110e 40%, #060a09 100%);
-  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
 
