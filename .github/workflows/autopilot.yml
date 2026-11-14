@@ -1,0 +1,17 @@
+# Free heartbeat for the BETX autopilot (every 5 minutes).
+# Repo → Settings → Secrets and variables → Actions: add APP_URL and CRON_SECRET.
+name: autopilot
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Run BETX automation
+        run: |
+          code=$(curl -s -o out.json -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.APP_URL }}/api/cron")
+          cat out.json; echo
+          test "$code" = "200"

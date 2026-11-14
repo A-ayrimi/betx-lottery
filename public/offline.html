@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BETX — offline</title>
+<meta name="theme-color" content="#060a09" />
+<style>
+  html,body{height:100%;margin:0;background:#060a09;color:#eaf5f1;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{min-height:100%;display:grid;place-items:center;padding:24px;background:
+    radial-gradient(700px 340px at 80% -10%,rgba(16,226,142,.16),transparent 60%),
+    radial-gradient(500px 300px at 10% 10%,rgba(233,196,106,.09),transparent 60%)}
+  .card{max-width:440px;width:100%;border:1px solid #1c2b26;border-radius:20px;padding:32px;background:linear-gradient(180deg,rgba(20,36,31,.95),rgba(9,18,15,.95));text-align:center}
+  .mark{width:56px;height:56px;margin:0 auto 18px;border-radius:14px;display:grid;place-items:center;background:#0d2a22}
+  h1{font-size:22px;margin:0 0 8px}
+  p{color:#8fa8a0;font-size:14px;line-height:1.9;margin:0 0 20px}
+  button{all:unset;cursor:pointer;background:linear-gradient(180deg,#35ffb0,#10e28e 60%,#0aa76c);color:#04150e;font-weight:800;padding:14px 22px;border-radius:14px}
+  .ltr{font-size:11px;letter-spacing:.28em;color:#e9c46a;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="mark">
+      <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
+        <defs><linearGradient id="g" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#35FFB0"/><stop offset=".52" stop-color="#10E28E"/><stop offset="1" stop-color="#E9C46A"/></linearGradient></defs>
+        <path fill="url(#g)" fill-rule="evenodd" clip-rule="evenodd" d="M12,4 H52 A8,8 0 0 1 60,12 V24 A8,8 0 0 0 60,40 V52 A8,8 0 0 1 52,60 H12 A8,8 0 0 1 4,52 V40 A8,8 0 0 0 4,24 V12 A8,8 0 0 1 12,4 Z M20,15 L29,15 L45,49 L36,49 Z M35,15 L44,15 L28,49 L19,49 Z"/>
+      </svg>
+    </div>
+    <div class="ltr">OFFLINE</div>
+    <h1>You're offline · آفلاین هستی</h1>
+    <p>Your balance is safe. Reconnect to keep playing.<br />موجودی‌ات امن است؛ برای ادامه اتصال را برگردان.</p>
+    <button onclick="location.reload()">Try again · تلاش دوباره</button>
+  </div>
+</div>
+</body>
+</html>

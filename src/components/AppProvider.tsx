@@ -1,0 +1,266 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import type { AppState, DrawResult } from "@/lib/types";
+import { useI18n } from "@/i18n/client";
+import { useStored, writeStored } from "@/lib/useStored";
+
+declare global {
+  interface Window {
+    Telegram?: { WebApp?: { initData?: string; ready?: () => void; expand?: () => void } };
+  }
+}
+
+interface Ctx {
+  state: AppState | null;
+  loading: boolean;
+  toast: string | null;
+  draw: DrawResult | null;
+  pendingRef: string;
+  setDraw: (d: DrawResult | null) => void;
+  setToast: (t: string | null) => void;
+  refresh: () => Promise<void>;
+  connect: (username: string, telegram: string, referral: string, acceptTerms: boolean) => Promise<boolean>;
+  account: (body: Record<string, unknown>) => Promise<boolean>;
+  logout: () => Promise<void>;
+  buy: (count: number) => Promise<DrawResult | true | null>;
+  spin: () => Promise<{ ok: boolean; index?: number; prize?: number; error?: string }>;
+  deposit: (amount: number) => Promise<boolean>;
+  withdraw: (amount: number, address: string) => Promise<boolean>;
+}
+
+const AppCtx = createContext<Ctx | null>(null);
+
+async function post(url: string, body?: unknown) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json().catch(() => ({ ok: false, error: "" }));
+}
+
+export function AppProvider({
+  children,
+  initialState = null,
+}: {
+  children: ReactNode;
+  initialState?: AppState | null;
+}) {
+  const [state, setState] = useState<AppState | null>(initialState);
+  const [loading, setLoading] = useState(!initialState);
+  const [toast, setToast] = useState<string | null>(null);
+  const [draw, setDraw] = useState<DrawResult | null>(null);
+  const pendingRef = useStored("betx_ref", "") ?? "";
+  const { d, t } = useI18n();
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/state", { cache: "no-store" });
+      const json = await res.json();
+      if (json.ok) setState(json.state);
+    } catch {
+      /* keep last known state */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // URL flags: ?ref=CODE, ?login=ok|expired|soon, ?deposit=success|cancel
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const ref = url.searchParams.get("ref");
+    if (ref && /^[A-Z0-9]{4,16}$/i.test(ref)) writeStored("betx_ref", ref.toUpperCase());
+
+    const login = url.searchParams.get("login");
+    const dep = url.searchParams.get("deposit");
+    const msg =
+      login === "ok" ? d.toast.loginOk
+      : login === "expired" ? d.toast.loginExpired
+      : login === "soon" ? d.wc.comingSoonToast
+      : dep === "success" ? d.toast.depositSuccess
+      : dep === "cancel" ? d.toast.depositCancel
+      : null;
+    if (ref || login || dep) {
+      ["ref", "login", "deposit"].forEach((k) => url.searchParams.delete(k));
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+    if (!msg) return;
+    const id = window.setTimeout(() => setToast(msg), 0);
+    return () => window.clearTimeout(id);
+  }, [d]);
+
+  // Telegram Mini App: silent sign-in with signed initData
+  useEffect(() => {
+    let tries = 0;
+    const t = window.setInterval(async () => {
+      tries++;
+      const wa = window.Telegram?.WebApp;
+      if (wa?.initData) {
+        window.clearInterval(t);
+        wa.ready?.();
+        wa.expand?.();
+        if (state?.user) return;
+        const json = await post("/api/auth/telegram", { initData: wa.initData });
+        if (json.ok) {
+          await refresh();
+          setToast(json.created ? d.toast.tgCreated : d.toast.welcomeBack);
+        }
+      } else if (tries > 10) {
+        window.clearInterval(t);
+      }
+    }, 250);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (initialState) return;
+    const id = window.setTimeout(refresh, 0);
+    return () => window.clearTimeout(id);
+  }, [refresh, initialState]);
+
+  // light polling keeps the pool meter honest while the tab is visible
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, 15000);
+    return () => window.clearInterval(t);
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4600);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const connect = useCallback(
+    async (username: string, telegram: string, referral: string, acceptTerms: boolean) => {
+      const json = await post("/api/auth/connect", { username, telegram, referral, acceptTerms });
+      if (!json.ok) {
+        setToast(json.error || d.toast.connectFail);
+        return false;
+      }
+      writeStored("betx_ref", null);
+      await refresh();
+      setToast(d.toast.welcome);
+      return true;
+    },
+    [refresh, d],
+  );
+
+  const account = useCallback(
+    async (body: Record<string, unknown>) => {
+      const json = await post("/api/account", body);
+      if (!json.ok) {
+        setToast(json.error || d.toast.invalid);
+        return false;
+      }
+      await refresh();
+      return true;
+    },
+    [refresh, d],
+  );
+
+  const logout = useCallback(async () => {
+    await post("/api/auth/logout");
+    await refresh();
+    setToast(d.toast.loggedOut);
+  }, [refresh, d]);
+
+  const buy = useCallback(
+    async (count: number) => {
+      const json = await post("/api/tickets/buy", { count });
+      if (!json.ok) {
+        setToast(json.error || d.toast.buyFail);
+        return null;
+      }
+      await refresh();
+      if (json.draw) {
+        setDraw(json.draw);
+        return json.draw as DrawResult;
+      }
+      setToast(t(d.toast.ticketsAdded, { n: json.serials?.length ?? count }));
+      return true as const;
+    },
+    [refresh, d, t],
+  );
+
+  const spin = useCallback(async () => {
+    const json = await post("/api/wheel/spin");
+    if (!json.ok) {
+      setToast(json.error || d.toast.spinFail);
+      return { ok: false as const, error: json.error };
+    }
+    return { ok: true as const, index: json.index as number, prize: json.prize as number };
+  }, [d]);
+
+  const deposit = useCallback(
+    async (amount: number) => {
+      const json = await post("/api/payments/deposit", { amount });
+      if (!json.ok) {
+        setToast(json.error || d.toast.payFail);
+        return false;
+      }
+      if (json.invoiceUrl) {
+        window.location.href = json.invoiceUrl;
+        return true;
+      }
+      await refresh();
+      setToast(t(d.toast.demoCredited, { amount: `$${Number(json.credited).toFixed(2)}` }));
+      return true;
+    },
+    [refresh, d, t],
+  );
+
+  const withdraw = useCallback(
+    async (amount: number, address: string) => {
+      const json = await post("/api/payments/withdraw", { amount, address });
+      if (!json.ok) {
+        setToast(json.error || d.toast.wdFail);
+        return false;
+      }
+      await refresh();
+      setToast(t(d.toast.wdOk, { id: json.id }));
+      return true;
+    },
+    [refresh, d, t],
+  );
+
+  const value = useMemo(
+    () => ({
+      state,
+      loading,
+      toast,
+      draw,
+      pendingRef,
+      setDraw,
+      setToast,
+      refresh,
+      connect,
+      account,
+      logout,
+      buy,
+      spin,
+      deposit,
+      withdraw,
+    }),
+    [state, loading, toast, draw, pendingRef, refresh, connect, account, logout, buy, spin, deposit, withdraw],
+  );
+
+  return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
+}
+
+export function useApp() {
+  const ctx = useContext(AppCtx);
+  if (!ctx) throw new Error("useApp must be used inside AppProvider");
+  return ctx;
+}

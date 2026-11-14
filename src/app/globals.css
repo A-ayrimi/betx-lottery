@@ -1,0 +1,375 @@
+@import "tailwindcss";
+
+:root {
+  --font-vazir: "Vazirmatn Variable";
+  --font-grotesk: "Space Grotesk Variable";
+  --font-manrope: "Manrope Variable";
+}
+
+@theme {
+  --color-ink: #060a09;
+  --color-ink-2: #0b1512;
+  --color-panel: #0d1a16;
+  --color-rule: #1c2b26;
+  --color-mint: #8fa8a0;
+  --color-neon: #10e28e;
+  --color-neon-2: #35ffb0;
+  --color-deep: #0b6b48;
+  --color-foil: #e9c46a;
+  --color-foil-2: #f6e3ae;
+  --font-sans: var(--font-vazir), "Vazirmatn", "Tahoma", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-display: var(--font-grotesk), "Space Grotesk", ui-monospace, monospace;
+}
+
+html {
+  background-color: #060a09;
+  scroll-behavior: smooth;
+}
+
+body {
+  color: #eaf5f1;
+  font-family: var(--font-vazir), "Vazirmatn", "Tahoma", ui-sans-serif, sans-serif;
+  font-weight: 400;
+  background-color: #060a09;
+  background-image:
+    radial-gradient(1100px 520px at 82% -10%, rgba(16, 226, 142, 0.16), transparent 62%),
+    radial-gradient(760px 420px at 12% 12%, rgba(233, 196, 106, 0.08), transparent 60%),
+    linear-gradient(180deg, #060a09 0%, #07110e 40%, #060a09 100%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #10e28e;
+  color: #060a09;
+}
+
+/* LTR locales (en, es, tr, ru): Manrope covers Latin-ext + Cyrillic */
+html[dir="ltr"] body {
+  font-family: var(--font-manrope), "Manrope", ui-sans-serif, system-ui, sans-serif;
+}
+html[dir="ltr"] .font-black {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.micro {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+/* guilloché rosette — banknote engraving, kept in SVG so it stays crisp */
+.guilloche {
+  background-image:
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      rgba(16, 226, 142, 0.1) 0 1px,
+      transparent 1px 13px
+    ),
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      rgba(233, 196, 106, 0.08) 0deg 2deg,
+      transparent 2deg 9deg
+    );
+  mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 72%);
+}
+
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+.rule-x {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgba(143, 168, 160, 0.28) 12%,
+    rgba(143, 168, 160, 0.28) 88%,
+    transparent
+  );
+  height: 1px;
+}
+
+.gold-text {
+  background: linear-gradient(180deg, #f6e3ae 0%, #e9c46a 46%, #b98c34 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.neon-text {
+  background: linear-gradient(180deg, #d7fff0 0%, #35ffb0 55%, #10e28e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.perf {
+  -webkit-mask-image: radial-gradient(circle at 0 50%, transparent 0 4px, #000 4.5px),
+    radial-gradient(circle at 100% 50%, transparent 0 4px, #000 4.5px);
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(circle at 0 50%, transparent 0 4px, #000 4.5px),
+    radial-gradient(circle at 100% 50%, transparent 0 4px, #000 4.5px);
+  mask-composite: intersect;
+}
+
+.stub-fill {
+  background-image: linear-gradient(150deg, #f6e3ae 0%, #e9c46a 45%, #a8792b 100%);
+}
+
+@keyframes betx-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: betx-marquee 38s linear infinite;
+}
+
+@keyframes betx-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(233, 196, 106, 0.85), 0 0 26px 6px rgba(233, 196, 106, 0.45);
+    transform: translateY(-2px) scale(1.04);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(233, 196, 106, 0), 0 0 0 0 rgba(233, 196, 106, 0);
+    transform: translateY(0) scale(1);
+  }
+}
+.flash {
+  animation: betx-flash 620ms ease-out;
+}
+
+@keyframes betx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.86);
+  }
+}
+.live-dot {
+  animation: betx-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes betx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: betx-rise 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes betx-confetti {
+  0% {
+    transform: translateY(-12vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(105vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+.confetti {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: betx-confetti linear forwards;
+}
+
+.wheel-shadow {
+  filter: drop-shadow(0 18px 42px rgba(233, 196, 106, 0.22));
+}
+
+.btn-foil {
+  background-image: linear-gradient(180deg, #f6e3ae 0%, #e9c46a 52%, #c2943c 100%);
+  color: #12100a;
+  box-shadow:
+    0 12px 34px -12px rgba(233, 196, 106, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.btn-foil:hover {
+  filter: brightness(1.06);
+}
+.btn-foil:active {
+  transform: translateY(1px);
+}
+
+.btn-neon {
+  background-image: linear-gradient(180deg, #35ffb0 0%, #10e28e 60%, #0aa76c 100%);
+  color: #04150e;
+  box-shadow:
+    0 12px 34px -12px rgba(16, 226, 142, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.btn-neon:hover {
+  filter: brightness(1.07);
+}
+.btn-neon:active {
+  transform: translateY(1px);
+}
+
+.panel {
+  background:
+    linear-gradient(180deg, rgba(20, 36, 31, 0.92), rgba(9, 18, 15, 0.92));
+  border: 1px solid rgba(143, 168, 160, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid #35ffb0;
+  outline-offset: 3px;
+}
+
+details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details[open] .faq-plus {
+  transform: rotate(45deg);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #07110e;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c2b26;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2b423a;
+}
+
+/* weak devices / no GPU: stop the pricey decorative repaints, keep everything else */
+html[data-perf="low"] .cta-breathe,
+html[data-perf="low"] .gold-text,
+html[data-perf="low"] .stub-next {
+  animation: none !important;
+}
+html[data-perf="low"] .cta-breathe {
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 3D dollar layer: dimmed behind the text column, full strength on the image side */
+.dollar-mask-end {
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.3) 44%, #000 64%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.3) 44%, #000 64%);
+}
+[dir="rtl"] .dollar-mask-end {
+  -webkit-mask-image: linear-gradient(270deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.38) 46%, #000 66%);
+  mask-image: linear-gradient(270deg, rgba(0, 0, 0, 0.26) 0%, rgba(0, 0, 0, 0.38) 46%, #000 66%);
+}
+@media (max-width: 1023px) {
+  /* single-column layout: text spans the full width */
+  .dollar-mask-end,
+  [dir="rtl"] .dollar-mask-end {
+    -webkit-mask-image: none;
+    mask-image: none;
+    opacity: 0.6;
+  }
+}
+
+/* soft dark halo keeps copy readable over moving gold */
+.legible {
+  text-shadow: 0 2px 14px rgba(6, 10, 9, 0.95), 0 0 3px rgba(6, 10, 9, 0.85);
+}
+.legible a,
+.legible button {
+  text-shadow: none;
+}
+.legible .gold-text,
+.legible .neon-text {
+  text-shadow: none;
+  filter: drop-shadow(0 2px 12px rgba(6, 10, 9, 0.9));
+}
+
+/* foil shimmer sweeping across gold type */
+.gold-text {
+  background: linear-gradient(105deg, #b98c34 0%, #e9c46a 28%, #fff3c9 42%, #e9c46a 56%, #b98c34 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: foil-shine 7s ease-in-out infinite;
+}
+@keyframes foil-shine {
+  0%, 100% { background-position: 100% 50%; }
+  50% { background-position: 0% 50%; }
+}
+
+/* primary calls-to-action breathe softly */
+.cta-breathe {
+  animation: cta-breathe 3.4s ease-in-out infinite;
+}
+.btn-foil.cta-breathe {
+  animation-name: cta-breathe-gold;
+}
+@keyframes cta-breathe {
+  0%, 100% { box-shadow: 0 12px 34px -12px rgba(16, 226, 142, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+  50% { box-shadow: 0 16px 48px -8px rgba(16, 226, 142, 0.85), 0 0 0 6px rgba(53, 255, 176, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+}
+@keyframes cta-breathe-gold {
+  0%, 100% { box-shadow: 0 12px 34px -12px rgba(233, 196, 106, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+  50% { box-shadow: 0 16px 48px -8px rgba(233, 196, 106, 0.9), 0 0 0 6px rgba(233, 196, 106, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+}
+
+/* the next free slot in the pool invites the eye */
+.stub-next {
+  animation: stub-breathe 2.2s ease-in-out infinite;
+}
+@keyframes stub-breathe {
+  0%, 100% { border-color: rgba(53, 255, 176, 0.25); box-shadow: 0 0 0 0 rgba(53, 255, 176, 0); }
+  50% { border-color: rgba(53, 255, 176, 0.8); box-shadow: 0 0 22px -4px rgba(53, 255, 176, 0.55); }
+}
+
