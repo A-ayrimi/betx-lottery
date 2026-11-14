@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="140" y1="80" x2="1390" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10251d"/>
+      <stop offset=".52" stop-color="#09130f"/>
+      <stop offset="1" stop-color="#060a09"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(650 0 0 520 1130 440)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10e28e" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#10e28e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="470" y1="240" x2="1100" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6e3ae" stop-opacity=".72"/>
+      <stop offset=".55" stop-color="#e9c46a" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#8f6827" stop-opacity=".08"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h1600v1000H0z"/>
+  <path fill="url(#glow)" d="M0 0h1600v1000H0z"/>
+  <g stroke="url(#gold)" stroke-width="3">
+    <circle cx="850" cy="520" r="390"/>
+    <circle cx="850" cy="520" r="350"/>
+    <circle cx="850" cy="520" r="290"/>
+    <circle cx="850" cy="520" r="230"/>
+    <circle cx="850" cy="520" r="165"/>
+    <path d="M850 130v780M460 520h780M574 244l552 552M574 796l552-552"/>
+    <path d="m850 355 165 95v190l-165 95-165-95V450l165-95Z"/>
+    <circle cx="850" cy="520" r="52" fill="#e9c46a" fill-opacity=".12"/>
+  </g>
+  <g fill="#e9c46a" fill-opacity=".58">
+    <circle cx="300" cy="280" r="7"/>
+    <circle cx="1260" cy="230" r="5"/>
+    <circle cx="1330" cy="710" r="8"/>
+    <circle cx="390" cy="790" r="5"/>
+  </g>
+  <path fill="#060a09" fill-opacity=".2" d="M0 0h1600v1000H0z"/>
+</svg>

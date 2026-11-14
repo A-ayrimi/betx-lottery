@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
 import { Logo, Mark } from "./Logo";
 import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
+
+const subscribeToLocation = () => () => {};
+const getLocationOrigin = () => window.location.origin;
+const getServerLocationOrigin = () => "";
 
 /* ------------------------------------------------------------ winners tape */
 
@@ -114,7 +118,7 @@ export function HowItWorks() {
   return (
     <section className="relative overflow-hidden py-20 lg:py-28">
       <div className="absolute inset-0 opacity-[0.16]">
-        <Image src="/images/ticket.jpg" alt="" aria-hidden fill sizes="100vw" className="object-cover" />
+        <Image src="/images/ticket.svg" alt="" aria-hidden fill sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#060a09,rgba(6,10,9,0.55),#060a09)]" />
       </div>
       <div className="relative mx-auto max-w-[1240px] px-4 sm:px-6">
@@ -223,7 +227,7 @@ export function Invite() {
   const { d, t } = useI18n();
   const code = state?.user?.referralCode ?? null;
   const bot = state?.config.botUsername;
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = useSyncExternalStore(subscribeToLocation, getLocationOrigin, getServerLocationOrigin);
   const full = code ? (bot ? `https://t.me/${bot}?start=ref_${code}` : `${origin}/?ref=${code}`) : "";
   const link = code ? full.replace(/^https?:\/\//, "") : d.invite.loginForLink;
   const [copied, setCopied] = useState(false);
@@ -278,7 +282,7 @@ export function Invite() {
             </div>
 
             <div className="relative min-h-[320px] overflow-hidden rounded-2xl border border-foil/25">
-              <Image src="/images/ticket.jpg" alt={d.invite.ticketAlt} fill sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover" />
+              <Image src="/images/ticket.svg" alt={d.invite.ticketAlt} fill sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,10,9,0.15),rgba(6,10,9,0.88))]" />
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <p className="micro text-foil">GOLDEN TICKET · $1</p>

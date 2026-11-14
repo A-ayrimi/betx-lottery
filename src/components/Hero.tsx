@@ -28,7 +28,7 @@ export function Hero() {
     <section id="top" className="relative overflow-hidden">
       <div className="absolute inset-0">
         <Image
-          src="/images/vault.jpg"
+          src="/images/vault.svg"
           alt=""
           aria-hidden
           fill

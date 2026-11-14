@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="95" y1="80" x2="1290" y2="850" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14251d"/>
+      <stop offset=".6" stop-color="#09130f"/>
+      <stop offset="1" stop-color="#060a09"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(520 0 0 420 1020 390)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e9c46a" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#e9c46a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ticket" x1="720" y1="210" x2="1110" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6e3ae"/>
+      <stop offset=".52" stop-color="#e9c46a"/>
+      <stop offset="1" stop-color="#9a702c"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h1400v900H0z"/>
+  <path fill="url(#glow)" d="M0 0h1400v900H0z"/>
+  <g transform="rotate(-12 930 450)">
+    <rect x="650" y="260" width="560" height="360" rx="32" fill="#060a09" fill-opacity=".4"/>
+    <rect x="630" y="230" width="560" height="360" rx="32" fill="url(#ticket)"/>
+    <path d="M660 270h500v280H660z" stroke="#573d14" stroke-opacity=".55" stroke-width="3" stroke-dasharray="10 12"/>
+    <circle cx="630" cy="410" r="30" fill="#0b1512"/>
+    <circle cx="1190" cy="410" r="30" fill="#0b1512"/>
+    <path d="M910 230v360" stroke="#573d14" stroke-opacity=".55" stroke-width="3" stroke-dasharray="10 12"/>
+    <path d="M800 390c0-45 33-74 80-78v-45h48v45c43 6 69 34 71 76h-53c-3-19-13-31-40-31-25 0-40 12-40 28 0 16 15 26 52 36 49 13 83 33 83 77 0 40-28 68-73 77v45h-48v-44c-49-7-80-37-83-82h53c4 22 21 36 48 36s45-12 45-30c0-18-15-28-55-39-51-14-88-33-88-71Z" fill="#1b170d"/>
+    <path d="M688 300h168M688 520h168" stroke="#573d14" stroke-opacity=".32" stroke-width="5"/>
+    <circle cx="720" cy="410" r="8" fill="#10e28e"/>
+    <circle cx="1120" cy="410" r="8" fill="#10e28e"/>
+  </g>
+  <g fill="#e9c46a" fill-opacity=".5">
+    <circle cx="310" cy="220" r="6"/>
+    <circle cx="400" cy="650" r="9"/>
+    <circle cx="1210" cy="170" r="5"/>
+  </g>
+  <path fill="#060a09" fill-opacity=".22" d="M0 0h1400v900H0z"/>
+</svg>
