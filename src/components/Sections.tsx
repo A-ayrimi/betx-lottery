@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
 import { Logo, Mark } from "./Logo";
@@ -11,6 +10,41 @@ import { useI18n } from "@/i18n/client";
 const subscribeToLocation = () => () => {};
 const getLocationOrigin = () => window.location.origin;
 const getServerLocationOrigin = () => "";
+
+function TicketArtwork({ className = "", label }: { className?: string; label?: string }) {
+  return (
+    <svg
+      viewBox="0 0 1400 900"
+      preserveAspectRatio="xMidYMid slice"
+      className={className}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      focusable="false"
+    >
+      <path fill="#09130f" d="M0 0h1400v900H0z" />
+      <circle cx="1020" cy="390" r="430" fill="#e9c46a" fillOpacity=".08" />
+      <g transform="rotate(-12 930 450)">
+        <rect x="650" y="260" width="560" height="360" rx="32" fill="#000" fillOpacity=".4" />
+        <rect x="630" y="230" width="560" height="360" rx="32" fill="#e9c46a" />
+        <path d="M660 270h500v280H660z" fill="none" stroke="#573d14" strokeOpacity=".55" strokeWidth="3" strokeDasharray="10 12" />
+        <circle cx="630" cy="410" r="30" fill="#0b1512" />
+        <circle cx="1190" cy="410" r="30" fill="#0b1512" />
+        <path d="M910 230v360" stroke="#573d14" strokeOpacity=".55" strokeWidth="3" strokeDasharray="10 12" />
+        <path d="M800 390c0-45 33-74 80-78v-45h48v45c43 6 69 34 71 76h-53c-3-19-13-31-40-31-25 0-40 12-40 28 0 16 15 26 52 36 49 13 83 33 83 77 0 40-28 68-73 77v45h-48v-44c-49-7-80-37-83-82h53c4 22 21 36 48 36s45-12 45-30c0-18-15-28-55-39-51-14-88-33-88-71Z" fill="#1b170d" />
+        <path d="M688 300h168M688 520h168" stroke="#573d14" strokeOpacity=".32" strokeWidth="5" />
+        <circle cx="720" cy="410" r="8" fill="#10e28e" />
+        <circle cx="1120" cy="410" r="8" fill="#10e28e" />
+      </g>
+      <g fill="#e9c46a" fillOpacity=".5">
+        <circle cx="310" cy="220" r="6" />
+        <circle cx="400" cy="650" r="9" />
+        <circle cx="1210" cy="170" r="5" />
+      </g>
+      <path fill="#060a09" fillOpacity=".22" d="M0 0h1400v900H0z" />
+    </svg>
+  );
+}
 
 /* ------------------------------------------------------------ winners tape */
 
@@ -118,7 +152,7 @@ export function HowItWorks() {
   return (
     <section className="relative overflow-hidden py-20 lg:py-28">
       <div className="absolute inset-0 opacity-[0.16]">
-        <Image src="/images/ticket.svg" alt="" aria-hidden fill sizes="100vw" className="object-cover" />
+        <TicketArtwork className="h-full w-full" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#060a09,rgba(6,10,9,0.55),#060a09)]" />
       </div>
       <div className="relative mx-auto max-w-[1240px] px-4 sm:px-6">
@@ -282,7 +316,7 @@ export function Invite() {
             </div>
 
             <div className="relative min-h-[320px] overflow-hidden rounded-2xl border border-foil/25">
-              <Image src="/images/ticket.svg" alt={d.invite.ticketAlt} fill sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover" />
+              <TicketArtwork className="absolute inset-0 h-full w-full" label={d.invite.ticketAlt} />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,10,9,0.15),rgba(6,10,9,0.88))]" />
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <p className="micro text-foil">GOLDEN TICKET · $1</p>
