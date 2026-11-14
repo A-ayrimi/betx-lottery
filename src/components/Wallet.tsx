@@ -30,7 +30,7 @@ export function Wallet() {
   };
 
   return (
-    <section id="wallet" className="relative py-20 lg:py-24">
+    <section id="wallet" className="relative scroll-mt-24 py-20 lg:py-24">
       <div className="mx-auto max-w-[1240px] px-4 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>

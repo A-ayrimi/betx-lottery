@@ -75,7 +75,7 @@ export const config = {
     },
   },
   limits: {
-    minDeposit: 2,
+    minDeposit: 1,
     maxDeposit: 500,
     minWithdraw: 5,
     /** referral reward paid to the inviter when an invitee's first deposit lands */

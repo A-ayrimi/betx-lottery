@@ -40,9 +40,27 @@ export function PoolBand() {
       setToast(d.pool.needLogin);
       return;
     }
+    const tickets = Math.min(count, remaining);
+    if (tickets <= 0) return;
+    const cost = tickets * state.config.ticketPrice;
+    const goToWallet = () => {
+      const wallet = document.getElementById("wallet");
+      if (!wallet) return;
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}#wallet`);
+      wallet.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    if (Number(state.user.balance) < cost) {
+      setToast(t(d.errors.insufficient, { n: tickets, cost: `$${money(cost)}` }));
+      goToWallet();
+      return;
+    }
     setBusy(true);
     const res = await buy(count);
     setBusy(false);
+    if (res === "insufficient") {
+      goToWallet();
+      return;
+    }
     if (res === true) burstFrom(btn, { count: 4 + count, power: 0.75 });
   };
 

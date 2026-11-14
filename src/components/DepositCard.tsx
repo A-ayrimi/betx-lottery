@@ -7,7 +7,7 @@ import { SoonBadge, WalletList } from "./WalletConnect";
 import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 
-const AMOUNTS = [5, 10, 20, 50];
+const AMOUNTS = [1, 3, 5, 10];
 type Method = "wallet" | "invoice" | "demo";
 type Phase = "" | "build" | "sign" | "broadcast" | "confirm" | "done";
 
@@ -40,7 +40,7 @@ export function DepositCard() {
         ...(!live ? [{ id: "demo" as Method, enabled: true }] : []),
       ];
   const [method, setMethod] = useState<Method>(methods[0]?.id ?? "wallet");
-  const [amount, setAmount] = useState(10);
+  const [amount, setAmount] = useState(1);
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
   const chosen = custom ? Number(custom) : amount;
@@ -106,7 +106,7 @@ export function DepositCard() {
         inputMode="decimal"
         value={custom}
         onChange={(e) => setCustom(e.target.value.replace(/[^0-9.]/g, ""))}
-        placeholder={`${d.wallet.custom} · min ${cfg?.minDeposit ?? 2}`}
+        placeholder={`${d.wallet.custom} · min ${cfg?.minDeposit ?? 1}`}
         aria-label={d.wallet.custom}
         className="focus-ring mt-2 w-full rounded-xl border border-rule bg-black/30 px-4 py-2.5 font-display text-sm text-white placeholder:text-mint/40"
       />

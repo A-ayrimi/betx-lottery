@@ -31,7 +31,7 @@ interface Ctx {
   connect: (username: string, telegram: string, referral: string, acceptTerms: boolean) => Promise<boolean>;
   account: (body: Record<string, unknown>) => Promise<boolean>;
   logout: () => Promise<void>;
-  buy: (count: number) => Promise<DrawResult | true | null>;
+  buy: (count: number) => Promise<DrawResult | true | "insufficient" | null>;
   spin: () => Promise<{ ok: boolean; index?: number; prize?: number; error?: string }>;
   deposit: (amount: number) => Promise<boolean>;
   withdraw: (amount: number, address: string) => Promise<boolean>;
@@ -181,7 +181,7 @@ export function AppProvider({
       const json = await post("/api/tickets/buy", { count });
       if (!json.ok) {
         setToast(json.error || d.toast.buyFail);
-        return null;
+        return json.code === "insufficient" ? "insufficient" : null;
       }
       await refresh();
       if (json.draw) {
