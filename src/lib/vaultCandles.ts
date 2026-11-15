@@ -25,6 +25,7 @@ export interface VaultCandle {
   h: number;
   l: number;
   c: number;
+  volume: number;
   fees: number; // positive inflow in the bucket (round fees)
   n: number; // number of recorded events in the bucket
 }
@@ -35,6 +36,7 @@ export interface VaultSummary {
   changePct: number;
   high: number;
   low: number;
+  volume: number;
   fees: number;
   count: number;
   initialCapital: number;
@@ -125,13 +127,14 @@ function byRound(rows: Row[]): VaultCandle[] {
   for (const r of rows) {
     const before = r.balance - r.delta;
     if (!cur) {
-      cur = { t: r.ts, o: before, h: Math.max(before, r.balance), l: Math.min(before, r.balance), c: r.balance, fees: 0, n: 0 };
+      cur = { t: r.ts, o: before, h: Math.max(before, r.balance), l: Math.min(before, r.balance), c: r.balance, volume: 0, fees: 0, n: 0 };
     }
     cur.h = Math.max(cur.h, r.balance);
     cur.l = Math.min(cur.l, r.balance);
     cur.c = r.balance;
     cur.t = r.ts;
     cur.n += 1;
+    cur.volume += Math.abs(r.delta);
     if (r.delta > 0) cur.fees += r.delta;
     if (r.roundId !== null) {
       out.push(cur);
@@ -159,6 +162,7 @@ function byTime(rows: Row[], size: number, span: number, now: number, initial: n
     let h = last;
     let l = last;
     let c = last;
+    let volume = 0;
     let fees = 0;
     let n = 0;
     while (p < rows.length && rows[p].ts < be) {
@@ -167,11 +171,12 @@ function byTime(rows: Row[], size: number, span: number, now: number, initial: n
       l = Math.min(l, r.balance);
       c = r.balance;
       n += 1;
+      volume += Math.abs(r.delta);
       if (r.delta > 0) fees += r.delta;
     }
     const o = last;
     if (n > 0) last = c;
-    out.push({ t: bs, o, h, l, c, fees: Math.round(fees * 100) / 100, n });
+    out.push({ t: bs, o, h, l, c, volume: Math.round(volume * 100) / 100, fees: Math.round(fees * 100) / 100, n });
   }
   return out;
 }
@@ -214,6 +219,7 @@ export async function getVaultCandles(tf: VaultTf): Promise<VaultPayload> {
     changePct: first ? Math.round((change / first) * 10000) / 100 : 0,
     high: candles.length ? Math.max(...candles.map((c) => c.h)) : current,
     low: candles.length ? Math.min(...candles.map((c) => c.l)) : current,
+    volume: Math.round(candles.reduce((a, c) => a + c.volume, 0) * 100) / 100,
     fees: Math.round(candles.reduce((a, c) => a + c.fees, 0) * 100) / 100,
     count: candles.length,
     initialCapital: initial,

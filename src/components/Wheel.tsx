@@ -8,17 +8,29 @@ import { useI18n } from "@/i18n/client";
 import { WHEEL_SECTORS } from "@/lib/wheel";
 import { burstFrom } from "@/lib/dollarFx";
 
+const GUEST_SPIN_KEY = "betx_guest_wheel_at";
+const SPIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 export function Wheel() {
-  const { state, spin, setToast, openWalletConnect, refresh } = useApp();
+  const { state, spin, setToast, refresh } = useApp();
   const { d, t, n } = useI18n();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [prize, setPrize] = useState<number | null>(null);
   const [confetti, setConfetti] = useState<number[]>([]);
+  const [guestCanSpin, setGuestCanSpin] = useState(true);
   const timers = useRef<number[]>([]);
   const wheelRef = useRef<HTMLDivElement>(null);
 
   const user = state?.user;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
+      setGuestCanSpin(!last || Date.now() - last >= SPIN_COOLDOWN_MS);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const [now, setNow] = useState(0);
   const target = user?.nextSpinAt ? new Date(user.nextSpinAt).getTime() : 0;
   useEffect(() => {
@@ -37,7 +49,8 @@ export function Wheel() {
     const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s2 = Math.floor((ms % 60000) / 1000);
     return [h, m, s2].map((x) => String(x).padStart(2, "0")).join(":");
   })();
-  const canSpin = user ? user.canSpin : true;
+  const freeSpinReady = !target || (now > 0 && now >= target);
+  const canSpin = user ? user.canSpin || user.bonusSpins > 0 || freeSpinReady : guestCanSpin;
   const sectors = WHEEL_SECTORS;
 
   const slices = useMemo(
@@ -53,7 +66,24 @@ export function Wheel() {
   const doSpin = async () => {
     if (spinning) return;
     if (!user) {
-      openWalletConnect();
+      const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
+      if (last && Date.now() - last < SPIN_COOLDOWN_MS) {
+        setGuestCanSpin(false);
+        setToast(d.wheel.nextTomorrow);
+        return;
+      }
+      localStorage.setItem(GUEST_SPIN_KEY, String(Date.now()));
+      setGuestCanSpin(false);
+      setSpinning(true);
+      setPrize(null);
+      const i = Math.floor(Math.random() * sectors.length);
+      const step = (360 - ((rotation + i * (360 / sectors.length) + 360 / sectors.length / 2) % 360)) % 360;
+      setRotation(rotation + 360 * 5 + step);
+      const timer = window.setTimeout(() => {
+        setSpinning(false);
+        setToast(d.wheel.guestPractice);
+      }, 4300);
+      timers.current.push(timer);
       return;
     }
     if (!canSpin) {
@@ -197,6 +227,11 @@ export function Wheel() {
           <p className="mt-5 max-w-[56ch] text-[16px] leading-9 text-mint">
             {d.wheel.body}
           </p>
+          {!user ? (
+            <p className="mt-3 rounded-xl border border-foil/25 bg-foil/[0.06] px-4 py-3 text-[12px] leading-6 text-foil">
+              {d.wheel.guestNote}
+            </p>
+          ) : null}
 
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[

@@ -54,6 +54,10 @@ export function PoolBand() {
       goToWallet();
       return;
     }
+    const treasury = state.vault.adminWallet;
+    if (!window.confirm(`${t(d.pool.tickets, { n: tickets })}\n${d.pool.purchaseBalance}\n${d.pool.price}: $${money(cost)}\n${d.pool.balance} $${money(state.user.balance)}\n${d.pool.treasuryAddress} ($${money(state.round.fee)}): ${treasury}`)) {
+      return;
+    }
     setBusy(true);
     let res;
     try {

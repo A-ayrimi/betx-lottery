@@ -29,7 +29,7 @@ export const TICKET_PRICE = 1;
 export const POOL_CAPACITY = 20;
 export const PRIZE = 15;
 export const FEE = 5;
-export const SPIN_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+export const SPIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Q = Tx | typeof db;
@@ -502,7 +502,7 @@ async function lastSpin(q: Q, userId: number) {
 export async function canSpin(q: Q, userId: number, bonusSpins: number) {
   if (bonusSpins > 0) return true;
   const last = await lastSpin(q, userId);
-  return !last || Date.now() - new Date(last.createdAt).getTime() > SPIN_COOLDOWN_MS;
+  return !last || Date.now() - new Date(last.createdAt).getTime() >= SPIN_COOLDOWN_MS;
 }
 
 export async function spinWheel(userId: number) {
@@ -510,7 +510,9 @@ export async function spinWheel(userId: number) {
     const me = (await tx.select().from(users).where(eq(users.id, userId)).for("update"))[0];
     if (!me) throw new UserError("userNotFound", 404);
     assertCanPlay(me);
-    if (!(await canSpin(tx, me.id, me.bonusSpins))) {
+    const last = await lastSpin(tx, me.id);
+    const freeSpinReady = !last || Date.now() - new Date(last.createdAt).getTime() >= SPIN_COOLDOWN_MS;
+    if (!freeSpinReady && me.bonusSpins < 1) {
       throw new UserError("spinTomorrow", 429);
     }
     const v = (await tx.select().from(vault).limit(1).for("update"))[0];
@@ -528,7 +530,7 @@ export async function spinWheel(userId: number) {
       .update(users)
       .set({
         balance: sql`${users.balance} + ${prize}`,
-        bonusSpins: Math.max(0, me.bonusSpins - 1),
+        bonusSpins: Math.max(0, me.bonusSpins - (freeSpinReady ? 0 : 1)),
       })
       .where(eq(users.id, me.id));
     if (prize > 0) {
@@ -562,6 +564,8 @@ export interface DrawOutcome {
   serials: string[];
   youWon: boolean;
   yourTickets: number;
+  winnerUserId: number;
+  participants: { userId: number; telegramId: string | null; locale: string; ticketCount: number }[];
 }
 
 /**
@@ -607,6 +611,12 @@ async function drawRound(
   const adminWallet = config.adminWallet;
   const winner = pool[fairIndex(serverSeed, roundId, pool.map((t) => t.serial))];
   const winnerRow = (await tx.select().from(users).where(eq(users.id, winner.userId)).limit(1))[0];
+  const participantCounts = new Map<number, number>();
+  for (const ticket of pool) participantCounts.set(ticket.userId, (participantCounts.get(ticket.userId) ?? 0) + 1);
+  const participantRows = await tx
+    .select({ id: users.id, telegramId: users.telegramId, locale: users.locale })
+    .from(users)
+    .where(inArray(users.id, [...participantCounts.keys()]));
   const winnerName = winnerRow?.displayName ?? winner.username;
   const drawnAt = new Date();
 
@@ -674,6 +684,13 @@ async function drawRound(
     serials: pool.map((t) => t.serial),
     youWon: winner.userId === buyerId,
     yourTickets: pool.filter((t) => t.userId === buyerId).length,
+    winnerUserId: winner.userId,
+    participants: participantRows.map((u) => ({
+      userId: u.id,
+      telegramId: u.telegramId,
+      locale: u.locale,
+      ticketCount: participantCounts.get(u.id) ?? 0,
+    })),
   };
 }
 
@@ -755,6 +772,15 @@ export async function buyTickets(userId: number, requested: number) {
       throw new UserError("insufficient", 402, { n: take, cost: usd(cost) });
     }
 
+    let firstGoldenTicket = false;
+    if (me.referredBy) {
+      const [previousTickets] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(tickets)
+        .where(and(eq(tickets.userId, me.id), eq(tickets.kind, "gold")));
+      firstGoldenTicket = (previousTickets?.count ?? 0) === 0;
+    }
+
     const created = await tx
       .insert(tickets)
       .values(
@@ -779,11 +805,23 @@ export async function buyTickets(userId: number, requested: number) {
       note: `${take} golden tickets · round ${round.id}`,
     });
 
-    if (me.referredBy) {
-      await tx
-        .update(users)
-        .set({ bonusSpins: sql`${users.bonusSpins} + 1` })
-        .where(eq(users.referralCode, me.referredBy));
+    if (firstGoldenTicket && me.referredBy) {
+      const inviter = (
+        await tx.select().from(users).where(eq(users.referralCode, me.referredBy)).limit(1)
+      )[0];
+      if (inviter && inviter.id !== me.id) {
+        await tx
+          .update(users)
+          .set({ bonusSpins: sql`${users.bonusSpins} + 1` })
+          .where(eq(users.id, inviter.id));
+        await tx.insert(ledger).values({
+          userId: inviter.id,
+          username: inviter.username,
+          type: "referral",
+          amount: "0",
+          note: `Golden ticket referral spin (${me.username})`,
+        });
+      }
     }
 
     let draw = null;
@@ -978,13 +1016,20 @@ export async function getState() {
 
   let user = null;
   if (me) {
-    const [myDeposits, myWithdrawals, last] = await Promise.all([
+    const [myDeposits, myWithdrawals, last, myTickets] = await Promise.all([
       db.select().from(deposits).where(eq(deposits.userId, me.id)).orderBy(desc(deposits.id)).limit(5),
       db.select().from(withdrawals).where(eq(withdrawals.userId, me.id)).orderBy(desc(withdrawals.id)).limit(5),
       lastSpin(db, me.id),
+      db
+        .select({ ticket: tickets, round: rounds })
+        .from(tickets)
+        .innerJoin(rounds, eq(tickets.roundId, rounds.id))
+        .where(eq(tickets.userId, me.id))
+        .orderBy(desc(tickets.id))
+        .limit(50),
     ]);
     const spinReady =
-      me.bonusSpins > 0 || !last || Date.now() - new Date(last.createdAt).getTime() > SPIN_COOLDOWN_MS;
+      me.bonusSpins > 0 || !last || Date.now() - new Date(last.createdAt).getTime() >= SPIN_COOLDOWN_MS;
     user = {
       id: me.id,
       username: me.username,
@@ -997,6 +1042,23 @@ export async function getState() {
       totalDeposited: Number(me.totalDeposited),
       payoutAddress: me.payoutAddress,
       bonusSpins: me.bonusSpins,
+      tickets: myTickets.map(({ ticket, round: ticketRound }) => ({
+        id: ticket.id,
+        roundId: ticket.roundId,
+        serial: ticket.serial,
+        kind: ticket.kind,
+        createdAt: new Date(ticket.createdAt).toISOString(),
+        status:
+          ticketRound.status === "refunded"
+            ? "refunded"
+            : ticketRound.status !== "drawn"
+              ? "pending"
+              : ticket.serial === ticketRound.winningSerial
+                ? "winner"
+                : "lost",
+        prize: ticket.serial === ticketRound.winningSerial ? Number(ticketRound.prize) : 0,
+        winningSerial: ticketRound.winningSerial,
+      })),
       locale: me.locale,
       termsAccepted: Boolean(me.termsAcceptedAt),
       selfExcludedUntil:

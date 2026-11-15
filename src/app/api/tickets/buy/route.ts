@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { limitByIp, rateLimit } from "@/lib/ratelimit";
 import { buyTickets, getSessionUser } from "@/lib/store";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
-import { notifyWinner } from "@/lib/telegram";
+import { notifyRoundLoss, notifyWinner } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +16,18 @@ export async function POST(req: NextRequest) {
     const result = await buyTickets(me.id, Number(body.count) || 1);
 
     const dw = result.draw;
-    if (dw?.winnerTelegramId) {
+    if (dw?.participants.length) {
       // never make the buyer wait for Telegram
-      after(() => notifyWinner(dw.winnerTelegramId!, dw.roundId, dw.prize, dw.winnerLocale).catch(() => {}));
+      after(async () => {
+        await Promise.all(
+          dw.participants.map((p) => {
+            if (!p.telegramId) return Promise.resolve();
+            return p.userId === dw.winnerUserId
+              ? notifyWinner(p.telegramId, dw.roundId, dw.prize, dw.winningSerial, p.locale)
+              : notifyRoundLoss(p.telegramId, dw.roundId, p.ticketCount, dw.winningSerial, p.locale);
+          }),
+        );
+      });
     }
 
     const draw = result.draw

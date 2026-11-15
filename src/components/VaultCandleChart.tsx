@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/i18n/client";
 import { intlTags } from "@/i18n/config";
 import { money } from "@/lib/format";
+import type { AppState } from "@/lib/types";
 import { OnchainTreasury } from "./OnchainTreasury";
 import { useApp } from "./AppProvider";
 
@@ -25,6 +26,7 @@ interface Candle {
   h: number;
   l: number;
   c: number;
+  volume: number;
   fees: number;
   n: number;
 }
@@ -35,6 +37,7 @@ interface Summary {
   changePct: number;
   high: number;
   low: number;
+  volume: number;
   fees: number;
   count: number;
   initialCapital: number;
@@ -75,9 +78,9 @@ function useBox() {
 }
 
 function downloadCsv(candles: Candle[], tf: Tf) {
-  const header = "time_utc,open,high,low,close,fees,events";
+  const header = "time_utc,open,high,low,close,volume,fees,events";
   const rows = candles.map((c) =>
-    [new Date(c.t).toISOString(), c.o, c.h, c.l, c.c, c.fees, c.n].join(","),
+    [new Date(c.t).toISOString(), c.o, c.h, c.l, c.c, c.volume, c.fees, c.n].join(","),
   );
   const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -88,6 +91,51 @@ function downloadCsv(candles: Candle[], tf: Tf) {
   a.click();
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function makeDemoPayload(state: AppState | null, tf: Tf): Payload {
+  const now = Date.now();
+  const initialCapital = state?.vault.initialCapital ?? 20;
+  const current = state?.vault.balance ?? initialCapital;
+  const count = tf === "round" ? Math.max(1, state?.vault.roundsCompleted ?? 0) : tf === "24h" ? 24 : 30;
+  const volume = (state?.vault.totalFees ?? 0) + (state?.vault.totalPaid ?? 0);
+  const candles = Array.from({ length: count }, (_, index) => {
+    const progress = count === 1 ? 1 : index / (count - 1);
+    const close = initialCapital + (current - initialCapital) * progress;
+    const open = index === 0 ? initialCapital : initialCapital + (current - initialCapital) * ((index - 1) / (count - 1));
+    const wiggle = Math.max(0.01, Math.abs(current - initialCapital) * 0.02);
+    const t = now - (count - index - 1) * (tf === "30d" ? 86_400_000 : 3_600_000);
+    return {
+      t,
+      o: open,
+      h: Math.max(open, close) + wiggle,
+      l: Math.max(0, Math.min(open, close) - wiggle),
+      c: close,
+      volume: index === count - 1 ? volume : 0,
+      fees: index === count - 1 ? state?.vault.totalFees ?? 0 : 0,
+      n: index === count - 1 ? state?.vault.roundsCompleted ?? 0 : 0,
+    };
+  });
+  const change = current - initialCapital;
+  const high = Math.max(initialCapital, current);
+  const low = Math.min(initialCapital, current);
+  return {
+    ok: true,
+    tf,
+    candles,
+    summary: {
+      current,
+      change,
+      changePct: initialCapital ? (change / initialCapital) * 100 : 0,
+      high,
+      low,
+      volume,
+      fees: state?.vault.totalFees ?? 0,
+      count: state?.vault.roundsCompleted ?? 0,
+      initialCapital,
+    },
+    updatedAt: new Date(now).toISOString(),
+  };
 }
 
 /* ----------------------------------------------------------------- chart */
@@ -112,7 +160,7 @@ function CandleChart({
   showMa: boolean;
   showVol: boolean;
   label: string;
-  labels: { open: string; high: string; low: string; close: string; fees: string };
+  labels: { open: string; high: string; low: string; close: string; volume: string; fees: string };
 }) {
   const { setNode, w, h } = useBox();
   const [hover, setHover] = useState<number | null>(null);
@@ -142,7 +190,7 @@ function CandleChart({
     return { lo: lo - pad, hi: hi + pad };
   }, [candles, n]);
 
-  const maxFees = useMemo(() => candles.reduce((m, c) => Math.max(m, c.fees), 0.01), [candles]);
+  const maxVolume = useMemo(() => candles.reduce((m, c) => Math.max(m, c.volume), 0.01), [candles]);
 
   const ma = useMemo(() => {
     const out: (number | null)[] = [];
@@ -239,10 +287,10 @@ function CandleChart({
             </text>
           ))}
 
-          {/* volume: round fees per bucket */}
+          {/* volume: total recorded vault movement per bucket */}
           {showVol
             ? candles.map((c, i) => {
-                const vh = (c.fees / maxFees) * (volH - 2);
+                const vh = (c.volume / maxVolume) * (volH - 2);
                 return (
                   <rect
                     key={`v${c.t}-${i}`}
@@ -316,6 +364,8 @@ function CandleChart({
             <span className={`text-end font-display tnum font-bold ${hc.c >= hc.o ? "text-neon-2" : "text-red-300"}`}>
               ${money(hc.c)}
             </span>
+            <span className="text-mint">{labels.volume}</span>
+            <span className="text-end font-display tnum text-white">${money(hc.volume)}</span>
             <span className="text-mint">{labels.fees}</span>
             <span className="text-end font-display tnum text-foil">+${money(hc.fees)}</span>
           </div>
@@ -359,11 +409,11 @@ function IconClose() {
 
 /**
  * Vault candle analytics. Compact card on the home page; full-screen modal
- * with timeframes, MA, fee volume, crosshair and CSV export. Data is the real
+ * with timeframes, MA, transaction volume, crosshair and CSV export. Data is the real
  * recorded vault balance (/api/vault/candles), refreshed every 30 seconds.
  */
 export function VaultCandleChart() {
-  const { state } = useApp();
+  const { state, demoEnabled } = useApp();
   const { d, t, n, locale } = useI18n();
   const tag = intlTags[locale];
   const [tf, setTf] = useState<Tf>("24h");
@@ -373,9 +423,14 @@ export function VaultCandleChart() {
   const [showMa, setShowMa] = useState(true);
   const [showVol, setShowVol] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const demoData = useMemo(
+    () => (demoEnabled ? makeDemoPayload(state, tf) : null),
+    [demoEnabled, state, tf],
+  );
 
   // fetch on timeframe change, then poll; stale responses are ignored
   useEffect(() => {
+    if (demoEnabled) return;
     let alive = true;
     const load = async () => {
       try {
@@ -398,7 +453,7 @@ export function VaultCandleChart() {
       alive = false;
       window.clearInterval(id);
     };
-  }, [tf]);
+  }, [tf, demoEnabled]);
 
   // modal: lock background scroll, close on Escape, move focus into the dialog
   useEffect(() => {
@@ -419,7 +474,9 @@ export function VaultCandleChart() {
     if (open) closeRef.current?.focus();
   }, [open]);
 
-  const current = data && data.tf === tf && data.ok ? data : null;
+  const current = demoEnabled
+    ? demoData
+    : data && data.tf === tf && data.ok ? data : null;
   const sum = current?.summary ?? null;
   const up = (sum?.change ?? 0) >= 0;
   const changeText = sum
@@ -430,7 +487,14 @@ export function VaultCandleChart() {
     : "";
 
   const tfLabel: Record<Tf, string> = { round: d.vaultChart.tfRound, "24h": d.vaultChart.tf24h, "30d": d.vaultChart.tfMonth };
-  const labels = { open: d.vaultChart.tOpen, high: d.vaultChart.tHigh, low: d.vaultChart.tLow, close: d.vaultChart.tClose, fees: d.vaultChart.tFees };
+  const labels = {
+    open: d.vaultChart.tOpen,
+    high: d.vaultChart.tHigh,
+    low: d.vaultChart.tLow,
+    close: d.vaultChart.tClose,
+    volume: d.vaultChart.tVolume,
+    fees: d.vaultChart.tFees,
+  };
   const chartLabel = `${d.vaultChart.title} · ${tfLabel[tf]}`;
 
   const body = (
@@ -467,7 +531,9 @@ export function VaultCandleChart() {
               <h2 id="vault-chart-title" className="mt-2 text-xl font-black text-white sm:text-2xl">
                 {d.vaultChart.title}
               </h2>
-              <p className="mt-1 max-w-[56ch] text-[12px] leading-6 text-mint">{d.vaultChart.subtitle}</p>
+              <p className="mt-1 max-w-[56ch] text-[12px] leading-6 text-mint">
+                {state?.config.live ? d.vaultChart.subtitle : d.vaultChart.subtitleDemo}
+              </p>
             </div>
             <div className="text-end">
               <p className="micro text-mint">{d.vaultChart.now}</p>
@@ -589,7 +655,7 @@ export function VaultCandleChart() {
                       showVol ? "border-foil/50 bg-foil/10 text-foil" : "border-rule text-mint hover:text-white"
                     }`}
                   >
-                    {d.vaultChart.fees}
+                    {d.vaultChart.volume}
                   </button>
                 </div>
 
@@ -603,7 +669,7 @@ export function VaultCandleChart() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-px bg-rule/40 sm:grid-cols-6">
+              <div className="grid grid-cols-2 gap-px bg-rule/40 sm:grid-cols-7">
                 <Stat label={d.vaultChart.now} value={sum ? `$${money(sum.current)}` : "—"} />
                 <Stat
                   label={d.vaultChart.change}
@@ -612,6 +678,7 @@ export function VaultCandleChart() {
                 />
                 <Stat label={d.vaultChart.high} value={sum ? `$${money(sum.high)}` : "—"} />
                 <Stat label={d.vaultChart.low} value={sum ? `$${money(sum.low)}` : "—"} />
+                <Stat label={d.vaultChart.volume} value={sum ? `$${money(sum.volume)}` : "—"} />
                 <Stat label={d.vaultChart.feesTotal} value={sum ? `$${money(sum.fees)}` : "—"} tone="foil" />
                 <Stat label={d.vaultChart.count} value={sum ? n(sum.count) : "—"} />
               </div>

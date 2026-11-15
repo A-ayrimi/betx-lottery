@@ -19,6 +19,8 @@ import { I18nProvider } from "@/i18n/client";
 import { getDictionary } from "@/i18n";
 import { isLocale } from "@/i18n/config";
 import { getState } from "@/lib/store";
+import { config } from "@/lib/config";
+import { createDemoState } from "@/lib/demoSession";
 import { buildMetadata, structuredData } from "@/lib/site";
 import { maybeRunAutomation } from "@/lib/automation";
 import { after } from "next/server";
@@ -37,11 +39,15 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
   if (!isLocale(locale)) notFound();
 
   let state = null;
-  after(maybeRunAutomation);
-  try {
-    state = await getState();
-  } catch (e) {
-    console.error("state load failed", e);
+  if (config.live) {
+    after(maybeRunAutomation);
+    try {
+      state = await getState();
+    } catch (e) {
+      console.error("state load failed", e);
+    }
+  } else {
+    state = createDemoState();
   }
 
   const jsonLd = structuredData(locale);
@@ -49,8 +55,8 @@ export default async function Home({ params }: PageProps<"/[locale]">) {
   return (
     <I18nProvider locale={locale} dict={getDictionary(locale)}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <AppProvider initialState={state}>
-        <WalletProvider>
+      <AppProvider initialState={state} demoEnabled={!config.live}>
+        <WalletProvider demoEnabled={!config.live}>
         <main className="relative">
           <Header />
           <Hero />

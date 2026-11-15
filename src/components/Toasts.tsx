@@ -129,6 +129,12 @@ function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }
                 </div>
               ) : null}
 
+              {draw.demo ? (
+                <p className="mt-4 rounded-xl border border-foil/30 bg-foil/[0.06] px-4 py-3 text-[12px] leading-6 text-mint">
+                  {d.draw.demoNotice}
+                </p>
+              ) : null}
+
               <div className="mt-6 grid grid-cols-2 gap-3 text-start">
                 <div className="panel rounded-xl p-4">
                   <p className="micro text-mint">PRIZE</p>
@@ -143,9 +149,11 @@ function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }
               <button onClick={onClose} className="btn-neon focus-ring mt-7 w-full rounded-xl px-6 py-3.5 text-base font-bold">
                 OK
               </button>
-              <a href={href(`/verify/${draw.roundId}`)} className="mt-3 inline-block text-[12px] text-neon-2 hover:underline">
-                {d.board.verify}
-              </a>
+              {!draw.demo ? (
+                <a href={href(`/verify/${draw.roundId}`)} className="mt-3 inline-block text-[12px] text-neon-2 hover:underline">
+                  {d.board.verify}
+                </a>
+              ) : null}
             </motion.div>
           ) : null}
         </AnimatePresence>

@@ -23,7 +23,7 @@ import { getPayment } from "@/lib/nowpayments";
 import { applyNowPayment } from "@/lib/nowpaymentsApply";
 import { payoutConfig, processAutoPayouts } from "@/lib/payout";
 import { feeConfig, feeQueue, processFeeSweeps } from "@/lib/fees";
-import { sendMessage } from "@/lib/telegram";
+import { notifyRoundLoss, notifyWinner, sendMessage } from "@/lib/telegram";
 import { botStrings } from "@/i18n/bot";
 import { interpolate } from "@/i18n/config";
 
@@ -195,6 +195,14 @@ async function drawFullRounds() {
   await ensureTreasuryBackfill().catch(() => {});
   const outcomes = await autoDrawFullRounds();
   for (const o of outcomes) {
+    await Promise.all(
+      o.participants.map((p) => {
+        if (!p.telegramId) return Promise.resolve();
+        return p.userId === o.winnerUserId
+          ? notifyWinner(p.telegramId, o.roundId, o.prize, o.winningSerial, p.locale)
+          : notifyRoundLoss(p.telegramId, o.roundId, p.ticketCount, o.winningSerial, p.locale);
+      }),
+    );
     await alert(
       `draw-${o.roundId}`,
       `🎰 Round ${o.roundId} auto-drawn: <b>${o.winnerName}</b> won $${o.prize.toFixed(2)} (${o.winningSerial}). $${o.fee.toFixed(2)} fee → treasury ${o.adminWallet}.`,

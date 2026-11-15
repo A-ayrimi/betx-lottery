@@ -9,7 +9,7 @@ import { DepositCard } from "./DepositCard";
 
 
 export function Wallet() {
-  const { state, withdraw, setToast } = useApp();
+  const { state, withdraw, setToast, isDemoSession } = useApp();
   const { d, t, n, ago, date } = useI18n();
   const [busy, setBusy] = useState<"dep" | "wd" | null>(null);
   const [wd, setWd] = useState({ amount: "", address: "" });
@@ -129,9 +129,45 @@ export function Wallet() {
             >
               {busy === "wd" ? d.wallet.submitting : d.wallet.submit}
             </button>
-            <p className="mt-3 text-[12px] leading-6 text-mint/80">{d.wallet.wdHint}</p>
+            <p className="mt-3 text-[12px] leading-6 text-mint/80">{isDemoSession ? d.wc.demoWalletNote : d.wallet.wdHint}</p>
           </form>
         </div>
+
+        {user && user.tickets.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="panel mt-4 overflow-hidden rounded-2xl"
+          >
+            <p className="micro border-b border-rule px-6 py-4 text-mint">{d.wallet.ticketCards}</p>
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {user.tickets.map((ticket) => (
+                <article key={ticket.id} className="rounded-xl border border-foil/25 bg-foil/[0.05] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="micro text-mint">#{ticket.roundId}</span>
+                    <span className={`text-[11px] font-bold ${ticket.status === "winner" ? "text-neon-2" : ticket.status === "pending" ? "text-foil" : "text-mint"}`}>
+                      {ticket.status === "winner"
+                        ? d.wallet.ticketWon
+                        : ticket.status === "pending"
+                          ? d.wallet.ticketPending
+                          : ticket.status === "refunded"
+                            ? d.wallet.ticketRefunded
+                            : d.wallet.ticketLost}
+                    </span>
+                  </div>
+                  <p dir="ltr" className="font-display mt-3 break-all text-sm font-bold tracking-[0.12em] text-white">
+                    {ticket.serial}
+                  </p>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-mint/70">
+                    <span>{ticket.kind.toUpperCase()}</span>
+                    {ticket.status === "winner" ? <span dir="ltr">${money(ticket.prize)}</span> : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </motion.div>
+        ) : null}
 
         {user && (user.deposits.length > 0 || user.withdrawals.length > 0) ? (
           <motion.div
@@ -142,8 +178,34 @@ export function Wallet() {
           >
             <p className="micro border-b border-rule px-6 py-4 text-mint">{d.wallet.transactions}</p>
             {[
-              ...user.deposits.map((x) => ({ key: `d${x.id}`, kind: d.wallet.deposit, amount: x.amount, status: x.status, at: x.createdAt, link: x.invoiceUrl, sign: "+" })),
-              ...user.withdrawals.map((x) => ({ key: `w${x.id}`, kind: d.wallet.withdrawal, amount: x.amount, status: x.status, at: x.createdAt, link: null as string | null, sign: "−" })),
+              ...user.deposits.map((x) => ({ key: `d${x.id}`, kind: d.wallet.deposit, amount: x.amount, status: x.status, at: x.createdAt, link: x.invoiceUrl, linkLabel: d.wallet.continuePay, sign: "+" })),
+              ...user.withdrawals.map((x) => ({
+                key: `w${x.id}`,
+                kind: d.wallet.withdrawal,
+                amount: x.amount,
+                status: x.status,
+                at: x.createdAt,
+                link: x.txHash && state?.config.tron.explorer ? `${state.config.tron.explorer}${x.txHash}` : null,
+                linkLabel: d.wc.viewTx,
+                sign: "−",
+              })),
+              ...(isDemoSession
+                ? (state?.activity ?? [])
+                    .filter((x) => x.user === user.username)
+                    .map((x) => {
+                      const purchase = x.type === "ticket_buy";
+                      return {
+                        key: `demo${x.id}`,
+                        kind: purchase ? d.wallet.demoTicketPurchase : d.wallet.demoPrize,
+                        amount: x.amount,
+                        status: d.wc.demoBadge,
+                        at: x.at,
+                        link: null,
+                        linkLabel: "",
+                        sign: purchase ? "−" : "+",
+                      };
+                    })
+                : []),
             ]
               .sort((a, b) => b.at.localeCompare(a.at))
               .map((r) => (
@@ -152,8 +214,8 @@ export function Wallet() {
                   <span className="text-mint">
                     {statusLabel(r.status)} · <span suppressHydrationWarning>{ago(r.at)}</span>
                     {r.link ? (
-                      <a href={r.link} className="ms-2 text-neon-2 underline-offset-4 hover:underline">
-                        {d.wallet.continuePay}
+                      <a href={r.link} target="_blank" rel="noopener noreferrer" className="ms-2 text-neon-2 underline-offset-4 hover:underline">
+                        {r.linkLabel}
                       </a>
                     ) : null}
                   </span>

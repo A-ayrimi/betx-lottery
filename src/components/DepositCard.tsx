@@ -18,7 +18,7 @@ async function post(url: string, body: unknown) {
 }
 
 export function DepositCard() {
-  const { state, deposit, setToast } = useApp();
+  const { state, deposit, setToast, isDemoSession } = useApp();
   const { d, t } = useI18n();
   const cfg = state?.config;
   const user = state?.user;
@@ -46,6 +46,19 @@ export function DepositCard() {
   const chosen = custom ? Number(custom) : amount;
 
   const labels: Record<Method, string> = { wallet: d.wc.methodWallet, invoice: d.wc.methodInvoice, demo: "Demo" };
+
+  if (isDemoSession) {
+    return (
+      <div className="panel min-w-0 rounded-2xl p-6">
+        <p className="micro text-neon-2">{d.wallet.depositKicker} · {d.wc.demoBadge}</p>
+        <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
+        <p dir="ltr" className="font-display tnum mt-4 text-3xl font-bold text-white">
+          ${money(user?.balance ?? 0)} USDT
+        </p>
+        <p className="mt-3 text-[12px] leading-6 text-mint/80">{d.wc.demoWalletNote}</p>
+      </div>
+    );
+  }
 
   const payOther = async () => {
     if (!user) return setToast(d.errors.loginToDeposit);

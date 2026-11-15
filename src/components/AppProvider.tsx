@@ -6,12 +6,24 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { AppState, DrawResult } from "@/lib/types";
 import { useI18n } from "@/i18n/client";
 import { useStored, writeStored } from "@/lib/useStored";
+import {
+  buyDemoTickets,
+  clearDemoSession,
+  createDemoState,
+  depositDemoBalance,
+  DEMO_WALLET_ADDRESS,
+  loadDemoSession,
+  saveDemoSession,
+  spinDemoWheel,
+  withdrawDemoBalance,
+} from "@/lib/demoSession";
 
 declare global {
   interface Window {
@@ -25,12 +37,15 @@ interface Ctx {
   toast: string | null;
   draw: DrawResult | null;
   pendingRef: string;
+  demoEnabled: boolean;
+  isDemoSession: boolean;
   walletConnectOpen: boolean;
   setDraw: (d: DrawResult | null) => void;
   setToast: (t: string | null) => void;
+  startDemoSession: (address: string) => void;
   openWalletConnect: () => void;
   closeWalletConnect: () => void;
-  refresh: () => Promise<void>;
+  refresh: (force?: boolean) => Promise<void>;
   connect: (username: string, telegram: string, referral: string, acceptTerms: boolean) => Promise<boolean>;
   account: (body: Record<string, unknown>) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -54,22 +69,43 @@ async function post(url: string, body?: unknown) {
 export function AppProvider({
   children,
   initialState = null,
+  demoEnabled = false,
 }: {
   children: ReactNode;
   initialState?: AppState | null;
+  demoEnabled?: boolean;
 }) {
   const [state, setState] = useState<AppState | null>(initialState);
   const [loading, setLoading] = useState(!initialState);
   const [toast, setToast] = useState<string | null>(null);
   const [draw, setDraw] = useState<DrawResult | null>(null);
+  const [isDemoSession, setIsDemoSession] = useState(false);
   const [walletConnectOpen, setWalletConnectOpen] = useState(false);
+  const stateRef = useRef(state);
   const pendingRef = useStored("betx_ref", "") ?? "";
-  const { d, t } = useI18n();
+  const { d, t, locale } = useI18n();
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const openWalletConnect = useCallback(() => setWalletConnectOpen(true), []);
   const closeWalletConnect = useCallback(() => setWalletConnectOpen(false), []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
+    if (demoEnabled) {
+      const saved = loadDemoSession();
+      if (saved) {
+        setState(saved.state);
+        setIsDemoSession(true);
+        setLoading(false);
+        return;
+      }
+      if (isDemoSession || (!stateRef.current?.user && !force)) {
+        setLoading(false);
+        return;
+      }
+    }
     try {
       const res = await fetch("/api/state", { cache: "no-store" });
       const json = await res.json();
@@ -79,7 +115,21 @@ export function AppProvider({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [demoEnabled, isDemoSession]);
+
+  const startDemoSession = useCallback(
+    (address: string) => {
+      if (!demoEnabled || address !== DEMO_WALLET_ADDRESS) {
+        throw new Error("Demo wallet is unavailable outside demo mode");
+      }
+      const next = createDemoState(address, locale);
+      saveDemoSession(next);
+      setState(next);
+      setIsDemoSession(true);
+      setLoading(false);
+    },
+    [demoEnabled, locale],
+  );
 
   // URL flags: ?ref=CODE, ?login=ok|expired|soon, ?deposit=success|cancel
   useEffect(() => {
@@ -107,6 +157,7 @@ export function AppProvider({
 
   // Telegram Mini App: silent sign-in with signed initData
   useEffect(() => {
+    if (demoEnabled) return;
     let tries = 0;
     const t = window.setInterval(async () => {
       tries++;
@@ -127,13 +178,24 @@ export function AppProvider({
     }, 250);
     return () => window.clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [demoEnabled]);
 
   useEffect(() => {
+    if (demoEnabled) {
+      const saved = loadDemoSession();
+      if (saved) {
+        const id = window.setTimeout(() => {
+          setState(saved.state);
+          setIsDemoSession(true);
+          setLoading(false);
+        }, 0);
+        return () => window.clearTimeout(id);
+      }
+    }
     if (initialState) return;
-    const id = window.setTimeout(refresh, 0);
+    const id = window.setTimeout(() => void refresh(), 0);
     return () => window.clearTimeout(id);
-  }, [refresh, initialState]);
+  }, [demoEnabled, refresh, initialState]);
 
   // light polling keeps the pool meter honest while the tab is visible
   useEffect(() => {
@@ -166,6 +228,27 @@ export function AppProvider({
 
   const account = useCallback(
     async (body: Record<string, unknown>) => {
+      if (isDemoSession && state?.user) {
+        let nextUser = state.user;
+        if (body.action === "self_exclude") {
+          const days = Number(body.days);
+          if (!Number.isFinite(days) || days < 1) return false;
+          nextUser = {
+            ...nextUser,
+            selfExcludedUntil: new Date(Date.now() + days * 86_400_000).toISOString(),
+          };
+        } else if (body.action === "deposit_limit") {
+          const amount = body.amount === null ? null : Number(body.amount);
+          if (amount !== null && (!Number.isFinite(amount) || amount <= 0)) return false;
+          nextUser = { ...nextUser, depositLimit: amount, pendingLimit: null };
+        } else {
+          return false;
+        }
+        const next = { ...state, user: nextUser };
+        saveDemoSession(next);
+        setState(next);
+        return true;
+      }
       const json = await post("/api/account", body);
       if (!json.ok) {
         setToast(json.error || d.toast.invalid);
@@ -174,17 +257,43 @@ export function AppProvider({
       await refresh();
       return true;
     },
-    [refresh, d],
+    [refresh, d, isDemoSession, state],
   );
 
   const logout = useCallback(async () => {
+    if (isDemoSession) {
+      clearDemoSession();
+      setState(demoEnabled ? createDemoState() : null);
+      setIsDemoSession(false);
+      setToast(d.toast.loggedOut);
+      return;
+    }
     await post("/api/auth/logout");
-    await refresh();
+    await refresh(true);
     setToast(d.toast.loggedOut);
-  }, [refresh, d]);
+  }, [refresh, d, demoEnabled, isDemoSession]);
 
   const buy = useCallback(
     async (count: number) => {
+      if (isDemoSession && state) {
+        const result = buyDemoTickets(state, count);
+        if (result.error === "insufficient") {
+          setToast(d.toast.buyFail);
+          return "insufficient" as const;
+        }
+        if (result.error) {
+          setToast(d.toast.buyFail);
+          return null;
+        }
+        saveDemoSession(result.state);
+        setState(result.state);
+        if (result.draw) {
+          setDraw(result.draw);
+          return result.draw;
+        }
+        setToast(t(d.toast.ticketsAdded, { n: result.serials.length }));
+        return true as const;
+      }
       let json;
       try {
         json = await post("/api/tickets/buy", { count });
@@ -204,10 +313,20 @@ export function AppProvider({
       setToast(t(d.toast.ticketsAdded, { n: json.serials?.length ?? count }));
       return true as const;
     },
-    [refresh, d, t],
+    [refresh, d, t, isDemoSession, state],
   );
 
   const spin = useCallback(async () => {
+    if (isDemoSession && state) {
+      const result = spinDemoWheel(state);
+      if (!result.ok) {
+        setToast(d.toast.spinFail);
+        return { ok: false as const, error: result.error };
+      }
+      saveDemoSession(result.state);
+      setState(result.state);
+      return { ok: true as const, index: result.index, prize: result.prize };
+    }
     let json;
     try {
       json = await post("/api/wheel/spin");
@@ -220,10 +339,21 @@ export function AppProvider({
       return { ok: false as const, error: json.error };
     }
     return { ok: true as const, index: json.index as number, prize: json.prize as number };
-  }, [d]);
+  }, [d, isDemoSession, state]);
 
   const deposit = useCallback(
     async (amount: number) => {
+      if (isDemoSession && state) {
+        const next = depositDemoBalance(state, amount);
+        if (!next) {
+          setToast(d.toast.payFail);
+          return false;
+        }
+        saveDemoSession(next);
+        setState(next);
+        setToast(t(d.toast.demoCredited, { amount: `$${Number(amount).toFixed(2)}` }));
+        return true;
+      }
       const json = await post("/api/payments/deposit", { amount });
       if (!json.ok) {
         setToast(json.error || d.toast.payFail);
@@ -237,11 +367,22 @@ export function AppProvider({
       setToast(t(d.toast.demoCredited, { amount: `$${Number(json.credited).toFixed(2)}` }));
       return true;
     },
-    [refresh, d, t],
+    [refresh, d, t, isDemoSession, state],
   );
 
   const withdraw = useCallback(
     async (amount: number, address: string) => {
+      if (isDemoSession && state) {
+        const next = withdrawDemoBalance(state, amount, address);
+        if (!next) {
+          setToast(d.toast.wdFail);
+          return false;
+        }
+        saveDemoSession(next);
+        setState(next);
+        setToast(d.wallet.demoWithdrawalSaved);
+        return true;
+      }
       const json = await post("/api/payments/withdraw", { amount, address });
       if (!json.ok) {
         setToast(json.error || d.toast.wdFail);
@@ -251,7 +392,7 @@ export function AppProvider({
       setToast(t(d.toast.wdOk, { id: json.id }));
       return true;
     },
-    [refresh, d, t],
+    [refresh, d, t, isDemoSession, state],
   );
 
   const value = useMemo(
@@ -261,9 +402,12 @@ export function AppProvider({
       toast,
       draw,
       pendingRef,
+      demoEnabled,
+      isDemoSession,
       walletConnectOpen,
       setDraw,
       setToast,
+      startDemoSession,
       openWalletConnect,
       closeWalletConnect,
       refresh,
@@ -281,7 +425,10 @@ export function AppProvider({
       toast,
       draw,
       pendingRef,
+      demoEnabled,
+      isDemoSession,
       walletConnectOpen,
+      startDemoSession,
       openWalletConnect,
       closeWalletConnect,
       refresh,

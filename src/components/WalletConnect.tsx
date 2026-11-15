@@ -12,25 +12,23 @@ async function post(url: string, body: unknown) {
   return res.json().catch(() => ({ ok: false }));
 }
 
-const isMobile = () => typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
 /**
  * Wallet picker + Sign-In with TRON.
  * connect -> server nonce -> wallet signs (free, off-chain) -> server verifies.
  */
 export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDone?: () => void }) {
-  const { state, refresh, setToast, pendingRef } = useApp();
-  const { wallets, ready, connect, signMessage } = useWallet();
-  const { d } = useI18n();
+  const { state, refresh, setToast, pendingRef, demoEnabled, startDemoSession } = useApp();
+  const { wallets, ready, connect, connectDemo, signMessage } = useWallet();
+  const { d, t } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [step, setStep] = useState<"" | "connect" | "sign">("");
   const linking = Boolean(state?.user);
   const needsTerms = !linking && !acceptTerms;
 
-  const login = async (name: string, readyState: string, url: string) => {
+  const login = async (name: string, readyState: string) => {
     if (needsTerms) return setToast(d.errors.mustAccept);
-    if (readyState === "NotFound" && !isMobile()) {
-      window.open(url, "_blank", "noopener,noreferrer");
+    if (readyState !== "Found") {
+      setToast(d.wc.noWallet);
       return;
     }
     setBusy(name);
@@ -49,7 +47,7 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
       });
       if (!res.ok) throw new Error(res.error);
       if (res.created) writeStored("betx_ref", null);
-      await refresh();
+      await refresh(true);
       setToast(res.linked ? d.wc.linked : res.created ? d.toast.welcome : d.wc.connected);
       onDone?.();
     } catch (e) {
@@ -57,6 +55,24 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
     } finally {
       setBusy(null);
       setStep("");
+    }
+  };
+
+  const loginDemo = () => {
+    if (!acceptTerms) {
+      setToast(d.errors.mustAccept);
+      return;
+    }
+    setBusy("demo");
+    try {
+      const address = connectDemo();
+      startDemoSession(address);
+      setToast(t(d.wc.demoConnected, { address, balance: "100.00" }));
+      onDone?.();
+    } catch (e) {
+      setToast(walletErrorMessage(e));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -70,7 +86,7 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
               return (
                 <button
                   key={w.name}
-                  onClick={() => login(w.name, w.readyState, w.url)}
+                  onClick={() => login(w.name, w.readyState)}
                   disabled={busy !== null}
                   className={`focus-ring flex items-center gap-3 rounded-xl border px-4 py-3 text-start transition-colors disabled:opacity-60 ${
                     found ? "border-neon/40 bg-neon/[0.06] hover:bg-neon/[0.12]" : "border-rule bg-black/20 hover:border-mint/40"
@@ -80,12 +96,25 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
                   <img src={w.icon} alt="" className="h-7 w-7 rounded-lg" />
                   <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
                   <span className={`micro ${found ? "text-neon-2" : "text-mint"}`}>
-                    {busy === w.name ? "…" : found ? d.wc.detected : isMobile() ? d.wc.openApp : d.wc.install}
+                    {busy === w.name ? "…" : found ? d.wc.detected : d.wc.install}
                   </span>
                 </button>
               );
             })}
       </div>
+      {!state?.user && demoEnabled ? (
+        <div className="mt-4 rounded-xl border border-foil/40 bg-foil/[0.06] p-3">
+            <button
+              type="button"
+              onClick={loginDemo}
+              disabled={busy !== null}
+              className="btn-foil focus-ring w-full rounded-xl px-5 py-3 text-sm font-bold disabled:opacity-60"
+            >
+              {busy === "demo" ? "…" : d.wc.demoLogin}
+            </button>
+            <p className="mt-2 text-[11px] leading-5 text-mint/80">{d.wc.demoWalletNote}</p>
+        </div>
+      ) : null}
       {step ? (
         <p className="mt-3 flex items-center gap-2 text-[12px] text-foil" role="status">
           <span className="live-dot h-1.5 w-1.5 rounded-full bg-foil" />
@@ -111,12 +140,14 @@ export function AddressChip({
   usdt,
   trx,
   balanceLabel,
+  demo = false,
   onClick,
 }: {
   address: string;
   usdt: number | null;
   trx: number | null;
   balanceLabel: string;
+  demo?: boolean;
   onClick?: () => void;
 }) {
   const usdtText = usdt === null ? "—" : money(usdt);
@@ -126,7 +157,7 @@ export function AddressChip({
       onClick={onClick}
       className="focus-ring flex items-center gap-2 rounded-full border border-neon/30 bg-neon/[0.07] px-3 py-1.5"
       title={`${address}\n${balanceLabel}: ${usdtText} USDT · ${trxText} TRX`}
-      aria-label={`${address}, ${balanceLabel}: ${usdtText} USDT, ${trxText} TRX`}
+      aria-label={`${demo ? "DEMO " : ""}${address}, ${balanceLabel}: ${usdtText} USDT, ${trxText} TRX`}
     >
       <span className="h-2 w-2 rounded-full bg-neon-2 shadow-[0_0_10px_2px_rgba(53,255,176,0.7)]" />
       <span className="flex flex-col items-start leading-tight">
@@ -137,6 +168,7 @@ export function AddressChip({
           {usdtText} USDT · {trxText} TRX
         </span>
       </span>
+      {demo ? <span className="micro rounded-full border border-foil/40 px-1.5 py-0.5 text-[8px] text-foil">DEMO</span> : null}
     </button>
   );
 }

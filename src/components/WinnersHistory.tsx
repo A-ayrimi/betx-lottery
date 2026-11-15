@@ -29,7 +29,7 @@ interface HistoryRow {
  * older pages load from /api/rounds/history.
  */
 export function WinnersHistory() {
-  const { state } = useApp();
+  const { state, demoEnabled } = useApp();
   const { d, t, n, date, href, locale } = useI18n();
   const [extra, setExtra] = useState<HistoryRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -37,6 +37,11 @@ export function WinnersHistory() {
   const [highlight, setHighlight] = useState<number | null>(null);
   const seenTop = useRef<number | null>(null);
   const live = useMemo(() => (state?.winners ?? []) as HistoryRow[], [state?.winners]);
+  useEffect(() => {
+    if (!demoEnabled) return;
+    const id = window.setTimeout(() => setTotal(live.length), 0);
+    return () => window.clearTimeout(id);
+  }, [demoEnabled, live.length]);
   // round ids considered "new" (set in an effect, never read from a ref in render)
   const [freshIds, setFreshIds] = useState<number[]>([]);
   useEffect(() => {
@@ -82,6 +87,7 @@ export function WinnersHistory() {
   const unique = rows.filter((r, i) => rows.findIndex((x) => x.roundId === r.roundId) === i);
 
   const loadMore = useCallback(async () => {
+    if (demoEnabled) return;
     setLoadingMore(true);
     try {
       const offset = unique.length;
@@ -100,7 +106,7 @@ export function WinnersHistory() {
     } finally {
       setLoadingMore(false);
     }
-  }, [unique.length, live]);
+  }, [unique.length, live, demoEnabled]);
 
   const exact = (iso: string | null) => {
     if (!iso) return "—";
@@ -126,18 +132,22 @@ export function WinnersHistory() {
           <div className="flex items-center gap-2">
             <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
             <span dir="ltr" className="font-display text-[11px] tracking-[0.22em] text-neon-2">
-              {d.board.live}
+              {demoEnabled ? d.wc.demoBadge : d.board.live}
             </span>
           </div>
         </div>
 
         <p className="mt-6 rounded-2xl border border-neon/20 bg-neon/[0.05] px-5 py-4 text-[13px] leading-7 text-mint">
-          <span className="text-neon-2">◆</span> {d.board.autoDrawNote}
-          <br />
-          <span className="text-foil">◆</span> {d.board.treasuryNote}{" "}
-          <code dir="ltr" className="font-display text-[11px] text-neon-2">
-            {state?.config.adminWallet ?? state?.vault.adminWallet ?? ""}
-          </code>
+          <span className="text-neon-2">◆</span> {demoEnabled ? d.draw.demoNotice : d.board.autoDrawNote}
+          {!demoEnabled ? (
+            <>
+              <br />
+              <span className="text-foil">◆</span> {d.board.treasuryNote}{" "}
+              <code dir="ltr" className="font-display text-[11px] text-neon-2">
+                {state?.config.adminWallet ?? state?.vault.adminWallet ?? ""}
+              </code>
+            </>
+          ) : null}
         </p>
 
         <div className="panel mt-6 min-w-0 overflow-hidden rounded-2xl">
@@ -196,12 +206,16 @@ export function WinnersHistory() {
                           </>
                         )}
                       </span>
-                      <a
-                        href={href("/verify")}
-                        className="text-[12px] text-neon-2/80 underline-offset-4 hover:underline"
-                      >
-                        {d.board.verify}
-                      </a>
+                      {demoEnabled ? (
+                        <span className="text-[12px] text-foil">{d.wc.demoBadge}</span>
+                      ) : (
+                        <a
+                          href={href("/verify")}
+                          className="text-[12px] text-neon-2/80 underline-offset-4 hover:underline"
+                        >
+                          {d.board.verify}
+                        </a>
+                      )}
                     </motion.div>
                   );
                 })

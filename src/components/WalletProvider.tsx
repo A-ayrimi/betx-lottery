@@ -2,17 +2,20 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Adapter } from "@tronweb3/tronwallet-abstract-adapter";
+import {
+  clearDemoSession,
+  DEMO_WALLET_ADDRESS,
+  loadDemoSession,
+} from "@/lib/demoSession";
 
 /**
  * Multi-wallet TRON connector (TronLink, Trust, TokenPocket, OKX, Bitget).
- * Adapters are imported lazily in the browser only. On mobile, connecting to a
- * wallet that isn't injected deep-links into that wallet's in-app browser.
+ * Adapters are imported lazily in the browser; missing wallets never deep-link.
  */
 
 export interface WalletOption {
   name: string;
   icon: string;
-  url: string;
   readyState: "Loading" | "NotFound" | "Found";
 }
 
@@ -22,6 +25,7 @@ interface WalletCtx {
   address: string | null;
   adapterName: string | null;
   connect: (name: string) => Promise<string>;
+  connectDemo: () => string;
   disconnect: () => Promise<void>;
   signMessage: (message: string) => Promise<string>;
   signTransaction: (tx: unknown) => Promise<unknown>;
@@ -29,6 +33,7 @@ interface WalletCtx {
 
 const Ctx = createContext<WalletCtx | null>(null);
 const LAST_KEY = "betx_wallet";
+const DEMO_ADAPTER_NAME = "Demo wallet";
 
 async function loadAdapters(): Promise<Adapter[]> {
   const [tl, trust, tp, okx, bk] = await Promise.all([
@@ -38,7 +43,7 @@ async function loadAdapters(): Promise<Adapter[]> {
     import("@tronweb3/tronwallet-adapter-okxwallet"),
     import("@tronweb3/tronwallet-adapter-bitkeep"),
   ]);
-  const base = { openUrlWhenWalletNotFound: false, openAppWithDeeplink: true };
+  const base = { openUrlWhenWalletNotFound: false, openAppWithDeeplink: false };
   return [
     new tl.TronLinkAdapter({ ...base, openTronLinkAppOnMobile: true, dappName: "BETX" }),
     new trust.TrustAdapter(base),
@@ -48,7 +53,7 @@ async function loadAdapters(): Promise<Adapter[]> {
   ] as unknown as Adapter[];
 }
 
-export function WalletProvider({ children }: { children: ReactNode }) {
+export function WalletProvider({ children, demoEnabled = false }: { children: ReactNode; demoEnabled?: boolean }) {
   const adaptersRef = useRef<Adapter[]>([]);
   const [wallets, setWallets] = useState<WalletOption[]>([]);
   const [ready, setReady] = useState(false);
@@ -60,7 +65,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       adaptersRef.current.map((a) => ({
         name: a.name,
         icon: a.icon,
-        url: a.url,
         readyState: a.readyState as WalletOption["readyState"],
       })),
     );
@@ -75,6 +79,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         list.forEach((a) => a.on("readyStateChanged", snapshot));
         snapshot();
         setReady(true);
+        const demoSession = demoEnabled ? loadDemoSession() : null;
+        if (demoSession) {
+          window.setTimeout(() => {
+            if (!alive) return;
+            setAdapterName(DEMO_ADAPTER_NAME);
+            setAddress(demoSession.address);
+          }, 0);
+          return;
+        }
         // silent reconnect: only for an injected wallet the user picked before (never deep-links)
         const last = localStorage.getItem(LAST_KEY);
         const prev = list.find((a) => a.name === last);
@@ -103,7 +116,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       alive = false;
       adaptersRef.current.forEach((a) => a.removeAllListeners());
     };
-  }, [snapshot]);
+  }, [snapshot, demoEnabled]);
 
   const current = useCallback(() => adaptersRef.current.find((a) => a.name === adapterName) ?? null, [adapterName]);
 
@@ -111,6 +124,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     async (name: string) => {
       const adapter = adaptersRef.current.find((a) => a.name === name);
       if (!adapter) throw new Error("Wallet not available");
+      if (adapter.readyState !== "Found") throw new Error("Wallet not found in this browser");
       adapter.removeAllListeners("accountsChanged");
       adapter.removeAllListeners("disconnect");
       await adapter.connect();
@@ -131,6 +145,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(async () => {
     const a = current();
     localStorage.removeItem(LAST_KEY);
+    clearDemoSession();
     setAddress(null);
     setAdapterName(null);
     try {
@@ -140,7 +155,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [current]);
 
+  const connectDemo = useCallback(() => {
+    if (!demoEnabled) throw new Error("Demo wallet is unavailable outside demo mode");
+    const active = current();
+    if (active?.connected) throw new Error("Disconnect the real wallet before using a test wallet");
+    localStorage.removeItem(LAST_KEY);
+    setAdapterName(DEMO_ADAPTER_NAME);
+    setAddress(DEMO_WALLET_ADDRESS);
+    return DEMO_WALLET_ADDRESS;
+  }, [current, demoEnabled]);
+
   const ensure = useCallback(async () => {
+    if (adapterName === DEMO_ADAPTER_NAME) {
+      throw new Error("Demo wallets cannot sign messages or transactions");
+    }
     let a = current();
     if (!a || !a.connected) {
       const name = adapterName || localStorage.getItem(LAST_KEY);
@@ -159,8 +187,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ wallets, ready, address, adapterName, connect, disconnect, signMessage, signTransaction }),
-    [wallets, ready, address, adapterName, connect, disconnect, signMessage, signTransaction],
+    () => ({ wallets, ready, address, adapterName, connect, connectDemo, disconnect, signMessage, signTransaction }),
+    [wallets, ready, address, adapterName, connect, connectDemo, disconnect, signMessage, signTransaction],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

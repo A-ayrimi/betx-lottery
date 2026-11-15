@@ -20,8 +20,10 @@ export function Header() {
     walletConnectOpen,
     openWalletConnect,
     closeWalletConnect,
+    demoEnabled,
+    isDemoSession,
   } = useApp();
-  const { address: connectedAddress } = useWallet();
+  const { address: connectedAddress, disconnect } = useWallet();
   const { d, href } = useI18n();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ username: "", telegram: "", referral: "", accept: false });
@@ -42,16 +44,18 @@ export function Header() {
   const user = state?.user ?? null;
   const walletAddress = connectedAddress;
   const walletMatchesAccount = !connectedAddress || connectedAddress === user?.walletAddress;
-  const walletBalances =
-    walletMatchesAccount && walletBalance?.address === walletAddress ? walletBalance.balances : null;
-  const live = Boolean(state?.config.live);
+  const walletBalances = isDemoSession && walletAddress === user?.walletAddress
+    ? { usdt: user.balance, trx: 0 }
+    : walletMatchesAccount && walletBalance?.address === walletAddress ? walletBalance.balances : null;
+  const live = state?.config.live ?? !demoEnabled;
+  const vaultAddress = state?.vault.adminWallet ?? state?.config.adminWallet ?? "";
   const tronOnly = state?.config.tronOnly !== false;
   const testnet = state?.config.tron.network && state.config.tron.network !== "mainnet";
   const bot = state?.config.botUsername;
   const botStart = bot ? `https://t.me/${bot}${pendingRef ? `?start=ref_${pendingRef}` : ""}` : null;
 
   useEffect(() => {
-    if (!walletAddress || !user?.walletAddress || user.walletAddress !== walletAddress) {
+    if (isDemoSession || !walletAddress || !user?.walletAddress || user.walletAddress !== walletAddress) {
       return;
     }
 
@@ -75,7 +79,13 @@ export function Header() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [walletAddress, user?.walletAddress]);
+  }, [isDemoSession, walletAddress, user?.walletAddress]);
+
+  const handleLogout = async () => {
+    const wasDemo = isDemoSession;
+    await logout();
+    if (wasDemo) await disconnect();
+  };
 
   const openModal = () => {
     setForm((f) => ({ ...f, referral: f.referral || pendingRef }));
@@ -114,6 +124,11 @@ export function Header() {
               <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
               <span className="micro text-mint">VAULT</span>
               <span dir="ltr" className="font-display tnum text-sm font-bold text-neon-2"><AnimatedMoney value={state?.vault.balance ?? 20} /></span>
+              {vaultAddress ? (
+                <span dir="ltr" title={vaultAddress} className="font-display text-[9px] text-mint/60">
+                  {vaultAddress.slice(0, 5)}…{vaultAddress.slice(-4)}
+                </span>
+              ) : null}
             </div>
 
             {user ? (
@@ -129,15 +144,16 @@ export function Header() {
                     usdt={walletBalances?.usdt ?? null}
                     trx={walletBalances?.trx ?? null}
                     balanceLabel={d.wc.walletBalance}
+                    demo={isDemoSession}
                     onClick={() => (window.location.hash = "wallet")}
                   />
                 ) : (
                   <button onClick={openModal} className="btn-neon focus-ring rounded-full px-4 py-2 text-xs font-bold">
-                    {d.wc.linkWallet}
+                    {!live ? d.wc.demoAlt : d.wc.linkWallet}
                   </button>
                 )}
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="focus-ring rounded-full border border-rule px-3 py-2 text-xs text-mint transition-colors hover:border-mint/50 hover:text-white"
                 >
                   {d.header.logout}
@@ -149,6 +165,7 @@ export function Header() {
                 usdt={walletBalances?.usdt ?? null}
                 trx={walletBalances?.trx ?? null}
                 balanceLabel={d.wc.walletBalance}
+                demo={isDemoSession}
                 onClick={openModal}
               />
             ) : (
@@ -243,7 +260,7 @@ export function Header() {
                   )
                 ) : null}
 
-                {!user && !live ? (
+                {!user && !live && !demoEnabled ? (
                   tronOnly ? (
                     <div className="mt-4 rounded-xl border border-dashed border-rule bg-black/20 px-4 py-3 opacity-70">
                       <button

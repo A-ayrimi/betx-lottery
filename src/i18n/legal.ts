@@ -22,8 +22,8 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
           "One account per person. Accounts are personal and non-transferable.",
         ] },
         { h: "3. The games", p: [
-          "Lucky pool: each round has a fixed number of $1 tickets. When the last ticket is sold, one ticket is selected at random. 75% of the round's ticket revenue is paid to the winning ticket holder and 25% is retained as the platform fee.",
-          "Daily wheel: one free spin per 20 hours plus bonus spins earned through referrals. Prizes are paid only from realised platform profit.",
+          "Lucky pool: each round has a fixed number of $1 tickets. When the last ticket is sold, one ticket is selected at random. 75% of the round's ticket revenue is credited to the winning registered player's platform balance and 25% is retained as the platform fee. Withdrawals require review and administrative approval.",
+          "Daily wheel: one free spin every 24 hours plus one bonus spin after each referred user's first golden-ticket purchase. Guest spins are previews only and cannot win prizes or receive balance.",
           "Draws are provably fair: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so results can be independently verified.",
         ] },
         { h: "4. Deposits and withdrawals", p: [

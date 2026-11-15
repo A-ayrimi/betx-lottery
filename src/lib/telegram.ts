@@ -95,11 +95,28 @@ export function verifyInitData(initData: string, maxAgeSec = 24 * 3600) {
   }
 }
 
-export async function notifyWinner(telegramId: string, roundId: number, prize: number, locale?: string) {
+export async function notifyWinner(telegramId: string, roundId: number, prize: number, serial: string, locale?: string) {
   const b = botStrings(locale);
-  await sendMessage(telegramId, interpolate(b.winner, { round: roundId, prize: `$${prize.toFixed(2)}` }), [
-    [{ text: b.open, web_app: { url: config.appUrl } }],
-  ]);
+  await sendMessage(
+    telegramId,
+    interpolate(b.winner, { round: roundId, prize: `$${prize.toFixed(2)}`, serial }),
+    [[{ text: b.open, web_app: { url: config.appUrl } }]],
+  );
+}
+
+export async function notifyRoundLoss(
+  telegramId: string,
+  roundId: number,
+  ticketCount: number,
+  winningSerial: string,
+  locale?: string,
+) {
+  const b = botStrings(locale);
+  await sendMessage(
+    telegramId,
+    interpolate(b.roundLost, { round: roundId, n: ticketCount, serial: winningSerial }),
+    [[{ text: b.open, web_app: { url: config.appUrl } }]],
+  );
 }
 
 export async function notifyDeposit(telegramId: string, amount: number, locale?: string) {

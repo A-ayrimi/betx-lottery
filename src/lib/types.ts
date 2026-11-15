@@ -20,4 +20,5 @@ export interface DrawResult {
   serials?: string[];
   youWon?: boolean;
   yourTickets?: number;
+  demo?: boolean;
 }

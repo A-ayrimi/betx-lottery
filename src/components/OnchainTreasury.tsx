@@ -21,6 +21,7 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
   const [data, setData] = useState<Onchain | null>(null);
 
   useEffect(() => {
+    if (demo) return;
     let alive = true;
     const load = async () => {
       try {
@@ -37,7 +38,16 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
       alive = false;
       window.clearInterval(id);
     };
-  }, []);
+  }, [demo]);
+
+  if (demo) {
+    return (
+      <div className="rounded-xl border border-foil/30 bg-foil/[0.05] px-4 py-3">
+        <p className="micro text-foil">{d.onchain.title} · DEMO</p>
+        <p className="mt-2 text-[12px] leading-6 text-mint/80">{d.onchain.demoNote}</p>
+      </div>
+    );
+  }
 
   const time = data
     ? new Intl.DateTimeFormat(intlTags[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(data.fetchedAt))

@@ -3,15 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { LOCALE_COOKIE, localeNames, locales, type Locale } from "@/i18n/config";
+import { useApp } from "./AppProvider";
 
-function switchLocale(l: Locale) {
+function switchLocale(l: Locale, persistAccount: boolean) {
   document.cookie = `${LOCALE_COOKIE}=${l}; path=/; max-age=31536000; samesite=lax`;
   // persist preference on the account too (best effort)
-  fetch("/api/account", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "locale", locale: l }),
-  }).catch(() => {});
+  if (persistAccount) {
+    fetch("/api/account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "locale", locale: l }),
+    }).catch(() => {});
+  }
   const { pathname, search, hash, origin } = window.location;
   const rest = pathname.replace(/^\/[a-z]{2}(?=\/|$)/, "");
   // full reload on purpose: <html lang/dir> is rendered by the root layout
@@ -20,6 +23,7 @@ function switchLocale(l: Locale) {
 
 export function LanguageSwitcher() {
   const { locale, d } = useI18n();
+  const { demoEnabled } = useApp();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -31,7 +35,7 @@ export function LanguageSwitcher() {
     return () => document.removeEventListener("click", close);
   }, []);
 
-  const go = (l: Locale) => switchLocale(l);
+  const go = (l: Locale) => switchLocale(l, !demoEnabled);
 
   return (
     <div ref={ref} className="relative">
