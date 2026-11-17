@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { config } from "@/lib/config";
-import { ensureSeed, makeReferralCode, rewardSignupReferral, setSession, UserError } from "@/lib/store";
+import { makeReferralCode, rewardSignupReferral, setSession, UserError } from "@/lib/store";
 import { assertRegion, handleError } from "@/lib/api";
 import { getRequestLocale } from "@/i18n";
 
@@ -16,7 +16,6 @@ const slug = (s: string) =>
 export async function POST(req: NextRequest) {
   try {
     if (config.tronOnly) throw new UserError("comingSoon", 503);
-    await ensureSeed();
     const country = await assertRegion();
     await limitByIp("connect", 10);
     const locale = await getRequestLocale();

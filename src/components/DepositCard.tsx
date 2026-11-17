@@ -200,7 +200,11 @@ function TronDeposit({ amount }: { amount: number }) {
     setLink(null);
     setPhase("build");
     try {
-      const built = await post("/api/wallet/deposit", { step: "build", amount });
+      const built = await post("/api/wallet/deposit", {
+        step: "build",
+        amount,
+        idempotencyKey: crypto.randomUUID(),
+      });
       if (!built.ok) throw new Error(built.error);
       setPhase("sign");
       const signed = await wallet.signTransaction(built.transaction);

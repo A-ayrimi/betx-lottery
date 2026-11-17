@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       const r = await broadcast(signed);
       if (!r.ok) throw new UserError("broadcastFailed", 400, { reason: r.error ?? "" });
       const txid = r.txid ?? w.expectedTxId!;
-      const { telegramId, locale } = await processWithdrawal(w.id, "paid", txid);
+      const { telegramId, locale } = await processWithdrawal(w.id, "paid", txid, undefined, "admin");
       if (telegramId) {
         await sendMessage(
           telegramId,

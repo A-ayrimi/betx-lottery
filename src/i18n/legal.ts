@@ -5,24 +5,25 @@
 export type LegalDoc = { title: string; updated: string; sections: { h: string; p: string[] }[] };
 
 const company = () => process.env.COMPANY_NAME || "BETX";
-const support = () => process.env.SUPPORT_EMAIL || "support@betx.example";
-const licence = () => process.env.LICENSE_INFO || "[licence number and regulator to be inserted]";
+const support = () => process.env.SUPPORT_EMAIL?.trim() || null;
+const licence = () => process.env.LICENSE_INFO || "Licensing information is not configured.";
 
 export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): LegalDoc {
   const c = company();
+  const supportContact = support();
   if (kind === "terms") {
     return {
       title: "Terms of Service",
       updated: "2026-01-01",
       sections: [
-        { h: "1. Operator", p: [`The service is operated by ${c}. Licence: ${licence()}. Contact: ${support()}.`] },
+        { h: "1. Operator", p: [`The service is operated by ${c}. Licence: ${licence()}. ${supportContact ? `Contact: ${supportContact}.` : "Support contact is not configured."}`] },
         { h: "2. Eligibility", p: [
           "You must be at least 18 years old, or the age of legal majority for gambling in your jurisdiction if higher.",
           "You may not use the service from any jurisdiction where online gambling is prohibited or where we are not licensed, including the restricted territories listed on our website. Using VPNs or other tools to circumvent geographic restrictions is prohibited and may result in account closure and forfeiture of winnings obtained in breach.",
           "One account per person. Accounts are personal and non-transferable.",
         ] },
         { h: "3. The games", p: [
-          "Lucky pool: each round has a fixed number of $1 tickets. When the last ticket is sold, one ticket is selected at random. 75% of the round's ticket revenue is credited to the winning registered player's platform balance and 25% is retained as the platform fee. Withdrawals require review and administrative approval.",
+          "Lucky pool: each round has a fixed capacity of 20 tickets priced at $1 each. A full round receives a provisional random result and must be approved by an administrator before settlement. On settlement, $15 is allocated to the winner, $3 to treasury and $2 as gross administrator revenue, recorded separately. Withdrawals require review and administrative approval.",
           "Daily wheel: one free spin every 24 hours plus one bonus spin after each referred user's first golden-ticket purchase. Guest spins are previews only and cannot win prizes or receive balance.",
           "Draws are provably fair: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so results can be independently verified.",
         ] },
@@ -51,7 +52,7 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
       title: "Privacy Policy",
       updated: "2026-01-01",
       sections: [
-        { h: "1. Controller", p: [`${c} is the data controller. Contact: ${support()}.`] },
+        { h: "1. Controller", p: [`${c} is the data controller. ${supportContact ? `Contact: ${supportContact}.` : "Support contact is not configured."}`] },
         { h: "2. Data we collect", p: [
           "Account data: username, display name, Telegram ID and handle (if you sign in with Telegram), preferred language.",
           "Compliance data: approximate country derived from your IP address at the network edge, terms-acceptance timestamp, responsible-gaming settings.",
@@ -71,7 +72,7 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
           "Data may be processed outside your country under appropriate safeguards. Transaction records are kept for the period required by anti-money-laundering law (typically 5 years); other data is deleted when no longer needed.",
         ] },
         { h: "7. Your rights", p: [
-          `Depending on your location (e.g. GDPR, UK GDPR, LGPD) you may request access, correction, deletion, restriction, portability or object to processing by emailing ${support()}. You may also complain to your data-protection authority.`,
+          `Depending on your location (e.g. GDPR, UK GDPR, LGPD) you may request access, correction, deletion, restriction, portability or object to processing${supportContact ? ` by emailing ${supportContact}` : " through the support contact once it is configured"}. You may also complain to your data-protection authority.`,
         ] },
       ],
     };
@@ -92,7 +93,9 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
       ] },
       { h: "Get help", p: [
         "International: BeGambleAware (begambleaware.org), Gamblers Anonymous (gamblersanonymous.org), GamCare (gamcare.org.uk). Contact local health services for support in your country.",
-        `Need us to close your account? Email ${support()}.`,
+        supportContact
+          ? `Need us to close your account? Email ${supportContact}.`
+          : "Need us to close your account? The support contact is not configured.",
       ] },
       { h: "Underage gaming", p: [
         "Players must be 18+. We may request proof of age at any time. Parents can use device-level filtering tools to block gambling sites.",

@@ -2,7 +2,7 @@ import type { getState } from "@/lib/store";
 
 export type AppState = Awaited<ReturnType<typeof getState>>;
 export type UserState = NonNullable<AppState["user"]>;
-export type RoundState = AppState["round"];
+export type RoundState = NonNullable<AppState["round"]>;
 export type TicketStub = RoundState["tickets"][number];
 export type VaultState = AppState["vault"];
 export type WinnerState = AppState["winners"][number];

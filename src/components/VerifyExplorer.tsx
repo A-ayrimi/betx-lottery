@@ -23,7 +23,7 @@ export interface VerifyRow {
 }
 
 /** Public, crawlable proof-of-fairness index: every draw links to its verifier. */
-export function VerifyExplorer({ rows }: { rows: VerifyRow[] }) {
+export function VerifyExplorer({ rows, dataUnavailable = false }: { rows: VerifyRow[]; dataUnavailable?: boolean }) {
   const { d, locale, date } = useI18n();
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-12 sm:px-6">
@@ -57,8 +57,8 @@ export function VerifyExplorer({ rows }: { rows: VerifyRow[] }) {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-mint">
-                    {d.board.noDraws}
+                  <td colSpan={6} role={dataUnavailable ? "alert" : "status"} className="px-5 py-10 text-center text-sm text-mint">
+                    {dataUnavailable ? d.errors.unavailable : d.board.noDraws}
                   </td>
                 </tr>
               ) : (

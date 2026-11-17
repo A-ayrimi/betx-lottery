@@ -12,7 +12,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/i18n/client";
 import { intlTags } from "@/i18n/config";
 import { money } from "@/lib/format";
-import type { AppState } from "@/lib/types";
 import { OnchainTreasury } from "./OnchainTreasury";
 import { useApp } from "./AppProvider";
 
@@ -91,51 +90,6 @@ function downloadCsv(candles: Candle[], tf: Tf) {
   a.click();
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function makeDemoPayload(state: AppState | null, tf: Tf): Payload {
-  const now = Date.now();
-  const initialCapital = state?.vault.initialCapital ?? 20;
-  const current = state?.vault.balance ?? initialCapital;
-  const count = tf === "round" ? Math.max(1, state?.vault.roundsCompleted ?? 0) : tf === "24h" ? 24 : 30;
-  const volume = (state?.vault.totalFees ?? 0) + (state?.vault.totalPaid ?? 0);
-  const candles = Array.from({ length: count }, (_, index) => {
-    const progress = count === 1 ? 1 : index / (count - 1);
-    const close = initialCapital + (current - initialCapital) * progress;
-    const open = index === 0 ? initialCapital : initialCapital + (current - initialCapital) * ((index - 1) / (count - 1));
-    const wiggle = Math.max(0.01, Math.abs(current - initialCapital) * 0.02);
-    const t = now - (count - index - 1) * (tf === "30d" ? 86_400_000 : 3_600_000);
-    return {
-      t,
-      o: open,
-      h: Math.max(open, close) + wiggle,
-      l: Math.max(0, Math.min(open, close) - wiggle),
-      c: close,
-      volume: index === count - 1 ? volume : 0,
-      fees: index === count - 1 ? state?.vault.totalFees ?? 0 : 0,
-      n: index === count - 1 ? state?.vault.roundsCompleted ?? 0 : 0,
-    };
-  });
-  const change = current - initialCapital;
-  const high = Math.max(initialCapital, current);
-  const low = Math.min(initialCapital, current);
-  return {
-    ok: true,
-    tf,
-    candles,
-    summary: {
-      current,
-      change,
-      changePct: initialCapital ? (change / initialCapital) * 100 : 0,
-      high,
-      low,
-      volume,
-      fees: state?.vault.totalFees ?? 0,
-      count: state?.vault.roundsCompleted ?? 0,
-      initialCapital,
-    },
-    updatedAt: new Date(now).toISOString(),
-  };
 }
 
 /* ----------------------------------------------------------------- chart */
@@ -413,7 +367,7 @@ function IconClose() {
  * recorded vault balance (/api/vault/candles), refreshed every 30 seconds.
  */
 export function VaultCandleChart() {
-  const { state, demoEnabled } = useApp();
+  const { state, demoEnabled, dataUnavailable } = useApp();
   const { d, t, n, locale } = useI18n();
   const tag = intlTags[locale];
   const [tf, setTf] = useState<Tf>("24h");
@@ -423,11 +377,6 @@ export function VaultCandleChart() {
   const [showMa, setShowMa] = useState(true);
   const [showVol, setShowVol] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const demoData = useMemo(
-    () => (demoEnabled ? makeDemoPayload(state, tf) : null),
-    [demoEnabled, state, tf],
-  );
-
   // fetch on timeframe change, then poll; stale responses are ignored
   useEffect(() => {
     if (demoEnabled) return;
@@ -437,14 +386,18 @@ export function VaultCandleChart() {
         const res = await fetch(`/api/vault/candles?tf=${tf}`, { cache: "no-store" });
         const json = (await res.json()) as Payload;
         if (!alive) return;
-        if (json.ok) {
+        if (res.ok && json.ok && Array.isArray(json.candles) && json.summary) {
           setData(json);
           setFailed(false);
         } else {
+          setData(null);
           setFailed(true);
         }
       } catch {
-        if (alive) setFailed(true);
+        if (alive) {
+          setData(null);
+          setFailed(true);
+        }
       }
     };
     void load();
@@ -474,9 +427,8 @@ export function VaultCandleChart() {
     if (open) closeRef.current?.focus();
   }, [open]);
 
-  const current = demoEnabled
-    ? demoData
-    : data && data.tf === tf && data.ok ? data : null;
+  const ledgerVerified = state?.vault.ledgerStatus === "verified";
+  const current = !demoEnabled && ledgerVerified && data && data.tf === tf && data.ok ? data : null;
   const sum = current?.summary ?? null;
   const up = (sum?.change ?? 0) >= 0;
   const changeText = sum
@@ -505,6 +457,12 @@ export function VaultCandleChart() {
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-mint">{d.vaultChart.empty}</div>
         )
+      ) : demoEnabled ? (
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-mint">{d.vaultChart.demoHistoryUnavailable}</div>
+      ) : dataUnavailable ? (
+        <div role="alert" className="flex h-full items-center justify-center px-6 text-center text-sm text-mint">{d.errors.unavailable}</div>
+      ) : state && !ledgerVerified ? (
+        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-foil">{d.vaultChart.ledgerWarning}</div>
       ) : failed ? (
         <div className="flex h-full items-center justify-center px-6 text-center text-sm text-mint">{d.vaultChart.failed}</div>
       ) : (
@@ -526,7 +484,7 @@ export function VaultCandleChart() {
             <div>
               <p className="micro flex items-center gap-2 text-neon-2">
                 <span className="live-dot h-1.5 w-1.5 rounded-full bg-neon-2" />
-                {d.vaultChart.kicker}
+                {demoEnabled ? d.vaultChart.kickerDemo : d.vaultChart.kicker}
               </p>
               <h2 id="vault-chart-title" className="mt-2 text-xl font-black text-white sm:text-2xl">
                 {d.vaultChart.title}
@@ -534,6 +492,9 @@ export function VaultCandleChart() {
               <p className="mt-1 max-w-[56ch] text-[12px] leading-6 text-mint">
                 {state?.config.live ? d.vaultChart.subtitle : d.vaultChart.subtitleDemo}
               </p>
+              {!demoEnabled && state?.vault.ledgerStatus !== "verified" ? (
+                <p role="status" className="mt-2 max-w-[56ch] text-xs leading-5 text-foil">{d.vaultChart.ledgerWarning}</p>
+              ) : null}
             </div>
             <div className="text-end">
               <p className="micro text-mint">{d.vaultChart.now}</p>
@@ -568,7 +529,7 @@ export function VaultCandleChart() {
 
           <p className="relative mt-3 text-[11px] leading-6 text-mint/70">{d.vaultChart.cardNote}</p>
           <div className="relative mt-3 max-w-xl">
-            <OnchainTreasury demo={!state?.config.live} compact />
+            <OnchainTreasury demo={demoEnabled} compact />
           </div>
         </div>
       </div>

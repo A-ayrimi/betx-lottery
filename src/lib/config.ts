@@ -1,19 +1,30 @@
 /**
  * Central runtime configuration. Everything sensitive comes from env vars.
  *
- * BETX_MODE=live  -> real payments, no demo seed data, no demo top-ups.
- * anything else   -> demo mode (simulated balance, sample activity).
+ * BETX_MODE=live  -> live application mode.
+ * BETX_MODE=demo  -> browser-local demo mode.
  */
+export function getBetxMode(): "live" | "demo" {
+  const mode = process.env.BETX_MODE;
+  if (mode === "live" || mode === "demo") return mode;
+  throw new Error("BETX_MODE must be explicitly set to live or demo");
+}
+
 export const config = {
-  /** Default is live mode (real TRON wallet, no demo seed data). Set BETX_MODE=demo to test with simulated funds. */
+  /** Mode must be explicitly configured; ambiguous values fail closed. */
   get live() {
-    return (process.env.BETX_MODE || "live") !== "demo";
+    return getBetxMode() === "live";
   },
   get appUrl() {
     return (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
   },
   get vaultInitial() {
-    return Number(process.env.VAULT_INITIAL || "20");
+    const raw = process.env.VAULT_INITIAL;
+    const amount = Number(raw);
+    if (!raw || !Number.isFinite(amount) || amount <= 0) {
+      throw new Error("VAULT_INITIAL must be explicitly configured before vault initialization");
+    }
+    return amount;
   },
   nowpayments: {
     get apiKey() {
@@ -59,13 +70,13 @@ export const config = {
   get tronOnly() {
     return process.env.TRON_ONLY !== "off";
   },
-  /** Main treasury wallet: every $5 round fee is auto-allocated here. */
+  /** Treasury destination for verified transfers. */
   get adminWallet() {
-    return (process.env.ADMIN_WALLET || "TN41NBCuPWnReq3TgQJtuLLVmauwgRNVen").trim();
+    return (process.env.ADMIN_WALLET || "").trim();
   },
   fees: {
     get autoSweep() {
-      return process.env.AUTO_FEE_PAYOUT === "on";
+      return false;
     },
     get sweepThreshold() {
       return Number(process.env.FEE_SWEEP_THRESHOLD || 20);
@@ -97,8 +108,10 @@ export function publicConfig() {
     referralDepositBonus: config.limits.referralDepositBonus,
     adminWallet: config.adminWallet,
     tronOnly: config.tronOnly,
+    totalRoundRevenue: 20,
     prizePerRound: 15,
-    feePerRound: 5,
+    treasuryContributionPerRound: 3,
+    adminGrossRevenuePerRound: 2,
     roundCapacity: 20,
     ticketPrice: 1,
   };

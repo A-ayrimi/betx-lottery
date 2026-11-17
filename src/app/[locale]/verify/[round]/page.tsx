@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { rounds, tickets } from "@/db/schema";
-import { ensureSeed, fairIndex } from "@/lib/store";
+import { fairIndex, normalizeRoundStatus, ROUND_STATUSES } from "@/lib/store";
 import { Logo } from "@/components/Logo";
 
 export const dynamic = "force-dynamic";
@@ -12,15 +12,15 @@ export default async function VerifyPage({ params }: PageProps<"/[locale]/verify
   const { round, locale } = await params;
   const home = `/${locale}`;
   const id = Number(round);
-  await ensureSeed();
   const r = Number.isInteger(id) ? (await db.select().from(rounds).where(eq(rounds.id, id)).limit(1))[0] : undefined;
 
   const body = (() => {
     if (!r) return <p className="text-mint">Round not found.</p>;
-    if (r.status !== "drawn" || !r.serverSeed) {
+    const status = normalizeRoundStatus(r.status);
+    if (![ROUND_STATUSES.AWAITING_ADMIN_APPROVAL, ROUND_STATUSES.APPROVED, ROUND_STATUSES.SETTLED].some((value) => value === status) || !r.serverSeed) {
       return (
         <div className="space-y-3 text-mint">
-          <p>This round is still open. The secret seed is revealed after the draw.</p>
+          <p>The draw result or revealed seed is not available for verification yet.</p>
           <Row label="Commitment (SHA-256)" value={r.seedHash ?? "—"} />
         </div>
       );
@@ -29,14 +29,26 @@ export default async function VerifyPage({ params }: PageProps<"/[locale]/verify
   })();
 
   let details: React.ReactNode = null;
-  if (r && r.status === "drawn" && r.serverSeed) {
+  if (r && [ROUND_STATUSES.AWAITING_ADMIN_APPROVAL, ROUND_STATUSES.APPROVED, ROUND_STATUSES.SETTLED].some((value) => value === normalizeRoundStatus(r.status)) && r.serverSeed) {
     const list = await db.select().from(tickets).where(eq(tickets.roundId, r.id)).orderBy(tickets.id);
     const serials = list.map((t) => t.serial);
     const hashOk = createHash("sha256").update(r.serverSeed).digest("hex") === r.seedHash;
     const idx = fairIndex(r.serverSeed, r.id, serials);
-    const winnerOk = serials[idx] === r.winningSerial;
+    const winnerOk =
+      serials.length === r.capacity &&
+      r.sold === r.capacity &&
+      serials[idx] === r.winningSerial &&
+      list[idx]?.userId === r.winnerId;
+    const status = normalizeRoundStatus(r.status);
     details = (
       <div className="space-y-4">
+        <p className="text-sm text-foil">
+          {status === ROUND_STATUSES.SETTLED
+            ? "Settled result."
+            : status === ROUND_STATUSES.APPROVED
+              ? "Approved result; settlement is pending."
+              : "Provisional result awaiting administrator approval."}
+        </p>
         <Row label="Server seed (revealed)" value={r.serverSeed} />
         <Row label="Commitment (SHA-256)" value={r.seedHash ?? "—"} ok={hashOk} />
         <Row label="Message" value={`${r.id}:${serials.join(",")}`} />

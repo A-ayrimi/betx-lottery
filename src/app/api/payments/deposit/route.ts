@@ -5,9 +5,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { deposits } from "@/db/schema";
 import { config } from "@/lib/config";
-import { assertCanPlay, checkDepositLimit, creditDeposit, getSessionUser, UserError } from "@/lib/store";
+import { assertCanPlay, creditDeposit, getSessionUser, UserError } from "@/lib/store";
 import { createInvoice } from "@/lib/nowpayments";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
+import { DepositReservationError, isValidDepositIdempotencyKey, reserveDeposit } from "@/lib/depositReservations";
 
 export const dynamic = "force-dynamic";
 
@@ -33,50 +34,57 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(amount) || amount < minDeposit || amount > maxDeposit) {
       throw new UserError("depositRange", 400, { min: `$${minDeposit}`, max: `$${maxDeposit}` });
     }
-    await checkDepositLimit(me, amount);
+    if (!isValidDepositIdempotencyKey(body.idempotencyKey)) {
+      throw new UserError("depositRequestKey", 400);
+    }
 
     const orderId = `BTX-${me.id}-${Date.now()}-${randomBytes(3).toString("hex")}`;
+    if (config.live && !config.nowpayments.enabled) throw new UserError("gatewayOff", 503);
+
+    const dep = await reserveDeposit(db, {
+      userId: me.id,
+      provider: config.live ? "nowpayments" : "demo",
+      amount,
+      orderId,
+      idempotencyKey: body.idempotencyKey.toLowerCase(),
+      payCurrency: config.nowpayments.payCurrency,
+    });
 
     if (!config.live) {
-      const dep = (
-        await db
-          .insert(deposits)
-          .values({ userId: me.id, provider: "demo", orderId, amountUsd: String(amount), status: "finished" })
-          .returning()
-      )[0];
       await creditDeposit(dep.id, "finished");
       return NextResponse.json({ ok: true, mode: "demo", credited: amount });
     }
 
-    if (!config.nowpayments.enabled) throw new UserError("gatewayOff", 503);
+    try {
+      const invoice = await createInvoice({
+        amountUsd: amount,
+        orderId,
+        description: `BETX wallet top-up · ${me.username}`,
+      });
 
-    const dep = (
       await db
-        .insert(deposits)
-        .values({
-          userId: me.id,
-          provider: "nowpayments",
-          orderId,
-          amountUsd: String(amount),
-          payCurrency: config.nowpayments.payCurrency,
-          status: "waiting",
-        })
-        .returning()
-    )[0];
+        .update(deposits)
+        .set({ invoiceId: String(invoice.id), invoiceUrl: invoice.invoice_url, updatedAt: new Date() })
+        .where(eq(deposits.id, dep.id));
 
-    const invoice = await createInvoice({
-      amountUsd: amount,
-      orderId,
-      description: `BETX wallet top-up · ${me.username}`,
-    });
-
-    await db
-      .update(deposits)
-      .set({ invoiceId: String(invoice.id), invoiceUrl: invoice.invoice_url, updatedAt: new Date() })
-      .where(eq(deposits.id, dep.id));
-
-    return NextResponse.json({ ok: true, mode: "live", invoiceUrl: invoice.invoice_url });
+      return NextResponse.json({ ok: true, mode: "live", invoiceUrl: invoice.invoice_url });
+    } catch (error) {
+      try {
+        await db
+          .update(deposits)
+          .set({ status: "failed", updatedAt: new Date() })
+          .where(eq(deposits.id, dep.id));
+      } catch (cleanupError) {
+        console.error("Could not release the failed payment deposit reservation", cleanupError);
+      }
+      throw error;
+    }
   } catch (e) {
+    if (e instanceof DepositReservationError) {
+      if (e.code === "user_not_found") return handleError(new UserError("userNotFound", 404));
+      if (e.code === "idempotency_conflict") return handleError(new UserError("depositRequestKey", 409));
+      return handleError(new UserError("depositLimit", 403, { limit: `$${e.limit?.toFixed(2) ?? "0.00"}` }));
+    }
     return handleError(e);
   }
 }

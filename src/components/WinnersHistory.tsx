@@ -29,11 +29,12 @@ interface HistoryRow {
  * older pages load from /api/rounds/history.
  */
 export function WinnersHistory() {
-  const { state, demoEnabled } = useApp();
+  const { state, demoEnabled, loading, dataUnavailable } = useApp();
   const { d, t, n, date, href, locale } = useI18n();
   const [extra, setExtra] = useState<HistoryRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null);
   const seenTop = useRef<number | null>(null);
   const live = useMemo(() => (state?.winners ?? []) as HistoryRow[], [state?.winners]);
@@ -82,7 +83,7 @@ export function WinnersHistory() {
     return () => window.clearTimeout(id);
   }, [live]);
 
-  const rows = [...live, ...extra].sort((a, b) => b.roundId - a.roundId);
+  const rows = (dataUnavailable ? [] : [...live, ...extra]).sort((a, b) => b.roundId - a.roundId);
   // De-dupe by round (live refresh may overlap with fetched pages).
   const unique = rows.filter((r, i) => rows.findIndex((x) => x.roundId === r.roundId) === i);
 
@@ -93,16 +94,19 @@ export function WinnersHistory() {
       const offset = unique.length;
       const res = await fetch(`/api/rounds/history?limit=20&offset=${offset}`, { cache: "no-store" });
       const json = await res.json();
-      if (json.ok) {
+      if (res.ok && json.ok) {
+        setLoadError(false);
         setTotal(json.total);
         setExtra((prev) => {
           const ids = new Set([...live.map((l) => l.roundId), ...prev.map((p) => p.roundId)]);
           const fresh = (json.draws as HistoryRow[]).filter((r) => !ids.has(r.roundId));
           return [...prev, ...fresh];
         });
+      } else {
+        setLoadError(true);
       }
     } catch {
-      /* keep what we have */
+      setLoadError(true);
     } finally {
       setLoadingMore(false);
     }
@@ -137,7 +141,7 @@ export function WinnersHistory() {
           </div>
         </div>
 
-        <p className="mt-6 rounded-2xl border border-neon/20 bg-neon/[0.05] px-5 py-4 text-[13px] leading-7 text-mint">
+        <div className="mt-6 rounded-2xl border border-neon/20 bg-neon/[0.05] px-5 py-4 text-[13px] leading-7 text-mint">
           <span className="text-neon-2">◆</span> {demoEnabled ? d.draw.demoNotice : d.board.autoDrawNote}
           {!demoEnabled ? (
             <>
@@ -148,7 +152,8 @@ export function WinnersHistory() {
               </code>
             </>
           ) : null}
-        </p>
+          {loadError ? <p role="alert" className="mt-4 text-sm text-red-300">{d.errors.unavailable}</p> : null}
+        </div>
 
         <div className="panel mt-6 min-w-0 overflow-hidden rounded-2xl">
           <div className="overflow-x-auto">
@@ -161,7 +166,13 @@ export function WinnersHistory() {
                 ))}
               </div>
               {unique.length === 0 ? (
-                <p className="px-6 py-10 text-center text-sm text-mint">{d.board.noDraws}</p>
+                <p role={dataUnavailable || loadError ? "alert" : "status"} className="px-6 py-10 text-center text-sm text-mint">
+                  {dataUnavailable || loadError
+                    ? d.errors.unavailable
+                    : loading
+                      ? d.vaultChart.loading
+                      : d.board.noDraws}
+                </p>
               ) : (
                 unique.map((w) => {
                   const e = exact(w.drawnAt);
@@ -226,7 +237,7 @@ export function WinnersHistory() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-[12px] text-mint/70">
-            {total !== null ? t(d.board.showing, { n: n(unique.length), total: n(total) }) : ""}
+            {!dataUnavailable && total !== null ? t(d.board.showing, { n: n(unique.length), total: n(total) }) : ""}
           </p>
           {(total === null || unique.length < total) && unique.length > 0 ? (
             <button

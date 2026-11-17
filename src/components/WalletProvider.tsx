@@ -88,6 +88,11 @@ export function WalletProvider({ children, demoEnabled = false }: { children: Re
           }, 0);
           return;
         }
+        if (demoEnabled) {
+          setAdapterName(null);
+          setAddress(null);
+          return;
+        }
         // silent reconnect: only for an injected wallet the user picked before (never deep-links)
         const last = localStorage.getItem(LAST_KEY);
         const prev = list.find((a) => a.name === last);
@@ -186,9 +191,20 @@ export function WalletProvider({ children, demoEnabled = false }: { children: Re
     [ensure],
   );
 
+  const modeMatchesWallet = (adapterName === DEMO_ADAPTER_NAME) === demoEnabled;
   const value = useMemo(
-    () => ({ wallets, ready, address, adapterName, connect, connectDemo, disconnect, signMessage, signTransaction }),
-    [wallets, ready, address, adapterName, connect, connectDemo, disconnect, signMessage, signTransaction],
+    () => ({
+      wallets,
+      ready,
+      address: modeMatchesWallet ? address : null,
+      adapterName: modeMatchesWallet ? adapterName : null,
+      connect,
+      connectDemo,
+      disconnect,
+      signMessage,
+      signTransaction,
+    }),
+    [wallets, ready, address, adapterName, modeMatchesWallet, connect, connectDemo, disconnect, signMessage, signTransaction],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

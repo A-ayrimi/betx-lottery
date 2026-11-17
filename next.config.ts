@@ -13,6 +13,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    agentUpgrade: "security",
+  },
   // tronweb is server-only (signature checks, tx building) — keep it out of the bundle
   serverExternalPackages: ["tronweb"],
   poweredByHeader: false,

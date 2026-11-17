@@ -288,15 +288,17 @@ export function Wheel() {
             </p>
           ) : null}
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="mt-7 rounded-2xl border border-rule bg-white/[0.03] px-5 py-4 text-[13px] leading-8 text-mint"
-          >
-            <span className="text-neon-2">◆</span>{" "}
-            {t(d.wheel.floor, { amount: `$${money(state?.vault.initialCapital ?? 20)}` })}
-          </motion.p>
+          {state ? (
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="mt-7 rounded-2xl border border-rule bg-white/[0.03] px-5 py-4 text-[13px] leading-8 text-mint"
+            >
+              <span className="text-neon-2">◆</span>{" "}
+              {t(d.wheel.floor, { amount: `$${money(state.vault.initialCapital)}` })}
+            </motion.p>
+          ) : null}
 
           {prize !== null ? (
             <motion.div

@@ -3,7 +3,7 @@ import { desc } from "drizzle-orm";
 import { db } from "@/db";
 import { feeTransfers } from "@/db/schema";
 import { isAdmin } from "@/lib/admin";
-import { feeConfig, feeQueue, markFeePaid } from "@/lib/fees";
+import { feeConfig, feeQueue } from "@/lib/fees";
 
 export const dynamic = "force-dynamic";
 
@@ -40,21 +40,10 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** Record a manual on-chain fee payment: { id, txHash } */
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const done = await markFeePaid(Number(body.id), String(body.txHash ?? ""));
-    return NextResponse.json({ ok: true, transfer: { id: done.id, status: done.status, txHash: done.txHash } });
-  } catch (e) {
-    const code = e instanceof Error ? e.message : "failed";
-    if (code === "bad-tx") return NextResponse.json({ ok: false, error: "Invalid transaction hash." }, { status: 400 });
-    if (code === "not-found") return NextResponse.json({ ok: false, error: "Fee transfer not found." }, { status: 404 });
-    if (code === "amount-mismatch") {
-      return NextResponse.json({ ok: false, error: "On-chain amount does not cover this fee." }, { status: 400 });
-    }
-    console.error(e);
-    return NextResponse.json({ ok: false, error: "failed" }, { status: 500 });
-  }
+  return NextResponse.json(
+    { ok: false, error: "Treasury transfers are paused until historical accounting is reconciled." },
+    { status: 409 },
+  );
 }

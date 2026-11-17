@@ -6,7 +6,6 @@ import { db } from "@/db";
 import { users, walletNonces } from "@/db/schema";
 import { recoverSigner, shortAddr } from "@/lib/tron";
 import {
-  ensureSeed,
   getSessionUser,
   makeReferralCode,
   rewardSignupReferral,
@@ -26,7 +25,6 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   try {
-    await ensureSeed();
     await limitByIp("verify", 20);
     const country = await assertRegion();
     const body = await req.json().catch(() => ({}));

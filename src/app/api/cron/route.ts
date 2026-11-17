@@ -9,7 +9,7 @@ function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET || "";
   if (secret.length < 16) return false;
   const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  const got = bearer || req.nextUrl.searchParams.get("key") || "";
+  const got = bearer;
   const a = Buffer.from(secret);
   const b = Buffer.from(got);
   return a.length === b.length && timingSafeEqual(a, b);

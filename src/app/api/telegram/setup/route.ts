@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/admin";
 export const dynamic = "force-dynamic";
 
 /**
- * Run once after deploying:  GET /api/telegram/setup?key=ADMIN_TOKEN
+ * Run only in an authorized environment with the x-admin-token header.
  * Registers the webhook, the command list and the Mini App menu button.
  */
 export async function GET(req: NextRequest) {

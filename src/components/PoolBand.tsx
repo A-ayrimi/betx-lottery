@@ -9,7 +9,7 @@ import { GoldDollars3D } from "./GoldDollars3D";
 import { burstDollars, burstFrom } from "@/lib/dollarFx";
 
 export function PoolBand() {
-  const { state, buy, setToast, openWalletConnect } = useApp();
+  const { state, loading, dataUnavailable, demoEnabled, buy, setToast, openWalletConnect } = useApp();
   const { d, t, n, ago, dir } = useI18n();
   const barRef = useRef<HTMLDivElement>(null);
   const lastSold = useRef<number | null>(null);
@@ -17,11 +17,11 @@ export function PoolBand() {
 
   const round = state?.round;
   const sold = round?.sold ?? 0;
-  const capacity = round?.capacity ?? 20;
+  const capacity = round?.capacity ?? 1;
   const remaining = Math.max(0, capacity - sold);
 
   // stubs sold after first render get the flash animation (keyed remount)
-  const [initialMaxId] = useState(() => (state?.round.tickets ?? []).reduce((m, x) => Math.max(m, x.id), 0));
+  const [initialMaxId] = useState(() => (state?.round?.tickets ?? []).reduce((m, x) => Math.max(m, x.id), 0));
 
   // every real sale (anyone's) throws spinning gold dollars out of the progress bar
   useEffect(() => {
@@ -36,6 +36,10 @@ export function PoolBand() {
   }, [sold, capacity, dir]);
 
   const purchase = async (count: number, btn?: HTMLElement) => {
+    if (!round) {
+      setToast(d.errors.noActiveRound);
+      return;
+    }
     if (!state?.user) {
       openWalletConnect();
       return;
@@ -55,7 +59,10 @@ export function PoolBand() {
       return;
     }
     const treasury = state.vault.adminWallet;
-    if (!window.confirm(`${t(d.pool.tickets, { n: tickets })}\n${d.pool.purchaseBalance}\n${d.pool.price}: $${money(cost)}\n${d.pool.balance} $${money(state.user.balance)}\n${d.pool.treasuryAddress} ($${money(state.round.fee)}): ${treasury}`)) {
+    const treasuryContribution = round.treasuryContribution === null
+      ? "unverified"
+      : `$${money(round.treasuryContribution)}`;
+    if (!window.confirm(`${t(d.pool.tickets, { n: tickets })}\n${d.pool.purchaseBalance}\n${d.pool.price}: $${money(cost)}\n${d.pool.balance} $${money(state.user.balance)}\n${d.pool.treasuryAddress} (${treasuryContribution}): ${treasury}`)) {
       return;
     }
     setBusy(true);
@@ -76,6 +83,23 @@ export function PoolBand() {
   const pct = (k: number) => `${Math.round((Math.min(k, capacity) / capacity) * 100)}%`;
   const activity = state?.activity ?? [];
 
+  if (!state || !round) {
+    const message = dataUnavailable
+      ? d.errors.unavailable
+      : loading
+        ? d.vaultChart.loading
+        : demoEnabled && !state
+          ? d.wc.demoBadge
+          : d.errors.noActiveRound;
+    return (
+      <section id="pool" className="relative px-4 py-14 sm:px-6 lg:py-20">
+        <div className="panel mx-auto max-w-[1240px] rounded-2xl px-6 py-10 text-center text-sm text-mint" role={dataUnavailable ? "alert" : "status"}>
+          {message}
+        </div>
+      </section>
+    );
+  }
+
   const stubs = Array.from({ length: capacity }, (_, i) => {
     const t = round?.tickets[i];
     return { index: i + 1, ticket: t ?? null };
@@ -94,7 +118,7 @@ export function PoolBand() {
             <div>
               <p className="micro flex flex-wrap items-center gap-2 text-foil">
                 <span>
-                  ROUND {String(round?.id ?? 0).padStart(2, "0")} · POOL {sold}/
+                  ROUND {String(round.id).padStart(2, "0")} · POOL {sold}/
                   {capacity}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-neon/40 bg-neon/[0.08] px-2.5 py-1 text-neon-2">
@@ -107,7 +131,7 @@ export function PoolBand() {
                 {d.pool.titleAfter}
               </h2>
               <p className="mt-4 max-w-[58ch] text-[15px] leading-8 text-mint">
-                {t(d.pool.body, { prize: "$15" })}
+                {t(d.pool.body, { prize: `$${money(round.prize)}` })}
               </p>
             </div>
 
@@ -118,7 +142,7 @@ export function PoolBand() {
                   dir="ltr"
                   className="font-display tnum text-[clamp(2.4rem,6vw,3.6rem)] font-bold leading-none text-white"
                 >
-                  ${money(round?.prize ?? 15)}
+                  ${money(round.prize)}
                 </p>
               </div>
               <div className="hidden h-14 w-px bg-rule sm:block" />
@@ -128,7 +152,7 @@ export function PoolBand() {
                   dir="ltr"
                   className="font-display tnum text-[clamp(2.4rem,6vw,3.6rem)] font-bold leading-none text-foil"
                 >
-                  $1
+                  ${money(state.config.ticketPrice)}
                 </p>
               </div>
             </div>
@@ -286,7 +310,7 @@ export function PoolBand() {
                       }`}
                     >
                       <span dir="ltr" className="font-display tnum">
-                        {c} × $1
+                        {c} × ${money(state.config.ticketPrice)}
                       </span>
                       <span className="block text-[11px] font-medium opacity-80">
                         {t(d.pool.tickets, { n: n(c) })}
@@ -311,16 +335,6 @@ export function PoolBand() {
                     <span>{line}</span>
                   </li>
                 ))}
-                <li className="flex items-start gap-2.5">
-                  <span className="text-foil">◆</span>
-                  <span>
-                    $5 {d.pool.feeTo}{" "}
-                    <code dir="ltr" className="font-display text-[11px] text-neon-2">
-                      {(state?.config.adminWallet ?? "").slice(0, 10)}…
-                      {(state?.config.adminWallet ?? "").slice(-6)}
-                    </code>
-                  </span>
-                </li>
               </ul>
               <button
                 onClick={() =>

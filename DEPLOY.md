@@ -1,4 +1,4 @@
-# راهنمای راه‌اندازی رایگان BETX — Vercel + Supabase + ربات تلگرام + درگاه تتر
+# راهنمای قدیمی راه‌اندازی BETX — در وضعیت فعلی برای live استفاده نشود
 
 > هزینه زیرساخت: **۰ دلار** (پلن رایگان Vercel Hobby و Supabase Free).
 > کل این راهنما حدود ۳۰ دقیقه وقت می‌گیرد.
@@ -7,26 +7,19 @@
 
 ## ⚠️ قبل از شروع (مهم)
 
+- **توقف ایمنی فاز ۱:** این سند تأیید استقرار live نیست. مهاجرت نسخه‌دار هنوز اعمال نشده، داده‌های تاریخی و مانده‌ها بررسی نشده‌اند و آزمون یکپارچه با PostgreSQL اجرا نشده است. در این مرحله به دیتابیس تولید وصل نشو، پرداخت/برداشت واقعی را فعال نکن و `BETX_MODE=live` نگذار.
+- حالت `demo` فقط شبیه‌سازی مرورگر است و اتصال به دیتابیس راه دور را رد می‌کند. آزمون دیتابیس فقط با `.env.test.example` و PostgreSQL محلیِ ایزوله انجام شود.
+- `supabase/schema.sql` را روی دیتابیس موجود اجرا نکن. مهاجرت نسخه‌دار فقط پس از پیش‌آزمون روی دیتابیس محلیِ ایزوله و بررسی شناسه‌های تکراری مجاز است.
 - **مجوز:** قرعه‌کشی و شرط‌بندی با پول واقعی در بیشتر کشورها **مجوز قمار** لازم دارد (مثل Curaçao یا Anjouan) و در ایران **جرم کیفری** است. حالت `live` را فقط وقتی روشن کن که از نظر حقوقی در کشور مقصدت مجاز باشی.
 - **درگاه‌های پرداخت و تحریم:** NOWPayments و تقریباً همه درگاه‌های بین‌المللی به کاربران و فروشندگان کشورهای تحریم‌شده سرویس نمی‌دهند و برای کسب‌وکارهای قمار، احراز هویت (KYB) می‌خواهند. قبل از ثبت‌نام، قوانین (Terms) درگاه را بخوان.
 - **قوانین پلتفرم‌ها:** قوانین Vercel، Supabase و تلگرام درباره محتوای قمار را هم بررسی کن.
-- تا آن موقع، سایت در حالت `demo` کامل کار می‌کند (موجودی‌ها شبیه‌سازی‌شده و قرعه‌کشی واقعی).
+- DEMO داده‌های ساختگیِ محلی و برچسب DEMO دارد؛ نتیجهٔ آن قرعه‌کشی یا دادهٔ واقعی نیست.
 
 ---
 
 ## ۱) دیتابیس رایگان در Supabase
 
-1. وارد <https://supabase.com> شو ← **New project**. یک رمز قوی برای دیتابیس بگذار و نزدیک‌ترین Region (مثلاً Frankfurt) را انتخاب کن.
-2. از منوی چپ **SQL Editor** ← **New query** را باز کن.
-3. کل محتوای فایل `supabase/schema.sql` همین پروژه را کپی کن، Paste کن و **Run** بزن. همه جدول‌ها ساخته می‌شوند.
-4. **Project Settings → Database → Connection string → URI** را باز کن و نوع **Transaction pooler** (پورت `6543`) را انتخاب کن. این رشته را کپی کن و به‌جای `[YOUR-PASSWORD]` رمز خودت را بگذار.
-   - این مقدار همان `DATABASE_URL` است.
-   - `?sslmode=require` را به انتهایش **اضافه نکن**؛ کد خودش SSL را درست تنظیم می‌کند.
-
-> اگر بعداً اسکیمای پروژه را تغییر دادی، یا دوباره `schema.sql` را بساز
-> (`npx drizzle-kit export --sql > supabase/schema.sql`)
-> یا مستقیم push کن:
-> `npx drizzle-kit push --dialect=postgresql --schema=./src/db/schema.ts --url="$DATABASE_URL"`
+برای فاز ۱ پروژهٔ Supabase نساز و دیتابیس راه دور را تغییر نده. اگر برای اعتبارسنجی دیتابیس نیاز است، PostgreSQL محلیِ دورریختنی و ایزوله بساز؛ ابتدا migration را روی آن آزمایش کن و هرگز از `drizzle-kit push` روی دیتابیس تولید استفاده نکن.
 
 ---
 
@@ -47,18 +40,19 @@ git push -u origin main
 
 ## ۳) دیپلوی رایگان روی Vercel
 
+استقرار Vercel بخشی از این مرحله نیست. مراحل زیر صرفاً مرجع قدیمی‌اند؛ deploy یا redeploy نکن.
+
 1. <https://vercel.com> ← با GitHub وارد شو ← **Add New → Project** ← مخزن `betx` را انتخاب کن.
 2. Framework به‌طور خودکار **Next.js** تشخیص داده می‌شود؛ تنظیمات build را تغییر نده.
 3. در بخش **Environment Variables** این‌ها را وارد کن (لیست کامل در `.env.example` است):
 
 | متغیر | مقدار |
 |---|---|
-| `DATABASE_URL` | رشته Transaction pooler از Supabase |
-| `DATABASE_SSL` | `true` |
-| `BETX_MODE` | فعلاً `demo` |
-| `APP_URL` | آدرس نهایی، مثلاً `https://betx.vercel.app` |
-| `VAULT_INITIAL` | `20` |
-| `ADMIN_TOKEN` | یک رشته تصادفی بلند (حداقل ۱۶ کاراکتر) |
+| `DATABASE_URL` | برای DEMO تنظیم نکن؛ در این مرحله برای live نیز مجاز نیست |
+| `BETX_MODE` | فقط `demo`؛ live تأیید نشده است |
+| `APP_URL` | فقط برای preview غیرعملیاتی |
+| `VAULT_INITIAL` | مقداردهی خزانه را روی دیتابیس راه دور اجرا نکن |
+| `ADMIN_TOKEN` | فقط در محیط ایزوله و به‌صورت secret |
 
 4. **Deploy** بزن. بعد از اتمام، `https://YOUR-APP.vercel.app/api/health` باید `{"ok":true}` برگرداند.
 5. اگر دامنه نهایی‌ات فرق داشت، `APP_URL` را اصلاح کن و از تب Deployments یک **Redeploy** بزن.
@@ -68,6 +62,8 @@ git push -u origin main
 ---
 
 ## ۴) ربات تلگرام و لینک دعوت
+
+تنظیم webhook نیز در این مرحله انجام نشود. نمونهٔ هدر زیر فقط نشان می‌دهد endpoint دیگر توکن ادمین را از URL نمی‌خواند.
 
 ### ساخت ربات
 1. در تلگرام به `@BotFather` پیام بده ← `/newbot` ← اسم و یوزرنیم (مثلاً `BetxLuckyBot`) را انتخاب کن.
@@ -79,7 +75,7 @@ git push -u origin main
 3. **Redeploy** کن.
 4. فقط یک بار این آدرس را در مرورگر باز کن:
    ```
-   https://YOUR-APP.vercel.app/api/telegram/setup?key=ADMIN_TOKEN
+   curl -H "x-admin-token: $ADMIN_TOKEN" https://YOUR-APP.vercel.app/api/telegram/setup
    ```
    این کار webhook، لیست دستورها و دکمه منوی Mini App را خودکار ثبت می‌کند.
 5. در BotFather: `/mybots` ← ربات ← **Bot Settings → Configure Mini App** ← آدرس `APP_URL` را بده تا داخل تلگرام هم باز شود.
@@ -103,12 +99,14 @@ git push -u origin main
 
 ## ۵) درگاه پرداخت تتر (NOWPayments)
 
+**این بخش غیرفعال است؛ کلید درگاه، کیف پول یا پرداخت sandbox/live تنظیم نکن.** توضیحات زیر legacy و تأییدنشده‌اند و برای اجرای عملیات استفاده نشوند.
+
 1. در <https://nowpayments.io> ثبت‌نام کن (برای تست اول از sandbox استفاده کن: <https://account-sandbox.nowpayments.io>).
 2. **Settings → Payments → Payout wallets:** آدرس کیف پول TRC20 خودت را اضافه کن. پول‌ها مستقیم به همین کیف پول می‌آیند (non-custodial).
 3. **Settings → API keys:** یک API Key بساز ← `NOWPAYMENTS_API_KEY`
 4. **Settings → Payments → IPN:** یک IPN Secret بساز ← `NOWPAYMENTS_IPN_SECRET`
 5. برای sandbox مقدار `NOWPAYMENTS_API_BASE=https://api-sandbox.nowpayments.io/v1` را بگذار.
-6. `BETX_MODE=live` را تنظیم و Redeploy کن.
+6. **این مرحله را انجام نده.** راه‌اندازی live در فاز ۱ تأیید نشده است.
 
 ### جریان پرداخت در کد
 ```
@@ -132,7 +130,7 @@ git push -u origin main
 
 ## ۶) چک‌لیست قبل از live شدن
 
-- [ ] حالت live با sandbox کامل تست شده (واریز ← خرید بلیط ← قرعه‌کشی ← برداشت)
+- [ ] استقرار live فعلاً متوقف است؛ قبل از هر تصمیم باید migration، تطبیق مالی، آزمون دیتابیس و بررسی امنیتی جداگانه تکمیل شوند.
 - [ ] `ADMIN_TOKEN` و `TELEGRAM_WEBHOOK_SECRET` تصادفی و بلند هستند
 - [ ] دیتابیس live خالی است (در حالت live هیچ داده نمایشی ساخته نمی‌شود)
 - [ ] صفحه `/verify/<round>` برای اولین دور، عدالت قرعه‌کشی را تأیید می‌کند
@@ -226,9 +224,9 @@ git push -u origin main
 | `SESSION_SECRET` | حداقل ۳۲ کاراکتر تصادفی (`openssl rand -hex 32`) — امضای نشست‌های ورود |
 | `APP_URL` | دامنه نهایی با `https://` |
 | `ADMIN_TOKEN` / `CRON_SECRET` | هر کدام حداقل ۱۶ کاراکتر تصادفی |
-| `DATABASE_URL` | Postgres میزبانی‌شده (Supabase/Neon) |
-| `TRON_DEPOSIT_ADDRESS` | آدرس دریافت واریز بازیکنان |
-| `ADMIN_WALLET` | آدرس خزانه (کارمزدها) — موجودی واقعی آن زنده روی سایت نمایش داده می‌شود |
-| `BETX_MODE=live` | فقط بعد از تست روی شبکه Nile |
+| `DATABASE_URL` | در این مرحله به Postgres میزبانی‌شده وصل نشو |
+| `TRON_DEPOSIT_ADDRESS` | برای پول واقعی تنظیم یا استفاده نکن |
+| `ADMIN_WALLET` | مقداردهی خزانهٔ live انجام نشود |
+| `BETX_MODE` | live تأیید نشده؛ آن را فعال نکن |
 
 **موجودی خزانه روی بلاکچین:** سایت موجودی USDT و TRX آدرس `ADMIN_WALLET` را مستقیم از شبکه ترون می‌خواند (هر ۶۰ ثانیه) و لینک Tronscan می‌گذارد. هر واریزی به این آدرس — مثلاً شارژ صندوق توسط تو — خودکار نمایش داده می‌شود. این عدد جدا از «دفتر حساب داخلی» صندوق است و در پنل ادمین اختلاف این دو نمایش داده می‌شود.

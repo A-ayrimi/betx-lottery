@@ -9,7 +9,7 @@ import { DepositCard } from "./DepositCard";
 
 
 export function Wallet() {
-  const { state, withdraw, setToast, isDemoSession } = useApp();
+  const { state, withdraw, setToast, isDemoSession, loading, dataUnavailable, demoEnabled } = useApp();
   const { d, t, n, ago, date } = useI18n();
   const [busy, setBusy] = useState<"dep" | "wd" | null>(null);
   const [wd, setWd] = useState({ amount: "", address: "" });
@@ -60,25 +60,35 @@ export function Wallet() {
             <div className="relative">
               <p className="micro text-mint">{d.wallet.balance}</p>
               <p dir="ltr" className="font-display tnum mt-3 text-start text-5xl font-bold text-white">
-                ${money(user?.balance ?? 0)}
+                {user ? `$${money(user.balance)}` : "—"}
               </p>
               <p className="mt-2 text-sm text-mint">
-                {user ? t(d.wallet.equiv, { n: n(Math.floor(user.balance)) }) : d.wallet.loginToSee}
+                {user
+                  ? t(d.wallet.equiv, { n: n(Math.floor(user.balance)) })
+                  : state
+                    ? d.wallet.loginToSee
+                    : dataUnavailable
+                      ? d.errors.unavailable
+                      : loading
+                        ? d.vaultChart.loading
+                        : demoEnabled
+                          ? d.wc.demoBadge
+                          : d.errors.unavailable}
               </p>
               <div className="rule-x my-6" />
               <div className="space-y-2 text-[13px] text-mint">
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.totalDeposited}</span>
-                  <span dir="ltr" className="font-display tnum text-white">${money(user?.totalDeposited ?? 0)}</span>
+                  <span dir="ltr" className="font-display tnum text-white">{user ? `$${money(user.totalDeposited)}` : "—"}</span>
                 </p>
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.bonusSpins}</span>
-                  <span className="font-display tnum text-foil">{n(user?.bonusSpins ?? 0)}</span>
+                  <span className="font-display tnum text-foil">{user ? n(user.bonusSpins) : "—"}</span>
                 </p>
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.telegram}</span>
                   <span className={user?.telegramLinked ? "text-neon-2" : "text-mint/60"}>
-                    {user?.telegramLinked ? d.wallet.linked : d.wallet.notLinked}
+                    {user ? user.telegramLinked ? d.wallet.linked : d.wallet.notLinked : "—"}
                   </span>
                 </p>
               </div>

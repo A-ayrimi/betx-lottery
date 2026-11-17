@@ -9,6 +9,8 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -40,29 +42,33 @@ export const users = pgTable("users", {
 
 export const rounds = pgTable("rounds", {
   id: serial("id").primaryKey(),
-  status: text("status").notNull().default("open"), // open | drawn | refunded
+  status: text("status").notNull().default("LOCKED"),
   capacity: integer("capacity").notNull().default(20),
   sold: integer("sold").notNull().default(0),
   prize: numeric("prize", { precision: 12, scale: 2 }).notNull().default("15"),
   fee: numeric("fee", { precision: 12, scale: 2 }).notNull().default("5"),
-  winnerId: integer("winner_id"),
+  treasuryContribution: numeric("treasury_contribution", { precision: 12, scale: 2 }),
+  adminGrossRevenue: numeric("admin_gross_revenue", { precision: 12, scale: 2 }),
+  winnerId: integer("winner_id").references(() => users.id, { onDelete: "restrict" }),
   winnerName: text("winner_name"),
   winningSerial: text("winning_serial"),
-  // provably fair: hash is public while the round is open, seed revealed after draw
+  // Provably fair seed data remains public after a draw, but the winner must be reviewed and approved by an administrator.
   seedHash: text("seed_hash"),
   serverSeed: text("server_seed"),
-  // auto-settlement of the $5 platform fee to the admin treasury wallet
   feeStatus: text("fee_status").notNull().default("pending"), // pending | accrued | queued | paid | failed
   feeTxHash: text("fee_tx_hash"),
   feePaidAt: timestamp("fee_paid_at", { withTimezone: true }),
   openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
   drawnAt: timestamp("drawn_at", { withTimezone: true }),
 });
 
 export const tickets = pgTable("tickets", {
   id: serial("id").primaryKey(),
-  roundId: integer("round_id").notNull(),
-  userId: integer("user_id").notNull(),
+  roundId: integer("round_id").notNull().references(() => rounds.id, { onDelete: "restrict" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   kind: text("kind").notNull().default("gold"), // gold | bronze
   serial: text("serial").notNull().unique(),
   username: text("username").notNull(),
@@ -71,16 +77,16 @@ export const tickets = pgTable("tickets", {
 
 export const vault = pgTable("vault", {
   id: serial("id").primaryKey(),
-  balance: numeric("balance", { precision: 12, scale: 2 }).notNull().default("20"),
+  balance: numeric("balance", { precision: 12, scale: 2 }).notNull(),
   initialCapital: numeric("initial_capital", { precision: 12, scale: 2 })
-    .notNull()
-    .default("20"),
+    .notNull(),
   totalFees: numeric("total_fees", { precision: 12, scale: 2 }).notNull().default("0"),
   totalPaid: numeric("total_paid", { precision: 12, scale: 2 }).notNull().default("0"),
+  treasuryPaid: numeric("treasury_paid", { precision: 12, scale: 2 }),
   roundsCompleted: integer("rounds_completed").notNull().default(0),
   ticketsSold: integer("tickets_sold").notNull().default(0),
-  // treasury: every $5 round fee is auto-allocated to the admin wallet
-  adminWallet: text("admin_wallet").notNull().default("TN41NBCuPWnReq3TgQJtuLLVmauwgRNVen"),
+  // Treasury destination for verified transfers.
+  adminWallet: text("admin_wallet").notNull(),
   adminEarnings: numeric("admin_earnings", { precision: 12, scale: 2 }).notNull().default("0"),
   adminPaid: numeric("admin_paid", { precision: 12, scale: 2 }).notNull().default("0"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -88,24 +94,41 @@ export const vault = pgTable("vault", {
 
 export const ledger = pgTable("ledger", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id"),
+  userId: integer("user_id").references(() => users.id, { onDelete: "restrict" }),
   username: text("username"),
   type: text("type").notNull(), // ticket_buy | prize | spin | fee | referral
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   note: text("note").notNull().default(""),
+  account: text("account"),
+  roundId: integer("round_id").references(() => rounds.id, { onDelete: "restrict" }),
+  reference: uuid("reference"),
+  transactionKey: text("transaction_key"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("ledger_reference_unique").on(t.reference),
+  uniqueIndex("ledger_transaction_key_unique").on(t.transactionKey),
+]);
+
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  actor: text("actor").notNull(),
+  action: text("action").notNull(),
+  entity: text("entity").notNull(),
+  entityId: integer("entity_id").notNull(),
+  details: jsonb("details").notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const wheelSpins = pgTable("wheel_spins", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   prize: numeric("prize", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const deposits = pgTable("deposits", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   provider: text("provider").notNull().default("nowpayments"), // nowpayments | demo
   orderId: text("order_id").notNull().unique(),
   invoiceId: text("invoice_id"),
@@ -119,13 +142,14 @@ export const deposits = pgTable("deposits", {
   txHash: text("tx_hash").unique(),
   fromAddress: text("from_address"),
   expectedTxId: text("expected_tx_id"),
+  idempotencyKey: text("idempotency_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [uniqueIndex("deposits_user_provider_idempotency_unique").on(t.userId, t.provider, t.idempotencyKey)]);
 
 export const withdrawals = pgTable("withdrawals", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   username: text("username").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   address: text("address").notNull(),
@@ -138,11 +162,11 @@ export const withdrawals = pgTable("withdrawals", {
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   processedAt: timestamp("processed_at", { withTimezone: true }),
-});
+}, (t) => [uniqueIndex("withdrawals_tx_hash_unique").on(t.txHash)]);
 
 export const loginTokens = pgTable("login_tokens", {
   token: text("token").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   used: boolean("used").notNull().default(false),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
@@ -198,13 +222,13 @@ export const rateLimits = pgTable(
 );
 
 /**
- * One row per drawn round: the $5 platform fee auto-allocated to the admin
- * treasury wallet. `accrued` = accounted instantly at draw time; `paid` =
- * settled on-chain (auto sweep when enabled, otherwise manual + tx hash).
+ * One row per settled round for the $3 treasury allocation. The separate
+ * $2 gross administrator revenue is recorded in the accounting ledger.
+ * `paid` is set only after a verified on-chain transfer.
  */
 export const feeTransfers = pgTable("fee_transfers", {
   id: serial("id").primaryKey(),
-  roundId: integer("round_id").notNull().unique(),
+  roundId: integer("round_id").notNull().unique().references(() => rounds.id, { onDelete: "restrict" }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   adminWallet: text("admin_wallet").notNull(),
   status: text("status").notNull().default("accrued"), // accrued | queued | processing | paid | failed
@@ -214,7 +238,7 @@ export const feeTransfers = pgTable("fee_transfers", {
   lastError: text("last_error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
-});
+}, (t) => [uniqueIndex("fee_transfers_tx_hash_unique").on(t.txHash)]);
 
 /**
  * Every real change of the vault balance, recorded in the same transaction
@@ -227,7 +251,7 @@ export const vaultSnapshots = pgTable("vault_snapshots", {
   balance: numeric("balance", { precision: 12, scale: 2 }).notNull(),
   delta: numeric("delta", { precision: 12, scale: 2 }).notNull().default("0"),
   reason: text("reason").notNull(),
-  roundId: integer("round_id"),
+  roundId: integer("round_id").references(() => rounds.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -123,7 +123,9 @@ export function Header() {
             <div className="hidden items-center gap-2 rounded-full border border-rule px-3 py-2 lg:flex">
               <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
               <span className="micro text-mint">VAULT</span>
-              <span dir="ltr" className="font-display tnum text-sm font-bold text-neon-2"><AnimatedMoney value={state?.vault.balance ?? 20} /></span>
+              <span dir="ltr" className="font-display tnum text-sm font-bold text-neon-2">
+                {state ? <AnimatedMoney value={state.vault.balance} /> : "—"}
+              </span>
               {vaultAddress ? (
                 <span dir="ltr" title={vaultAddress} className="font-display text-[9px] text-mint/60">
                   {vaultAddress.slice(0, 5)}…{vaultAddress.slice(-4)}

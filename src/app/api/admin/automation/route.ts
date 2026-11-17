@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     automationStatus(),
     healthChecks(false).catch((e) => ({ error: String(e) })),
     readinessChecks(),
-    getTreasuryOnchain(true).catch(() => null),
+    getTreasuryOnchain(true).catch((e) => ({ error: e instanceof Error ? e.message : "on-chain balance unavailable" })),
   ]);
   return NextResponse.json({ ok: true, status, health, readiness, onchain });
 }

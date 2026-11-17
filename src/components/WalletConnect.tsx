@@ -26,6 +26,7 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
   const needsTerms = !linking && !acceptTerms;
 
   const login = async (name: string, readyState: string) => {
+    if (demoEnabled) return;
     if (needsTerms) return setToast(d.errors.mustAccept);
     if (readyState !== "Found") {
       setToast(d.wc.noWallet);
@@ -47,7 +48,7 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
       });
       if (!res.ok) throw new Error(res.error);
       if (res.created) writeStored("betx_ref", null);
-      await refresh(true);
+      await refresh();
       setToast(res.linked ? d.wc.linked : res.created ? d.toast.welcome : d.wc.connected);
       onDone?.();
     } catch (e) {
@@ -78,30 +79,32 @@ export function WalletList({ acceptTerms, onDone }: { acceptTerms: boolean; onDo
 
   return (
     <div>
-      <div className="grid gap-2">
-        {!ready
-          ? Array.from({ length: 3 }, (_, i) => <div key={i} className="h-[54px] animate-pulse rounded-xl border border-rule bg-white/[0.03]" />)
-          : wallets.map((w) => {
-              const found = w.readyState === "Found";
-              return (
-                <button
-                  key={w.name}
-                  onClick={() => login(w.name, w.readyState)}
-                  disabled={busy !== null}
-                  className={`focus-ring flex items-center gap-3 rounded-xl border px-4 py-3 text-start transition-colors disabled:opacity-60 ${
-                    found ? "border-neon/40 bg-neon/[0.06] hover:bg-neon/[0.12]" : "border-rule bg-black/20 hover:border-mint/40"
-                  } ${needsTerms ? "opacity-70" : ""}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={w.icon} alt="" className="h-7 w-7 rounded-lg" />
-                  <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
-                  <span className={`micro ${found ? "text-neon-2" : "text-mint"}`}>
-                    {busy === w.name ? "…" : found ? d.wc.detected : d.wc.install}
-                  </span>
-                </button>
-              );
-            })}
-      </div>
+      {!demoEnabled ? (
+        <div className="grid gap-2">
+          {!ready
+            ? Array.from({ length: 3 }, (_, i) => <div key={i} className="h-[54px] animate-pulse rounded-xl border border-rule bg-white/[0.03]" />)
+            : wallets.map((w) => {
+                const found = w.readyState === "Found";
+                return (
+                  <button
+                    key={w.name}
+                    onClick={() => login(w.name, w.readyState)}
+                    disabled={busy !== null}
+                    className={`focus-ring flex items-center gap-3 rounded-xl border px-4 py-3 text-start transition-colors disabled:opacity-60 ${
+                      found ? "border-neon/40 bg-neon/[0.06] hover:bg-neon/[0.12]" : "border-rule bg-black/20 hover:border-mint/40"
+                    } ${needsTerms ? "opacity-70" : ""}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={w.icon} alt="" className="h-7 w-7 rounded-lg" />
+                    <span className="flex-1 text-sm font-bold text-white">{w.name}</span>
+                    <span className={`micro ${found ? "text-neon-2" : "text-mint"}`}>
+                      {busy === w.name ? "…" : found ? d.wc.detected : d.wc.install}
+                    </span>
+                  </button>
+                );
+              })}
+        </div>
+      ) : null}
       {!state?.user && demoEnabled ? (
         <div className="mt-4 rounded-xl border border-foil/40 bg-foil/[0.06] p-3">
             <button

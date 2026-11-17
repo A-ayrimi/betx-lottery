@@ -51,9 +51,13 @@ export async function getTreasuryOnchain(force = false): Promise<OnchainTreasury
   if (inflight) return inflight;
   inflight = fetchTreasury()
     .then((value) => {
-      if (value.status !== "unavailable" || !cache) cache = { at: Date.now(), value };
-      else cache = { at: Date.now() - TTL_MS + 10_000, value: cache.value }; // retry in ~10s
-      return cache.value;
+      if (value.status !== "unavailable") cache = { at: Date.now(), value };
+      else cache = null;
+      return value;
+    })
+    .catch((error: unknown) => {
+      cache = null;
+      throw error;
     })
     .finally(() => {
       inflight = null;

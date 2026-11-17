@@ -9,14 +9,16 @@ export const DEMO_STARTING_BALANCE = 100;
 interface StoredDemoSession {
   version: 1;
   address: string;
-  state: AppState;
+  state: DemoAppState;
 }
+
+type DemoAppState = Omit<AppState, "round"> & { round: NonNullable<AppState["round"]> };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isDemoState(value: unknown): value is AppState {
+function isDemoState(value: unknown): value is DemoAppState {
   if (!isRecord(value) || !isRecord(value.config) || !isRecord(value.round) || !isRecord(value.vault)) return false;
   const user = value.user;
   return (
@@ -29,6 +31,10 @@ function isDemoState(value: unknown): value is AppState {
     Array.isArray(value.winners) &&
     Array.isArray(value.activity)
   );
+}
+
+export function isDemoAppState(state: AppState): state is DemoAppState {
+  return state.config.live === false && state.round !== null && state.user?.walletAddress === DEMO_WALLET_ADDRESS;
 }
 
 export function loadDemoSession(): StoredDemoSession | null {
@@ -54,7 +60,7 @@ export function loadDemoSession(): StoredDemoSession | null {
   return { version: 1, address: DEMO_WALLET_ADDRESS, state: parsed.state };
 }
 
-export function saveDemoSession(state: AppState) {
+export function saveDemoSession(state: DemoAppState) {
   if (!state.user || state.user.walletAddress !== DEMO_WALLET_ADDRESS) {
     throw new Error("Cannot persist a non-demo wallet session");
   }
@@ -66,7 +72,7 @@ export function clearDemoSession() {
   window.localStorage.removeItem(DEMO_SESSION_KEY);
 }
 
-export function createDemoState(walletAddress: string | null = null, locale = "en"): AppState {
+export function createDemoState(walletAddress: string | null = null, locale = "en"): DemoAppState {
   const now = new Date().toISOString();
   const user: UserState | null = walletAddress
     ? {
@@ -118,8 +124,10 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       referralDepositBonus: 0.5,
       adminWallet: DEMO_TREASURY_ADDRESS,
       tronOnly: true,
+      totalRoundRevenue: 20,
       prizePerRound: 15,
-      feePerRound: 5,
+      treasuryContributionPerRound: 3,
+      adminGrossRevenuePerRound: 2,
       roundCapacity: 20,
       ticketPrice: 1,
       tron: {
@@ -131,25 +139,30 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
     },
     region: { country: null, blocked: false },
     vault: {
-      balance: 25,
+      balance: 20,
       initialCapital: 20,
-      totalFees: 5,
+      totalFees: 0,
       totalPaid: 0,
+      treasuryPaid: 0,
       roundsCompleted: 0,
       ticketsSold: 0,
       adminWallet: DEMO_TREASURY_ADDRESS,
-      adminEarnings: 5,
+      adminEarnings: 0,
       adminPaid: 0,
+      ledgerStatus: "demo",
       feePending: 0,
       feePendingCount: 0,
     },
     round: {
       id: 1,
+      status: "OPEN",
       capacity: 20,
       sold: 0,
       remaining: 20,
       prize: 15,
       fee: 5,
+      treasuryContribution: 3,
+      adminGrossRevenue: 2,
       seedHash: "DEMO-ONLY",
       tickets: [],
     },
@@ -167,7 +180,7 @@ function randomUnit() {
   return Math.random();
 }
 
-export function buyDemoTickets(state: AppState, requested: number) {
+export function buyDemoTickets(state: DemoAppState, requested: number) {
   const user = state.user;
   if (!user) return { state, serials: [], roundId: state.round.id, draw: null, error: "login" as const };
   if (user.selfExcludedUntil && new Date(user.selfExcludedUntil).getTime() > Date.now()) {
@@ -214,7 +227,7 @@ export function buyDemoTickets(state: AppState, requested: number) {
     amount: cost,
     at: createdAt,
   };
-  let nextState: AppState = {
+  let nextState: DemoAppState = {
     ...state,
     user: nextUser,
     leaderboard: [
@@ -314,11 +327,11 @@ export function buyDemoTickets(state: AppState, requested: number) {
     },
     vault: {
       ...nextState.vault,
-      balance: nextState.vault.balance + fee,
-      totalFees: nextState.vault.totalFees + fee,
+      balance: nextState.vault.balance + state.config.treasuryContributionPerRound,
+      totalFees: nextState.vault.totalFees + state.config.treasuryContributionPerRound,
       totalPaid: nextState.vault.totalPaid + prize,
       roundsCompleted: nextState.vault.roundsCompleted + 1,
-      adminEarnings: nextState.vault.adminEarnings + fee,
+      adminEarnings: nextState.vault.adminEarnings + state.config.adminGrossRevenuePerRound,
     },
     winners: [history, ...nextState.winners].slice(0, 20),
     activity: [prizeActivity, ...nextState.activity].slice(0, 20),
@@ -336,7 +349,7 @@ function pickDemoSector() {
   return 0;
 }
 
-export function spinDemoWheel(state: AppState) {
+export function spinDemoWheel(state: DemoAppState) {
   const user = state.user;
   if (!user) return { state, ok: false as const, error: "login" };
   if (user.selfExcludedUntil && new Date(user.selfExcludedUntil).getTime() > Date.now()) {
@@ -360,7 +373,7 @@ export function spinDemoWheel(state: AppState) {
     amount: prize,
     at: createdAt.toISOString(),
   };
-  const nextState: AppState = {
+  const nextState: DemoAppState = {
     ...state,
     user: {
       ...user,
@@ -375,7 +388,7 @@ export function spinDemoWheel(state: AppState) {
   return { state: nextState, ok: true as const, index, prize };
 }
 
-export function depositDemoBalance(state: AppState, amount: number) {
+export function depositDemoBalance(state: DemoAppState, amount: number) {
   const user = state.user;
   if (!user || !Number.isFinite(amount) || amount <= 0 || amount > 500) return null;
   if (user.selfExcludedUntil && new Date(user.selfExcludedUntil).getTime() > Date.now()) return null;
@@ -400,10 +413,10 @@ export function depositDemoBalance(state: AppState, amount: number) {
         ...user.deposits,
       ].slice(0, 20),
     },
-  } satisfies AppState;
+  } satisfies DemoAppState;
 }
 
-export function withdrawDemoBalance(state: AppState, amount: number, address: string) {
+export function withdrawDemoBalance(state: DemoAppState, amount: number, address: string) {
   const user = state.user;
   if (!user || !Number.isFinite(amount) || amount < state.config.minWithdraw || amount > user.balance || !address.trim()) {
     return null;
@@ -426,5 +439,5 @@ export function withdrawDemoBalance(state: AppState, amount: number, address: st
         ...user.withdrawals,
       ].slice(0, 20),
     },
-  } satisfies AppState;
+  } satisfies DemoAppState;
 }

@@ -24,6 +24,7 @@ CREATE TABLE "deposits" (
 	"tx_hash" text,
 	"from_address" text,
 	"expected_tx_id" text,
+	"idempotency_key" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "deposits_order_id_unique" UNIQUE("order_id"),
@@ -45,6 +46,19 @@ CREATE TABLE "fee_transfers" (
 	CONSTRAINT "fee_transfers_round_id_unique" UNIQUE("round_id")
 );
 
+CREATE UNIQUE INDEX "fee_transfers_tx_hash_unique" ON "fee_transfers" ("tx_hash");
+CREATE UNIQUE INDEX "deposits_user_provider_idempotency_unique" ON "deposits" ("user_id", "provider", "idempotency_key");
+
+CREATE TABLE "admin_audit_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"actor" text NOT NULL,
+	"action" text NOT NULL,
+	"entity" text NOT NULL,
+	"entity_id" integer NOT NULL,
+	"details" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE "job_runs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"trigger" text NOT NULL,
@@ -62,8 +76,15 @@ CREATE TABLE "ledger" (
 	"type" text NOT NULL,
 	"amount" numeric(12, 2) NOT NULL,
 	"note" text DEFAULT '' NOT NULL,
+	"account" text,
+	"round_id" integer,
+	"reference" uuid,
+	"transaction_key" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+CREATE UNIQUE INDEX "ledger_reference_unique" ON "ledger" ("reference");
+CREATE UNIQUE INDEX "ledger_transaction_key_unique" ON "ledger" ("transaction_key");
 
 CREATE TABLE "login_tokens" (
 	"token" text PRIMARY KEY NOT NULL,
@@ -81,11 +102,13 @@ CREATE TABLE "rate_limits" (
 
 CREATE TABLE "rounds" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"status" text DEFAULT 'open' NOT NULL,
+	"status" text DEFAULT 'LOCKED' NOT NULL,
 	"capacity" integer DEFAULT 20 NOT NULL,
 	"sold" integer DEFAULT 0 NOT NULL,
 	"prize" numeric(12, 2) DEFAULT '15' NOT NULL,
 	"fee" numeric(12, 2) DEFAULT '5' NOT NULL,
+	"treasury_contribution" numeric(12, 2),
+	"admin_gross_revenue" numeric(12, 2),
 	"winner_id" integer,
 	"winner_name" text,
 	"winning_serial" text,
@@ -95,6 +118,9 @@ CREATE TABLE "rounds" (
 	"fee_tx_hash" text,
 	"fee_paid_at" timestamp with time zone,
 	"opened_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"reviewed_at" timestamp with time zone,
+	"approved_at" timestamp with time zone,
+	"settled_at" timestamp with time zone,
 	"drawn_at" timestamp with time zone
 );
 
@@ -146,13 +172,14 @@ CREATE TABLE "users" (
 
 CREATE TABLE "vault" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"balance" numeric(12, 2) DEFAULT '20' NOT NULL,
-	"initial_capital" numeric(12, 2) DEFAULT '20' NOT NULL,
+	"balance" numeric(12, 2) NOT NULL,
+	"initial_capital" numeric(12, 2) NOT NULL,
 	"total_fees" numeric(12, 2) DEFAULT '0' NOT NULL,
 	"total_paid" numeric(12, 2) DEFAULT '0' NOT NULL,
+	"treasury_paid" numeric(12, 2),
 	"rounds_completed" integer DEFAULT 0 NOT NULL,
 	"tickets_sold" integer DEFAULT 0 NOT NULL,
-	"admin_wallet" text DEFAULT 'TN41NBCuPWnReq3TgQJtuLLVmauwgRNVen' NOT NULL,
+	"admin_wallet" text NOT NULL,
 	"admin_earnings" numeric(12, 2) DEFAULT '0' NOT NULL,
 	"admin_paid" numeric(12, 2) DEFAULT '0' NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -198,4 +225,38 @@ CREATE TABLE "withdrawals" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"processed_at" timestamp with time zone
 );
+
+CREATE UNIQUE INDEX "withdrawals_tx_hash_unique" ON "withdrawals" ("tx_hash");
+
+ALTER TABLE "deposits"
+  ADD CONSTRAINT "deposits_user_id_users_id_fk"
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
+ALTER TABLE "fee_transfers"
+  ADD CONSTRAINT "fee_transfers_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT;
+ALTER TABLE "ledger"
+  ADD CONSTRAINT "ledger_user_id_users_id_fk"
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "ledger_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT;
+ALTER TABLE "login_tokens"
+  ADD CONSTRAINT "login_tokens_user_id_users_id_fk"
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
+ALTER TABLE "rounds"
+  ADD CONSTRAINT "rounds_winner_id_users_id_fk"
+  FOREIGN KEY ("winner_id") REFERENCES "users"("id") ON DELETE RESTRICT;
+ALTER TABLE "tickets"
+  ADD CONSTRAINT "tickets_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "tickets_user_id_users_id_fk"
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
+ALTER TABLE "vault_snapshots"
+  ADD CONSTRAINT "vault_snapshots_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT;
+ALTER TABLE "wheel_spins"
+  ADD CONSTRAINT "wheel_spins_user_id_users_id_fk"
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
+ALTER TABLE "withdrawals"
+  ADD CONSTRAINT "withdrawals_user_id_users_id_fk"
+  FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
 

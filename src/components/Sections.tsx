@@ -49,17 +49,23 @@ function TicketArtwork({ className = "", label }: { className?: string; label?: 
 /* ------------------------------------------------------------ winners tape */
 
 export function WinnersTicker() {
-  const { state } = useApp();
+  const { state, loading, dataUnavailable } = useApp();
+  const { d } = useI18n();
   const rows = state?.winners ?? [];
-  const items = rows.length ? rows : [{ roundId: 0, winnerName: "—", winningSerial: "—", prize: 15 }];
-  const doubled = [...items, ...items, ...items, ...items];
+  if (rows.length === 0) {
+    return (
+      <div role={dataUnavailable ? "alert" : "status"} className="border-y border-rule bg-[#07110e] px-4 py-4 text-center text-sm text-mint">
+        {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : d.board.noDraws}
+      </div>
+    );
+  }
 
   return (
     <div dir="ltr" className="relative overflow-hidden border-y border-rule bg-[#07110e] py-4">
       <div className="grain absolute inset-0" />
-      <div className="marquee-track relative flex w-max gap-10 whitespace-nowrap">
-        {doubled.map((w, i) => (
-          <span key={i} className="flex items-center gap-3 text-sm">
+      <div className="relative flex flex-wrap justify-center gap-x-10 gap-y-3">
+        {rows.map((w) => (
+          <span key={w.roundId} className="flex items-center gap-3 text-sm">
             <span className="text-foil">◆</span>
             <span className="text-mint">WINNER</span>
             <span className="text-white">{w.winnerName}</span>
@@ -90,14 +96,19 @@ export function Prizes() {
               <span className="neon-text">{d.prizes.titleNeon}</span>
             </h2>
             <p className="mt-5 max-w-[46ch] text-[15px] leading-8 text-mint">{d.prizes.body}</p>
-            <div className="mt-8 flex items-end gap-6">
+            <div className="mt-8 grid grid-cols-2 gap-4">
               <div>
-                <p className="micro text-mint">{d.prizes.share}</p>
-                <p dir="ltr" className="font-display tnum text-start text-[clamp(3.4rem,9vw,5.4rem)] font-bold leading-none text-foil">
-                  25%
+                <p className="micro text-mint">{d.hero.treasuryAllocation}</p>
+                <p dir="ltr" className="font-display tnum text-start text-[clamp(2.4rem,6vw,4rem)] font-bold leading-none text-foil">
+                  15%
                 </p>
               </div>
-              <p className="mb-2 max-w-[18ch] text-[13px] leading-7 text-mint">{d.prizes.shareNote}</p>
+              <div>
+                <p className="micro text-mint">{d.hero.adminEarnings}</p>
+                <p dir="ltr" className="font-display tnum text-start text-[clamp(2.4rem,6vw,4rem)] font-bold leading-none text-foil">
+                  10%
+                </p>
+              </div>
             </div>
             <div className="mt-6 flex items-center gap-4 rounded-2xl border border-neon/25 bg-neon/[0.06] px-5 py-4">
               <p dir="ltr" className="font-display tnum text-3xl font-bold text-neon-2">75%</p>
@@ -191,7 +202,7 @@ export function HowItWorks() {
 /* -------------------------------------------------------------- leaderboard */
 
 export function Leaderboard() {
-  const { state } = useApp();
+  const { state, loading, dataUnavailable } = useApp();
   const { d, ago, href, n } = useI18n();
   const rows = state?.leaderboard ?? [];
   const winners = state?.winners ?? [];
@@ -218,7 +229,11 @@ export function Leaderboard() {
                 <span dir="ltr" className="font-display tnum text-start text-[13px] text-white">${money(r.won)}</span>
               </div>
             ))}
-            {rows.length === 0 ? <p className="px-5 py-8 text-center text-sm text-mint">{d.board.empty}</p> : null}
+            {rows.length === 0 ? (
+              <p role={dataUnavailable ? "alert" : "status"} className="px-5 py-8 text-center text-sm text-mint">
+                {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : d.board.empty}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -245,7 +260,9 @@ export function Leaderboard() {
               </div>
             ))}
             {winners.length === 0 ? (
-              <p className="rounded-2xl border border-rule px-5 py-8 text-center text-sm text-mint">{d.board.noDraws}</p>
+              <p role={dataUnavailable ? "alert" : "status"} className="rounded-2xl border border-rule px-5 py-8 text-center text-sm text-mint">
+                {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : d.board.noDraws}
+              </p>
             ) : null}
           </div>
         </div>
@@ -369,7 +386,7 @@ export function Faq() {
 /* -------------------------------------------------------------------- footer */
 
 export function SiteFooter() {
-  const { state } = useApp();
+  const { state, dataUnavailable, demoEnabled } = useApp();
   const { d, t, n, href } = useI18n();
   const cfg = state?.config;
   return (
@@ -437,8 +454,18 @@ export function SiteFooter() {
             </div>
             <div>
               <p className="micro text-foil">{d.footer.vault}</p>
-              <p dir="ltr" className="font-display tnum mt-4 text-start text-2xl font-bold text-white">${money(state?.vault.balance ?? 20)}</p>
-              <p className="mt-1 text-[12px] text-mint">{t(d.footer.vaultNote, { n: n(state?.vault.roundsCompleted ?? 0) })}</p>
+              <p dir="ltr" className="font-display tnum mt-4 text-start text-2xl font-bold text-white">
+                {state ? `$${money(state.vault.balance)}` : "—"}
+              </p>
+              <p className="mt-1 text-[12px] text-mint">
+                {state
+                  ? t(d.footer.vaultNote, { n: n(state.vault.roundsCompleted) })
+                  : dataUnavailable
+                    ? d.errors.unavailable
+                    : demoEnabled
+                      ? d.wc.demoBadge
+                      : d.errors.unavailable}
+              </p>
             </div>
           </div>
         </div>

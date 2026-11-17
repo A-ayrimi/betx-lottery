@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ensureSeed } from "@/lib/store";
 import { requireDrawHistory } from "@/lib/history";
 import { I18nProvider } from "@/i18n/client";
 import { getDictionary } from "@/i18n";
@@ -22,15 +21,16 @@ export default async function VerifyIndex({ params }: PageProps<"/[locale]/verif
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   let rows: Awaited<ReturnType<typeof requireDrawHistory>> = [];
+  let dataUnavailable = false;
   try {
-    await ensureSeed();
     rows = await requireDrawHistory(30);
   } catch {
-    rows = [];
+    dataUnavailable = true;
+    console.error("Draw history could not be loaded.");
   }
   return (
     <I18nProvider locale={locale} dict={getDictionary(locale)}>
-      <VerifyExplorer rows={rows} />
+      <VerifyExplorer rows={rows} dataUnavailable={dataUnavailable} />
     </I18nProvider>
   );
 }

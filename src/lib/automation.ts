@@ -16,14 +16,14 @@ import {
   withdrawals,
 } from "@/db/schema";
 import { config } from "@/lib/config";
-import { autoDrawFullRounds, ensureTreasuryBackfill, refundRound, TICKET_PRICE } from "@/lib/store";
+import { autoDrawFullRounds, refundRound, TICKET_PRICE } from "@/lib/store";
 import { getBalances, listIncomingUsdt, tron } from "@/lib/tron";
 import { creditOnchain, settleTronDeposit } from "@/lib/tronDeposits";
 import { getPayment } from "@/lib/nowpayments";
 import { applyNowPayment } from "@/lib/nowpaymentsApply";
 import { payoutConfig, processAutoPayouts } from "@/lib/payout";
-import { feeConfig, feeQueue, processFeeSweeps } from "@/lib/fees";
-import { notifyRoundLoss, notifyWinner, sendMessage } from "@/lib/telegram";
+import { feeConfig, feeQueue } from "@/lib/fees";
+import { sendMessage } from "@/lib/telegram";
 import { botStrings } from "@/i18n/bot";
 import { interpolate } from "@/i18n/config";
 
@@ -192,36 +192,26 @@ async function scanIncoming() {
  * anything missed (crash between sale and draw, manual DB edits, races).
  */
 async function drawFullRounds() {
-  await ensureTreasuryBackfill().catch(() => {});
   const outcomes = await autoDrawFullRounds();
   for (const o of outcomes) {
-    await Promise.all(
-      o.participants.map((p) => {
-        if (!p.telegramId) return Promise.resolve();
-        return p.userId === o.winnerUserId
-          ? notifyWinner(p.telegramId, o.roundId, o.prize, o.winningSerial, p.locale)
-          : notifyRoundLoss(p.telegramId, o.roundId, p.ticketCount, o.winningSerial, p.locale);
-      }),
-    );
     await alert(
       `draw-${o.roundId}`,
-      `🎰 Round ${o.roundId} auto-drawn: <b>${o.winnerName}</b> won $${o.prize.toFixed(2)} (${o.winningSerial}). $${o.fee.toFixed(2)} fee → treasury ${o.adminWallet}.`,
+      `🎰 Round ${o.roundId} draw is awaiting administrator approval. Proposed winner: <b>${o.winnerName}</b> (${o.winningSerial}). No prize has been settled.`,
     );
   }
   return { drawn: outcomes.length, rounds: outcomes.map((o) => o.roundId) };
 }
 
-/** Settle accrued $5 round fees to the admin treasury wallet. */
+/** Fee transfers remain paused until historical accounting is reconciled. */
 async function settleFees() {
-  const res = await processFeeSweeps(alert);
-  return res;
+  return { enabled: false, skipped: "financial reconciliation required" as const };
 }
 
 /** Rounds that don't fill within ROUND_TIMEOUT_HOURS are closed and refunded. */
 async function refundStaleRounds() {
   const hours = Number(process.env.ROUND_TIMEOUT_HOURS ?? 24);
   if (!(hours > 0)) return { skipped: "disabled" };
-  const open = await db.select().from(rounds).where(eq(rounds.status, "open"));
+  const open = await db.select().from(rounds).where(inArray(rounds.status, ["open", "OPEN"]));
   let refunded = 0, refundedTickets = 0;
   for (const r of open) {
     if (r.sold === 0) continue;
@@ -264,14 +254,12 @@ export async function healthChecks(sendAlerts = true) {
     having abs(u.balance - coalesce(sum(l.amount), 0)) > 0.009
      limit 20`);
   const v = (await db.select().from(vault).limit(1))[0];
-  const [agg] = await db
+  const [vaultLedger] = await db
     .select({
-      spins: sql<string>`coalesce(sum(case when ${ledger.type} = 'spin' then ${ledger.amount} else 0 end), 0)`,
-      referral: sql<string>`coalesce(sum(case when ${ledger.type} = 'referral' then ${ledger.amount} else 0 end), 0)`,
+      balance: sql<string>`coalesce(sum(case when ${ledger.account} = 'vault_balance' and ${ledger.reference} is not null and ${ledger.transactionKey} is not null then ${ledger.amount} else 0 end), 0)`,
     })
     .from(ledger);
-  const expectedVault = v ? Number(v.initialCapital) + Number(v.totalFees) - Number(agg.spins) - Number(agg.referral) : 0;
-  const vaultDrift = v ? Math.round((Number(v.balance) - expectedVault) * 100) / 100 : 0;
+  const vaultDrift = v ? Math.round((Number(v.balance) - Number(vaultLedger.balance)) * 100) / 100 : 0;
 
   const [bal] = await db.select({ s: sql<string>`coalesce(sum(${users.balance}), 0)` }).from(users);
   const [pend] = await db
@@ -325,9 +313,26 @@ async function dailyReport() {
     .select({ s: sql<string>`coalesce(sum(${withdrawals.amount}), 0)`, c: sql<number>`count(*)::int` })
     .from(withdrawals)
     .where(and(eq(withdrawals.status, "paid"), gte(withdrawals.processedAt, since)));
-  const [rd] = await db.select({ c: sql<number>`count(*)::int` }).from(rounds).where(and(eq(rounds.status, "drawn"), gte(rounds.drawnAt, since)));
+  const [rd] = await db.select({ c: sql<number>`count(*)::int` }).from(rounds).where(and(inArray(rounds.status, ["drawn", "AWAITING_ADMIN_APPROVAL", "APPROVED", "SETTLED"]), gte(rounds.drawnAt, since)));
   const [tk] = await db.select({ c: sql<number>`count(*)::int` }).from(tickets).where(gte(tickets.createdAt, since));
-  const v = (await db.select().from(vault).limit(1))[0];
+  const [treasury] = await db
+    .select({ amount: sql<string>`coalesce(sum(${ledger.amount}), 0)` })
+    .from(ledger)
+    .where(and(
+      eq(ledger.account, "accounting"),
+      eq(ledger.type, "treasury_contribution"),
+      isNotNull(ledger.reference),
+      isNotNull(ledger.transactionKey),
+      gte(ledger.createdAt, since),
+    ));
+  const [vaultLedger] = await db
+    .select({ balance: sql<string>`coalesce(sum(${ledger.amount}), 0)` })
+    .from(ledger)
+    .where(and(
+      eq(ledger.account, "vault_balance"),
+      isNotNull(ledger.reference),
+      isNotNull(ledger.transactionKey),
+    ));
   const h = await healthChecks(false);
   await sendMessage(
     chat,
@@ -336,8 +341,8 @@ async function dailyReport() {
       `New players: <b>${u.c}</b>`,
       `Deposits: <b>$${Number(dp.s).toFixed(2)}</b> (${dp.c})`,
       `Withdrawals paid: <b>$${Number(wd.s).toFixed(2)}</b> (${wd.c})`,
-      `Tickets: <b>${tk.c}</b> · Rounds drawn: <b>${rd.c}</b> · Fees: <b>$${(rd.c * 5).toFixed(2)}</b>`,
-      `Vault: <b>$${Number(v?.balance ?? 0).toFixed(2)}</b>`,
+      `Tickets: <b>${tk.c}</b> · Rounds drawn: <b>${rd.c}</b> · Treasury contributions: <b>$${Number(treasury.amount).toFixed(2)}</b>`,
+      `Vault (verified ledger): <b>$${Number(vaultLedger.balance).toFixed(2)}</b>`,
       `Liabilities: $${h.liabilities.toFixed(2)}${h.holdings !== null ? ` · On-chain: $${h.holdings.toFixed(2)} ${h.solvent ? "✅" : "🚨"}` : ""}`,
       `Review queue: ${h.reviewQueue} · Ledger check: ${h.ledgerMismatches === 0 ? "✅" : "🚨 " + h.ledgerMismatches}`,
     ].join("\n"),
@@ -398,7 +403,7 @@ export async function automationStatus() {
   const runs = await db.select().from(jobRuns).orderBy(desc(jobRuns.id)).limit(15);
   const unmatched = await db.select().from(unmatchedTransfers).orderBy(desc(unmatchedTransfers.blockTime)).limit(20);
   const cfg = payoutConfig();
-  const fq = await feeQueue().catch(() => ({ rows: [], pending: 0, paid: 0 }));
+  const fq = await feeQueue();
   const fc = feeConfig();
   return {
     lastRunAt: st.lastRunAt,

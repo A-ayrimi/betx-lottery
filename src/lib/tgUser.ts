@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
 import { users, type User } from "@/db/schema";
-import { ensureSeed, makeReferralCode, rewardSignupReferral } from "@/lib/store";
+import { makeReferralCode, rewardSignupReferral } from "@/lib/store";
 import { fromTelegramLang } from "@/i18n/config";
 
 export interface TgProfile {
@@ -19,7 +19,6 @@ export interface TgProfile {
  * stops people farming rewards by re-opening the same invite link.
  */
 export async function upsertTelegramUser(profile: TgProfile, refCode?: string | null, country?: string | null) {
-  await ensureSeed();
   const tgId = String(profile.id);
   const found = (await db.select().from(users).where(eq(users.telegramId, tgId)).limit(1))[0];
   if (found) return { user: found, created: false, inviter: null as User | null };

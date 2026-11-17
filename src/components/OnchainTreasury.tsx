@@ -19,6 +19,7 @@ interface Onchain {
 export function OnchainTreasury({ demo, compact = false }: { demo: boolean; compact?: boolean }) {
   const { d, t, locale } = useI18n();
   const [data, setData] = useState<Onchain | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (demo) return;
@@ -27,9 +28,19 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
       try {
         const r = await fetch("/api/vault/onchain", { cache: "no-store" });
         const j = (await r.json()) as Onchain;
-        if (alive && j.ok) setData(j);
+        if (!alive) return;
+        if (r.ok && j.ok) {
+          setData(j);
+          setFailed(false);
+        } else {
+          setData(null);
+          setFailed(true);
+        }
       } catch {
-        /* keep last value */
+        if (alive) {
+          setData(null);
+          setFailed(true);
+        }
       }
     };
     void load();
@@ -71,16 +82,22 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
       {data && ok ? (
         <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-1">
           <p dir="ltr" className="font-display tnum text-2xl font-bold text-white">
-            ${money(data.usdt ?? 0)}
+            {data.usdt === null ? "—" : `$${money(data.usdt)}`}
             <span className="ms-1 text-[11px] font-medium text-mint">{d.onchain.usdt}</span>
           </p>
           <p dir="ltr" className="font-display tnum text-[12px] text-mint">
-            {(data.trx ?? 0).toFixed(2)} TRX · {d.onchain.trx}
+            {data.trx === null ? "—" : `${data.trx.toFixed(2)} TRX`} · {d.onchain.trx}
           </p>
         </div>
       ) : (
         <p className="mt-2 text-[12px] text-foil">
-          {!data ? "…" : data.status === "invalid" ? d.onchain.invalid : d.onchain.unavailable}
+          {!data
+            ? failed
+              ? d.errors.unavailable
+              : d.vaultChart.loading
+            : data.status === "invalid"
+              ? d.onchain.invalid
+              : d.onchain.unavailable}
         </p>
       )}
 

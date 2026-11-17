@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { limitByIp, rateLimit } from "@/lib/ratelimit";
-import { and, eq, lt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
 import { deposits } from "@/db/schema";
 import { config } from "@/lib/config";
-import { assertCanPlay, checkDepositLimit, getSessionUser, UserError } from "@/lib/store";
+import { assertCanPlay, getSessionUser, UserError } from "@/lib/store";
+import { DepositReservationError, isValidDepositIdempotencyKey, reserveDeposit } from "@/lib/depositReservations";
 import { broadcast, buildUsdtTransfer, tron } from "@/lib/tron";
 import { settleTronDeposit } from "@/lib/tronDeposits";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
@@ -30,42 +31,40 @@ export async function POST(req: NextRequest) {
     if (body.step === "build") {
       await assertRegion();
       assertCanPlay(me);
+      if (!isValidDepositIdempotencyKey(body.idempotencyKey)) {
+        throw new UserError("depositRequestKey", 400);
+      }
       const amount = Math.round(Number(body.amount) * 100) / 100;
       const { minDeposit, maxDeposit } = config.limits;
       if (!Number.isFinite(amount) || amount < minDeposit || amount > maxDeposit) {
         throw new UserError("depositRange", 400, { min: `$${minDeposit}`, max: `$${maxDeposit}` });
       }
-      // abandoned (never signed) requests must not eat into the daily limit
-      await db
-        .update(deposits)
-        .set({ status: "expired", updatedAt: new Date() })
-        .where(
-          and(
-            eq(deposits.userId, me.id),
-            eq(deposits.provider, "tron"),
-            eq(deposits.status, "waiting"),
-            lt(deposits.createdAt, new Date(Date.now() - 2 * 60 * 1000)),
-          ),
-        );
-      await checkDepositLimit(me, amount);
-
-      const transaction = await buildUsdtTransfer(me.walletAddress, tron.depositAddress, amount);
-      const dep = (
+      const dep = await reserveDeposit(db, {
+        userId: me.id,
+        provider: "tron",
+        amount,
+        orderId: `TRX-${me.id}-${Date.now()}-${randomBytes(3).toString("hex")}`,
+        idempotencyKey: body.idempotencyKey.toLowerCase(),
+        fromAddress: me.walletAddress,
+      });
+      try {
+        const transaction = await buildUsdtTransfer(me.walletAddress, tron.depositAddress, amount);
         await db
-          .insert(deposits)
-          .values({
-            userId: me.id,
-            provider: "tron",
-            orderId: `TRX-${me.id}-${Date.now()}-${randomBytes(3).toString("hex")}`,
-            amountUsd: String(amount),
-            payCurrency: "usdttrc20",
-            status: "waiting",
-            fromAddress: me.walletAddress,
-            expectedTxId: transaction.txID,
-          })
-          .returning()
-      )[0];
-      return NextResponse.json({ ok: true, depositId: dep.id, transaction });
+          .update(deposits)
+          .set({ expectedTxId: transaction.txID, updatedAt: new Date() })
+          .where(eq(deposits.id, dep.id));
+        return NextResponse.json({ ok: true, depositId: dep.id, transaction });
+      } catch (error) {
+        try {
+          await db
+            .update(deposits)
+            .set({ status: "failed", updatedAt: new Date() })
+            .where(eq(deposits.id, dep.id));
+        } catch (cleanupError) {
+          console.error("Could not release the failed TRON deposit reservation", cleanupError);
+        }
+        throw error;
+      }
     }
 
     if (body.step === "submit") {
@@ -92,6 +91,11 @@ export async function POST(req: NextRequest) {
 
     throw new UserError("txMismatch");
   } catch (e) {
+    if (e instanceof DepositReservationError) {
+      if (e.code === "user_not_found") return handleError(new UserError("userNotFound", 404));
+      if (e.code === "idempotency_conflict") return handleError(new UserError("depositRequestKey", 409));
+      return handleError(new UserError("depositLimit", 403, { limit: `$${e.limit?.toFixed(2) ?? "0.00"}` }));
+    }
     return handleError(e);
   }
 }

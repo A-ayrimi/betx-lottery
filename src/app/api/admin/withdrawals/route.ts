@@ -25,23 +25,23 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   try {
     const body = await req.json().catch(() => ({}));
-    const action = body.action === "paid" ? "paid" : body.action === "rejected" ? "rejected" : null;
-    if (!action) return NextResponse.json({ ok: false, error: "action must be paid|rejected" }, { status: 400 });
+    if (body.action !== "rejected") {
+      return NextResponse.json({ ok: false, error: "Withdrawals can only be rejected here; use the verified payment endpoint to pay." }, { status: 400 });
+    }
+    const action = "rejected" as const;
 
     const { withdrawal, telegramId, locale } = await processWithdrawal(
       Number(body.id),
       action,
       body.txHash ? String(body.txHash).slice(0, 120) : undefined,
       body.note ? String(body.note).slice(0, 200) : undefined,
+      "admin",
     );
     if (telegramId) {
       const b = botStrings(locale);
       await sendMessage(
         telegramId,
-        action === "paid"
-          ? interpolate(b.wdPaid, { amount: `$${Number(withdrawal.amount).toFixed(2)}` }) +
-              (body.txHash ? `\nTx: <code>${String(body.txHash).slice(0, 120)}</code>` : "")
-          : interpolate(b.wdRejected, { id: withdrawal.id }),
+        interpolate(b.wdRejected, { id: withdrawal.id }),
       );
     }
     return NextResponse.json({ ok: true });

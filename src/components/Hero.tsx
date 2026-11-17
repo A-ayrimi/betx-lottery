@@ -19,10 +19,17 @@ const fade = {
 };
 
 export function Hero() {
-  const { state, setToast } = useApp();
+  const { state, loading, dataUnavailable, demoEnabled, setToast } = useApp();
   const { d, t, n } = useI18n();
   const v = state?.vault;
-  const profit = v ? Math.max(0, v.balance - v.initialCapital) : 0;
+  const profit = v ? v.balance - v.initialCapital : null;
+  const unavailableText = dataUnavailable
+    ? d.errors.unavailable
+    : loading
+      ? d.vaultChart.loading
+      : demoEnabled
+        ? d.wc.demoBadge
+        : d.errors.unavailable;
 
   return (
     <section id="top" className="relative overflow-hidden">
@@ -52,7 +59,7 @@ export function Hero() {
             dir="ltr"
             className="micro inline-flex items-center gap-2 rounded-full border border-foil/30 bg-foil/[0.08] px-3.5 py-2 text-foil"
           >
-            PLAY SMART. WIN INSTANT. <span className="text-neon-2">◆</span> USDT
+            PLAY SMART · ADMIN-REVIEWED DRAWS <span className="text-neon-2">◆</span> USDT
           </motion.p>
 
           <motion.h1
@@ -87,10 +94,15 @@ export function Hero() {
           </motion.div>
 
           <motion.div custom={4} variants={fade} initial="hidden" animate="show" className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <Stat label="INITIAL VAULT" value={`$${money(v?.initialCapital ?? 20)}`} note={d.hero.statInitial} />
-            <Stat label="NET PROFIT" value={`+$${money(profit)}`} note={d.hero.statProfit} tone="foil" />
-            <Stat label="ROUNDS PAID" value={n(v?.roundsCompleted ?? 0)} note={d.hero.statRounds} />
-            <Stat label="PLAYERS" value={n(state?.stats.players ?? 0)} note={d.hero.statPlayers} />
+            <Stat label="INITIAL CAPITAL" value={v ? `$${money(v.initialCapital)}` : "—"} note={d.hero.statInitial} />
+            <Stat
+              label="LEDGER CHANGE"
+              value={profit === null ? "—" : `${profit > 0 ? "+" : ""}$${money(profit)}`}
+              note={d.hero.statProfit}
+              tone="foil"
+            />
+            <Stat label="ROUNDS SETTLED" value={v ? n(v.roundsCompleted) : "—"} note={d.hero.statRounds} />
+            <Stat label="REGISTERED USERS" value={state ? n(state.stats.players) : "—"} note={d.hero.statPlayers} />
           </motion.div>
         </div>
 
@@ -111,9 +123,11 @@ export function Hero() {
             </div>
 
             <p dir="ltr" className="font-display tnum mt-5 text-[clamp(2.8rem,7vw,4.1rem)] font-bold leading-none text-white">
-              <AnimatedMoney value={v?.balance ?? 20} />
+              {v ? <AnimatedMoney value={v.balance} /> : "—"}
             </p>
-            <p className="mt-2 text-sm text-mint">{d.hero.cashNote}</p>
+            <p role={dataUnavailable ? "alert" : undefined} className="mt-2 text-sm text-mint">
+              {v ? d.hero.cashNote : unavailableText}
+            </p>
 
             <div className="mt-4 rounded-xl border border-foil/25 bg-foil/[0.06] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
@@ -125,43 +139,41 @@ export function Hero() {
               </p>
               <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-mint">
                 <span>
-                  {d.hero.adminEarnings}:{" "}
+                  {d.hero.treasuryAllocation}:{" "}
                   <span dir="ltr" className="font-display tnum font-bold text-white">
-                    ${money(v?.adminEarnings ?? v?.totalFees ?? 0)}
+                    {v ? `$${money(v.totalFees)}` : "—"}
                   </span>
                 </span>
-                <span className="text-foil/80">{d.hero.autoFee}</span>
+                <span className="text-foil/80">
+                  {d.hero.adminEarnings}:{" "}
+                  <span dir="ltr" className="font-display tnum font-bold text-white">
+                    {v ? `$${money(v.adminEarnings)}` : "—"}
+                  </span>
+                </span>
               </div>
               <p className="mt-1 text-[10px] text-mint/60">{d.hero.treasuryNote}</p>
             </div>
 
             <div className="mt-3">
-              <OnchainTreasury demo={!state?.config.live} />
-            </div>
-
-            <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
-              <motion.div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#0b6b48,#35ffb0_60%,#e9c46a)]"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (v?.balance ?? 20))}%` }}
-                transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.5 }}
-              />
-            </div>
-            <div dir="ltr" className="mt-2 flex justify-between font-display text-[10px] tracking-[0.2em] text-mint">
-              <span>$0</span>
-              <span>$100 TARGET</span>
+              <OnchainTreasury demo={state ? !state.config.live : demoEnabled} />
             </div>
 
             <div className="mt-7 grid grid-cols-2 gap-3">
-              <Cell label={d.hero.cellFee} value="25%" note={d.hero.cellFeeNote} />
-              <Cell label={d.hero.cellPrize} value="$15" note={d.hero.cellPrizeNote} />
-              <Cell label={d.hero.cellOdds} value="1/20" note={d.hero.cellOddsNote} />
-              <Cell label={d.hero.cellCap} value="20" note={d.hero.cellCapNote} />
+              <Cell
+                label={d.hero.cellFee}
+                value={state ? `$${money(state.config.treasuryContributionPerRound)} + $${money(state.config.adminGrossRevenuePerRound)}` : "—"}
+                note={d.hero.cellFeeNote}
+              />
+              <Cell label={d.hero.cellPrize} value={state ? `$${money(state.config.prizePerRound)}` : "—"} note={d.hero.cellPrizeNote} />
+              <Cell label={d.hero.cellOdds} value={state ? `1/${state.config.roundCapacity}` : "—"} note={d.hero.cellOddsNote} />
+              <Cell label={d.hero.cellCap} value={state ? n(state.config.roundCapacity) : "—"} note={d.hero.cellCapNote} />
             </div>
 
-            <p className="mt-6 rounded-xl border border-neon/20 bg-neon/[0.06] px-4 py-3 text-[13px] leading-7 text-mint">
-              <span className="text-neon-2">◆</span> {t(d.hero.floor, { amount: `$${money(v?.initialCapital ?? 20)}` })}
-            </p>
+            {v ? (
+              <p className="mt-6 rounded-xl border border-neon/20 bg-neon/[0.06] px-4 py-3 text-[13px] leading-7 text-mint">
+                <span className="text-neon-2">◆</span> {t(d.hero.floor, { amount: `$${money(v.initialCapital)}` })}
+              </p>
+            ) : null}
           </div>
         </motion.aside>
       </div>

@@ -18,6 +18,7 @@ import {
   clearDemoSession,
   createDemoState,
   depositDemoBalance,
+  isDemoAppState,
   DEMO_WALLET_ADDRESS,
   loadDemoSession,
   saveDemoSession,
@@ -34,6 +35,7 @@ declare global {
 interface Ctx {
   state: AppState | null;
   loading: boolean;
+  dataUnavailable: boolean;
   toast: string | null;
   draw: DrawResult | null;
   pendingRef: string;
@@ -77,45 +79,55 @@ export function AppProvider({
 }) {
   const [state, setState] = useState<AppState | null>(initialState);
   const [loading, setLoading] = useState(!initialState);
+  const [dataUnavailable, setDataUnavailable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [draw, setDraw] = useState<DrawResult | null>(null);
   const [isDemoSession, setIsDemoSession] = useState(false);
   const [walletConnectOpen, setWalletConnectOpen] = useState(false);
-  const stateRef = useRef(state);
+  const refreshGeneration = useRef(0);
   const pendingRef = useStored("betx_ref", "") ?? "";
   const { d, t, locale } = useI18n();
-
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
 
   const openWalletConnect = useCallback(() => setWalletConnectOpen(true), []);
   const closeWalletConnect = useCallback(() => setWalletConnectOpen(false), []);
 
-  const refresh = useCallback(async (force = false) => {
+  const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     if (demoEnabled) {
       const saved = loadDemoSession();
       if (saved) {
         setState(saved.state);
         setIsDemoSession(true);
+        setDataUnavailable(false);
         setLoading(false);
         return;
       }
-      if (isDemoSession || (!stateRef.current?.user && !force)) {
-        setLoading(false);
-        return;
-      }
+      setState(null);
+      setIsDemoSession(false);
+      setDataUnavailable(false);
+      setLoading(false);
+      return;
     }
     try {
       const res = await fetch("/api/state", { cache: "no-store" });
       const json = await res.json();
-      if (json.ok) setState(json.state);
+      if (generation !== refreshGeneration.current) return;
+      if (!res.ok || !json.ok || !json.state || typeof json.state !== "object") {
+        setState(null);
+        setDataUnavailable(true);
+        return;
+      }
+      setState(json.state);
+      setDataUnavailable(false);
     } catch {
-      /* keep last known state */
+      if (generation === refreshGeneration.current) {
+        setState(null);
+        setDataUnavailable(true);
+      }
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
-  }, [demoEnabled, isDemoSession]);
+  }, [demoEnabled]);
 
   const startDemoSession = useCallback(
     (address: string) => {
@@ -126,6 +138,7 @@ export function AppProvider({
       saveDemoSession(next);
       setState(next);
       setIsDemoSession(true);
+      setDataUnavailable(false);
       setLoading(false);
     },
     [demoEnabled, locale],
@@ -228,7 +241,7 @@ export function AppProvider({
 
   const account = useCallback(
     async (body: Record<string, unknown>) => {
-      if (isDemoSession && state?.user) {
+      if (isDemoSession && state && isDemoAppState(state) && state.user) {
         let nextUser = state.user;
         if (body.action === "self_exclude") {
           const days = Number(body.days);
@@ -263,19 +276,20 @@ export function AppProvider({
   const logout = useCallback(async () => {
     if (isDemoSession) {
       clearDemoSession();
-      setState(demoEnabled ? createDemoState() : null);
+      setState(null);
       setIsDemoSession(false);
+      setDataUnavailable(false);
       setToast(d.toast.loggedOut);
       return;
     }
     await post("/api/auth/logout");
-    await refresh(true);
+    await refresh();
     setToast(d.toast.loggedOut);
-  }, [refresh, d, demoEnabled, isDemoSession]);
+  }, [refresh, d, isDemoSession]);
 
   const buy = useCallback(
     async (count: number) => {
-      if (isDemoSession && state) {
+      if (isDemoSession && state && isDemoAppState(state)) {
         const result = buyDemoTickets(state, count);
         if (result.error === "insufficient") {
           setToast(d.toast.buyFail);
@@ -317,7 +331,7 @@ export function AppProvider({
   );
 
   const spin = useCallback(async () => {
-    if (isDemoSession && state) {
+    if (isDemoSession && state && isDemoAppState(state)) {
       const result = spinDemoWheel(state);
       if (!result.ok) {
         setToast(d.toast.spinFail);
@@ -343,7 +357,7 @@ export function AppProvider({
 
   const deposit = useCallback(
     async (amount: number) => {
-      if (isDemoSession && state) {
+      if (isDemoSession && state && isDemoAppState(state)) {
         const next = depositDemoBalance(state, amount);
         if (!next) {
           setToast(d.toast.payFail);
@@ -354,7 +368,7 @@ export function AppProvider({
         setToast(t(d.toast.demoCredited, { amount: `$${Number(amount).toFixed(2)}` }));
         return true;
       }
-      const json = await post("/api/payments/deposit", { amount });
+      const json = await post("/api/payments/deposit", { amount, idempotencyKey: crypto.randomUUID() });
       if (!json.ok) {
         setToast(json.error || d.toast.payFail);
         return false;
@@ -372,7 +386,7 @@ export function AppProvider({
 
   const withdraw = useCallback(
     async (amount: number, address: string) => {
-      if (isDemoSession && state) {
+      if (isDemoSession && state && isDemoAppState(state)) {
         const next = withdrawDemoBalance(state, amount, address);
         if (!next) {
           setToast(d.toast.wdFail);
@@ -399,6 +413,7 @@ export function AppProvider({
     () => ({
       state,
       loading,
+      dataUnavailable,
       toast,
       draw,
       pendingRef,
@@ -422,6 +437,7 @@ export function AppProvider({
     [
       state,
       loading,
+      dataUnavailable,
       toast,
       draw,
       pendingRef,
@@ -442,7 +458,20 @@ export function AppProvider({
     ],
   );
 
-  return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
+  return (
+    <AppCtx.Provider value={value}>
+      {dataUnavailable ? (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="border-b border-red-500/30 bg-red-950 px-4 py-3 text-center text-sm text-red-100"
+        >
+          {d.errors.unavailable}
+        </div>
+      ) : null}
+      {children}
+    </AppCtx.Provider>
+  );
 }
 
 export function useApp() {

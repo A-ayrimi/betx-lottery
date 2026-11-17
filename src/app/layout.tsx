@@ -11,9 +11,9 @@ import { defaultLocale, dirOf, isLocale } from "@/i18n/config";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
   // Titles are fully composed per page (each dictionary already ends with “| BETX”).
-  title: "BETX | One ticket. One chance. Instant USDT wins.",
+  title: "BETX | One ticket. One chance. Administrator-reviewed draws.",
   description:
-    "BETX lucky pool: $1 tickets, 20-ticket provably-fair draws, a free daily wheel and instant USDT-TRC20 payouts.",
+    "BETX lucky pool: $1 tickets, 20-ticket provably-fair draws with administrator review, a free daily wheel and reviewed USDT-TRC20 withdrawals.",
   applicationName: "BETX",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "BETX", statusBarStyle: "black-translucent" },

@@ -1,4 +1,5 @@
 import { TronWeb } from "tronweb";
+import { getBetxMode } from "./config.ts";
 
 /**
  * TRON / USDT-TRC20 integration (server-only).
@@ -46,7 +47,7 @@ export const tron = {
     return Number(process.env.TRON_USDT_DECIMALS || 6);
   },
   get depositAddress() {
-    return (process.env.TRON_DEPOSIT_ADDRESS || process.env.ADMIN_WALLET || "TN41NBCuPWnReq3TgQJtuLLVmauwgRNVen").trim();
+    return (process.env.TRON_DEPOSIT_ADDRESS || process.env.ADMIN_WALLET || "").trim();
   },
   get apiKey() {
     return process.env.TRONGRID_API_KEY || "";
@@ -78,6 +79,14 @@ export function isTronAddress(a: unknown): a is string {
 export const isTxId = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{64}$/i.test(v);
 
 export const shortAddr = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+
+export function isTronBroadcastAuthorized() {
+  try {
+    return getBetxMode() === "live" && process.env.TRON_BROADCAST_ENABLED === "true";
+  } catch {
+    return false;
+  }
+}
 
 /** USD (2 decimals) -> token base units, without floating point drift. */
 export function toUnits(amountUsd: number): bigint {
@@ -150,11 +159,26 @@ function decodeMessage(m: unknown) {
   return m;
 }
 
-export async function broadcast(signed: unknown): Promise<{ ok: boolean; txid: string | null; error?: string }> {
+export async function broadcast(
+  signed: unknown,
+  sendRawTransaction: (transaction: unknown) => Promise<unknown> = (transaction) =>
+    tw().trx.sendRawTransaction(transaction as never),
+): Promise<{ ok: boolean; txid: string | null; error?: string }> {
+  if (!isTronBroadcastAuthorized()) {
+    return { ok: false, txid: null, error: "Live TRON broadcast authorization is disabled." };
+  }
   try {
-    const r: any = await tw().trx.sendRawTransaction(signed as any);
-    if (r?.result) return { ok: true, txid: r.txid || r.transaction?.txID || null };
-    return { ok: false, txid: null, error: `${r?.code ?? "ERROR"} ${decodeMessage(r?.message)}`.trim() };
+    const response = await sendRawTransaction(signed);
+    const r = response && typeof response === "object" ? response as Record<string, unknown> : null;
+    if (r?.result) {
+      const transaction = r.transaction && typeof r.transaction === "object"
+        ? r.transaction as Record<string, unknown>
+        : null;
+      const txid = typeof r.txid === "string" ? r.txid : typeof transaction?.txID === "string" ? transaction.txID : null;
+      return { ok: true, txid };
+    }
+    const code = typeof r?.code === "string" ? r.code : "ERROR";
+    return { ok: false, txid: null, error: `${code} ${decodeMessage(r?.message)}`.trim() };
   } catch (e) {
     return { ok: false, txid: null, error: e instanceof Error ? e.message : String(e) };
   }

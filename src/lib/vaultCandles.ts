@@ -1,6 +1,6 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { rounds, vault, vaultSnapshots } from "@/db/schema";
+import { ledger } from "@/db/schema";
 
 /**
  * Candle series for the vault balance, built ONLY from recorded snapshots
@@ -55,69 +55,6 @@ interface Row {
   balance: number;
   delta: number;
   roundId: number | null;
-}
-
-/** Idempotent: fills history for databases created before snapshots existed. */
-export async function ensureVaultSnapshots(): Promise<void> {
-  const [c] = await db.select({ c: sql<number>`count(*)::int` }).from(vaultSnapshots);
-  if ((c?.c ?? 0) > 0) return;
-
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(424244)`);
-    const [again] = await tx.select({ c: sql<number>`count(*)::int` }).from(vaultSnapshots);
-    if ((again?.c ?? 0) > 0) return;
-
-    const [v] = await tx.select().from(vault).limit(1);
-    if (!v) return;
-    const initial = Number(v.initialCapital);
-    const drawn = await tx
-      .select()
-      .from(rounds)
-      .where(eq(rounds.status, "drawn"))
-      .orderBy(asc(rounds.drawnAt), asc(rounds.id));
-    if (drawn.length === 0) {
-      await tx.insert(vaultSnapshots).values({
-        balance: String(Number(v.balance)),
-        delta: "0",
-        reason: "seed",
-        createdAt: new Date(Date.now() - HOUR),
-      });
-      return;
-    }
-    const firstAt = drawn[0].drawnAt ? new Date(drawn[0].drawnAt).getTime() : Date.now();
-    await tx.insert(vaultSnapshots).values({
-      balance: String(initial),
-      delta: "0",
-      reason: "seed",
-      createdAt: new Date(firstAt - HOUR),
-    });
-
-    // Each completed round credited its fee to the vault: rebuild that path.
-    let running = initial;
-    for (const r of drawn) {
-      const fee = Number(r.fee);
-      running += fee;
-      await tx.insert(vaultSnapshots).values({
-        balance: String(running),
-        delta: String(fee),
-        reason: "backfill",
-        roundId: r.id,
-        createdAt: r.drawnAt ? new Date(r.drawnAt) : new Date(),
-      });
-    }
-
-    // Any untracked movement (spins, referral bonuses before this feature)
-    // is reconciled so the last candle always equals the real vault balance.
-    const current = Number(v.balance);
-    if (Math.abs(running - current) > 0.009) {
-      await tx.insert(vaultSnapshots).values({
-        balance: String(current),
-        delta: String(Math.round((current - running) * 100) / 100),
-        reason: "backfill",
-        createdAt: new Date(),
-      });
-    }
-  });
 }
 
 /** Round-based candles: a candle closes at each completed draw. */
@@ -182,25 +119,60 @@ function byTime(rows: Row[], size: number, span: number, now: number, initial: n
 }
 
 export async function getVaultCandles(tf: VaultTf): Promise<VaultPayload> {
-  await ensureVaultSnapshots();
-  const [v] = await db.select().from(vault).limit(1);
-  const raw = (
-    await db
-      .select()
-      .from(vaultSnapshots)
-      .orderBy(desc(vaultSnapshots.createdAt), desc(vaultSnapshots.id))
-      .limit(MAX_ROWS)
-  ).reverse();
-  const rows: Row[] = raw.map((r) => ({
-    ts: new Date(r.createdAt).getTime(),
-    balance: Number(r.balance),
-    delta: Number(r.delta),
-    roundId: r.roundId ?? null,
-  }));
+  const balanceRows = await db
+    .select({
+      amount: ledger.amount,
+      createdAt: ledger.createdAt,
+      roundId: ledger.roundId,
+      id: ledger.id,
+      type: ledger.type,
+    })
+    .from(ledger)
+    .where(and(
+      eq(ledger.account, "vault_balance"),
+      isNotNull(ledger.reference),
+      isNotNull(ledger.transactionKey),
+    ))
+    .orderBy(desc(ledger.createdAt), desc(ledger.id))
+    .limit(MAX_ROWS);
+  const raw = balanceRows.reverse();
+  const [totals] = await db
+    .select({
+      current: sql<string>`coalesce(sum(${ledger.amount}), 0)`,
+      initialCapital: sql<string>`coalesce(sum(case when ${ledger.type} = 'vault_seed' then ${ledger.amount} else 0 end), 0)`,
+    })
+    .from(ledger)
+    .where(and(
+      eq(ledger.account, "vault_balance"),
+      isNotNull(ledger.reference),
+      isNotNull(ledger.transactionKey),
+    ));
+  const current = Number(totals?.current ?? 0);
+  const initial = Number(totals?.initialCapital ?? 0);
+  const omittedBalance = current - raw.reduce((sum, row) => sum + Number(row.amount), 0);
+  let running = omittedBalance;
+  const rows: Row[] = raw.map((entry) => {
+    const delta = Number(entry.amount);
+    running += delta;
+    return {
+      ts: new Date(entry.createdAt).getTime(),
+      balance: running,
+      delta,
+      roundId: entry.type === "vault_treasury_contribution" ? entry.roundId ?? null : null,
+    };
+  });
 
   const now = Date.now();
-  const initial = Number(v?.initialCapital ?? 20);
-  const current = Number(v?.balance ?? initial);
+
+  if (rows.length === 0) {
+    return {
+      ok: true,
+      tf,
+      candles: [],
+      summary: { current: 0, change: 0, changePct: 0, high: 0, low: 0, volume: 0, fees: 0, count: 0, initialCapital: 0 },
+      updatedAt: new Date(now).toISOString(),
+    };
+  }
 
   let candles: VaultCandle[];
   if (tf === "round") {

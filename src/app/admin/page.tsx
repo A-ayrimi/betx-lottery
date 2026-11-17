@@ -37,22 +37,31 @@ function AdminInner() {
   const wallet = useWallet();
   const [paying, setPaying] = useState<number | null>(null);
   const [token, setToken] = useState("");
-  const [data, setData] = useState<{ withdrawals: W[]; deposits: D[]; vault: { balance: number; totalFees: number } } | null>(null);
+  const [data, setData] = useState<{ withdrawals: W[]; deposits: D[]; vault: { balance: number; totalFees: number; adminEarnings: number } } | null>(null);
   const [err, setErr] = useState("");
-  const [tx, setTx] = useState<Record<number, string>>({});
 
 
   const load = useCallback(async (t: string) => {
     setErr("");
-    const res = await fetch("/api/admin/withdrawals", { headers: { "x-admin-token": t }, cache: "no-store" });
-    const json = await res.json();
-    if (!json.ok) {
-      setErr("Invalid admin token.");
+    try {
+      const res = await fetch("/api/admin/withdrawals", { headers: { "x-admin-token": t }, cache: "no-store" });
+      const json = await res.json();
+      if (res.status === 403) {
+        setErr("Invalid admin token.");
+        setData(null);
+        return;
+      }
+      if (!res.ok || !json.ok) {
+        setErr("Data temporarily unavailable.");
+        setData(null);
+        return;
+      }
+      sessionStorage.setItem("betx_admin", t);
+      setData(json);
+    } catch {
+      setErr("Data temporarily unavailable.");
       setData(null);
-      return;
     }
-    sessionStorage.setItem("betx_admin", t);
-    setData(json);
   }, []);
 
   useEffect(() => {
@@ -65,11 +74,11 @@ function AdminInner() {
     return () => window.clearTimeout(id);
   }, [load]);
 
-  const act = async (id: number, action: "paid" | "rejected") => {
+  const act = async (id: number, action: "rejected") => {
     const res = await fetch("/api/admin/withdrawals", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify({ id, action, txHash: tx[id] }),
+      body: JSON.stringify({ id, action }),
     });
     const json = await res.json();
     if (!json.ok) setErr(json.error || "Error");
@@ -129,14 +138,18 @@ function AdminInner() {
 
       {data ? (
         <>
-          <div className="mt-8 grid grid-cols-2 gap-3">
+          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="panel rounded-2xl p-5">
               <p className="micro text-mint">VAULT</p>
               <p dir="ltr" className="font-display mt-1 text-2xl text-white">${data.vault.balance.toFixed(2)}</p>
             </div>
             <div className="panel rounded-2xl p-5">
-              <p className="micro text-mint">TOTAL FEES</p>
+              <p className="micro text-mint">TREASURY ALLOCATED</p>
               <p dir="ltr" className="font-display mt-1 text-2xl text-foil">${data.vault.totalFees.toFixed(2)}</p>
+            </div>
+            <div className="panel rounded-2xl p-5">
+              <p className="micro text-mint">ADMIN GROSS REVENUE</p>
+              <p dir="ltr" className="font-display mt-1 text-2xl text-foil">${data.vault.adminEarnings.toFixed(2)}</p>
             </div>
           </div>
 
@@ -188,22 +201,12 @@ function AdminInner() {
                 {w.status === "processing" ? <p className="mt-1 text-[12px] text-neon-2">Auto payout in flight — confirming on-chain…</p> : null}
                 {w.status === "pending" ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <input
-                      dir="ltr"
-                      placeholder="tx hash (optional)"
-                      value={tx[w.id] || ""}
-                      onChange={(e) => setTx({ ...tx, [w.id]: e.target.value })}
-                      className="focus-ring min-w-[220px] flex-1 rounded-lg border border-rule bg-black/30 px-3 py-2 text-[12px] text-white"
-                    />
                     <button
                       onClick={() => payWithWallet(w.id)}
                       disabled={!wallet.address || paying !== null}
                       className="btn-foil rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
                     >
                       {paying === w.id ? "Confirm in wallet…" : "Pay with wallet"}
-                    </button>
-                    <button onClick={() => act(w.id, "paid")} className="btn-neon rounded-lg px-4 py-2 text-sm font-bold">
-                      Mark paid (manual)
                     </button>
                     <button onClick={() => act(w.id, "rejected")} className="rounded-lg border border-rule px-4 py-2 text-sm text-mint">
                       Reject & refund
@@ -264,10 +267,22 @@ interface Readiness {
 
 function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: number }) {
   const [r, setR] = useState<Readiness | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/automation", { headers: { "x-admin-token": token }, cache: "no-store" });
-    const j = await res.json();
-    if (j.ok) setR({ readiness: j.readiness, onchain: j.onchain });
+    try {
+      const res = await fetch("/api/admin/automation", { headers: { "x-admin-token": token }, cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setR(null);
+        setUnavailable(true);
+        return;
+      }
+      setR({ readiness: j.readiness, onchain: j.onchain });
+      setUnavailable(false);
+    } catch {
+      setR(null);
+      setUnavailable(true);
+    }
   }, [token]);
   useEffect(() => {
     const first = window.setTimeout(load, 0);
@@ -277,7 +292,13 @@ function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: 
       window.clearInterval(id);
     };
   }, [load]);
-  if (!r) return <div className="panel mt-6 h-24 animate-pulse rounded-2xl" />;
+  if (!r) {
+    return (
+      <div role={unavailable ? "alert" : "status"} className="panel mt-6 rounded-2xl px-5 py-8 text-sm text-mint">
+        {unavailable ? "Data temporarily unavailable." : "Loading readiness data…"}
+      </div>
+    );
+  }
   const oc = r.onchain;
   const diff = oc && oc.usdt !== null ? Math.round((oc.usdt - vaultBalance) * 100) / 100 : null;
   return (
@@ -332,13 +353,23 @@ function FeesPanel({ token }: { token: string }) {
     paid: number;
     transfers: FeeRow[];
   } | null>(null);
-  const [tx, setTx] = useState<Record<number, string>>({});
-  const [msg, setMsg] = useState("");
+  const [unavailable, setUnavailable] = useState(false);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/admin/fees", { headers: { "x-admin-token": token }, cache: "no-store" });
-    const j = await res.json();
-    if (j.ok) setData(j);
+    try {
+      const res = await fetch("/api/admin/fees", { headers: { "x-admin-token": token }, cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setData(null);
+        setUnavailable(true);
+        return;
+      }
+      setData(j);
+      setUnavailable(false);
+    } catch {
+      setData(null);
+      setUnavailable(true);
+    }
   }, [token]);
 
   useEffect(() => {
@@ -350,39 +381,32 @@ function FeesPanel({ token }: { token: string }) {
     };
   }, [refresh]);
 
-  const markPaid = async (id: number) => {
-    setMsg("");
-    const res = await fetch("/api/admin/fees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify({ id, txHash: tx[id] }),
-    });
-    const j = await res.json();
-    setMsg(j.ok ? `Fee #${id} marked paid ✓` : j.error || "Failed");
-    await refresh();
-  };
-
-  if (!data) return <div className="panel mt-6 h-24 animate-pulse rounded-2xl" />;
+  if (!data) {
+    return (
+      <div role={unavailable ? "alert" : "status"} className="panel mt-6 rounded-2xl px-5 py-8 text-sm text-mint">
+        {unavailable ? "Data temporarily unavailable." : "Loading treasury data…"}
+      </div>
+    );
+  }
 
   return (
     <div className="panel mt-6 rounded-2xl p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-lg font-black text-white">Treasury · $5 auto-fee per round</p>
+        <p className="text-lg font-black text-white">Treasury transfers</p>
         <span className="micro text-mint">
-          {data.config.autoSweep ? `AUTO-SWEEP ON ≥ $${data.config.threshold}` : "AUTO-ACCRUE · MANUAL SETTLEMENT"}
+          TRANSFERS PAUSED · HISTORICAL RECONCILIATION REQUIRED
         </span>
       </div>
       <p className="mt-2 break-all text-xs text-mint">
         Admin wallet: <code className="text-neon-2">{data.config.adminWallet}</code>
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
-        <Stat k="ACCRUED PENDING" v={`$${data.pending.toFixed(2)}`} bad={data.pending > 0 && !data.config.autoSweep} />
+        <Stat k="ACCRUED PENDING" v={`$${data.pending.toFixed(2)}`} bad={data.pending > 0} />
         <Stat k="SETTLED ON-CHAIN" v={`$${data.paid.toFixed(2)}`} />
         <Stat k="TRANSFERS" v={String(data.transfers.length)} />
       </div>
-      {msg ? <p className="mt-2 text-xs text-foil">{msg}</p> : null}
       <div className="mt-4 overflow-hidden rounded-xl border border-rule">
-        {data.transfers.length === 0 ? <p className="px-4 py-3 text-xs text-mint">No fee transfers yet — they appear automatically after each draw.</p> : null}
+        {data.transfers.length === 0 ? <p className="px-4 py-3 text-xs text-mint">No treasury transfer records.</p> : null}
         {data.transfers.slice(0, 15).map((f) => (
           <div key={f.id} className="border-b border-rule/50 px-4 py-3 last:border-b-0">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -391,22 +415,7 @@ function FeesPanel({ token }: { token: string }) {
               </span>
               <span className={f.status === "paid" ? "text-neon-2" : "text-foil"}>{f.status}</span>
             </div>
-            {f.txHash ? (
-              <p className="mt-1 break-all font-display text-[11px] text-mint">tx: {f.txHash}</p>
-            ) : (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <input
-                  dir="ltr"
-                  placeholder="on-chain tx hash after manual transfer"
-                  value={tx[f.id] || ""}
-                  onChange={(e) => setTx({ ...tx, [f.id]: e.target.value })}
-                  className="focus-ring min-w-[200px] flex-1 rounded-lg border border-rule bg-black/30 px-3 py-2 text-[11px] text-white"
-                />
-                <button onClick={() => markPaid(f.id)} className="rounded-lg border border-foil/40 px-3 py-2 text-[11px] text-foil hover:bg-foil/10">
-                  Mark paid
-                </button>
-              </div>
-            )}
+            {f.txHash ? <p className="mt-1 break-all font-display text-[11px] text-mint">tx: {f.txHash}</p> : null}
             {f.lastError ? <p className="mt-1 text-[11px] text-red-300">{f.lastError}</p> : null}
           </div>
         ))}
@@ -427,12 +436,25 @@ function Stat({ k, v, bad }: { k: string; v: string; bad?: boolean }) {
 function AutomationPanel({ token }: { token: string }) {
   const [auto, setAuto] = useState<Auto | null>(null);
   const [busy, setBusy] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [preview, setPreview] = useState<{ id: number; amount: number; user: string; ok: boolean; reason?: string }[] | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/admin/automation", { headers: { "x-admin-token": token }, cache: "no-store" });
-    const j = await res.json();
-    if (j.ok) setAuto(j);
+    try {
+      const res = await fetch("/api/admin/automation", { headers: { "x-admin-token": token }, cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setAuto(null);
+        setUnavailable(true);
+        return;
+      }
+      setAuto(j);
+      setUnavailable(false);
+    } catch {
+      setAuto(null);
+      setUnavailable(true);
+    }
   }, [token]);
 
   useEffect(() => {
@@ -446,18 +468,34 @@ function AutomationPanel({ token }: { token: string }) {
 
   const call = async (action: "run" | "evaluate") => {
     setBusy(true);
-    const res = await fetch("/api/admin/automation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-token": token },
-      body: JSON.stringify({ action }),
-    });
-    const j = await res.json();
-    if (action === "evaluate" && j.ok) setPreview(j.decisions);
-    await refresh();
-    setBusy(false);
+    setActionError("");
+    try {
+      const res = await fetch("/api/admin/automation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-token": token },
+        body: JSON.stringify({ action }),
+      });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        setActionError("Data temporarily unavailable.");
+        return;
+      }
+      if (action === "evaluate") setPreview(j.decisions);
+      await refresh();
+    } catch {
+      setActionError("Data temporarily unavailable.");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  if (!auto) return <div className="panel mt-6 h-24 animate-pulse rounded-2xl" />;
+  if (!auto) {
+    return (
+      <div role={unavailable ? "alert" : "status"} className="panel mt-6 rounded-2xl px-5 py-8 text-sm text-mint">
+        {unavailable ? "Data temporarily unavailable." : "Loading automation data…"}
+      </div>
+    );
+  }
   const { status: st, health: h } = auto;
   const healthy = st.ageSeconds !== null && st.ageSeconds < 300 && !st.lastError;
 
@@ -481,6 +519,7 @@ function AutomationPanel({ token }: { token: string }) {
           </button>
         </div>
       </div>
+      {actionError ? <p role="alert" className="mt-3 text-xs text-red-300">{actionError}</p> : null}
       {st.lastError ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">{st.lastError}</p> : null}
 
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
