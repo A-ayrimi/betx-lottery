@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/phase1-safety.test.mjs tests/regression-safety.test.mjs tests/postgres-regressions.test.mjs"
+    "test": "node --experimental-strip-types --test tests/phase1-safety.test.mjs tests/regression-safety.test.mjs tests/postgres-regressions.test.mjs tests/postgres-tls-regressions.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

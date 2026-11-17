@@ -31,13 +31,16 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   if (!isLocale(locale)) notFound();
 
   const dict = getDictionary(locale);
-  const demoEnabled = !publicConfig().live;
+  const demoMode = !publicConfig().live;
+  const databaseTestMode =
+    demoMode && process.env.NODE_ENV === "development" && process.env.BETX_TEST_DATABASE_UI === "true";
+  const demoEnabled = demoMode && !databaseTestMode;
 
   return (
     <I18nProvider locale={locale} dict={dict}>
       <AppProvider demoEnabled={demoEnabled}>
         <WalletProvider demoEnabled={demoEnabled}>
-          {demoEnabled ? (
+          {demoMode ? (
             <p className="sticky top-0 z-[60] bg-foil px-4 py-2 text-center font-display text-xs font-bold tracking-[0.18em] text-[#161206]">
               {dict.wc.demoBadge}
             </p>

@@ -18,7 +18,7 @@ async function post(url: string, body: unknown) {
 }
 
 export function DepositCard() {
-  const { state, deposit, setToast, isDemoSession } = useApp();
+  const { state, deposit, setToast, isDemoSession, dataUnavailable } = useApp();
   const { d, t } = useI18n();
   const cfg = state?.config;
   const user = state?.user;
@@ -125,7 +125,7 @@ export function DepositCard() {
       />
 
       {method === "wallet" ? (
-        <TronDeposit amount={chosen} />
+        <TronDeposit amount={chosen} dataUnavailable={dataUnavailable} />
       ) : (
         <>
           <button
@@ -142,7 +142,7 @@ export function DepositCard() {
   );
 }
 
-function TronDeposit({ amount }: { amount: number }) {
+function TronDeposit({ amount, dataUnavailable }: { amount: number; dataUnavailable: boolean }) {
   const { state, refresh, setToast } = useApp();
   const wallet = useWallet();
   const { d, t } = useI18n();
@@ -197,6 +197,10 @@ function TronDeposit({ amount }: { amount: number }) {
   };
 
   const pay = async () => {
+    if (dataUnavailable) {
+      setToast(d.errors.unavailable);
+      return;
+    }
     setLink(null);
     setPhase("build");
     try {
@@ -249,7 +253,7 @@ function TronDeposit({ amount }: { amount: number }) {
 
       <button
         onClick={pay}
-        disabled={(phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
+        disabled={dataUnavailable || (phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
         className="btn-neon focus-ring mt-3 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
       >
         {t(d.wc.payFromWallet, { amount: money(amount || 0) })}

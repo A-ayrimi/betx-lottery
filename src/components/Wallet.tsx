@@ -22,6 +22,7 @@ export function Wallet() {
 
   const onWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (dataUnavailable) return setToast(d.errors.unavailable);
     if (!user) return setToast(d.errors.notLoggedIn);
     setBusy("wd");
     const ok = await withdraw(Number(wd.amount), wd.address.trim());
@@ -134,7 +135,7 @@ export function Wallet() {
             </label>
             <button
               type="submit"
-              disabled={busy !== null}
+              disabled={busy !== null || dataUnavailable}
               className="btn-foil focus-ring mt-5 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
             >
               {busy === "wd" ? d.wallet.submitting : d.wallet.submit}

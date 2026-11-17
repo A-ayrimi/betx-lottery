@@ -42,6 +42,33 @@ test(
       assert.equal((await pool.query("SELECT current_schema() AS name")).rows[0].name, schemaName);
 
       await pool.query(schemaSql);
+      await pool.query(`
+        ALTER TABLE deposits DROP CONSTRAINT deposits_user_id_users_id_fk;
+        ALTER TABLE fee_transfers DROP CONSTRAINT fee_transfers_round_id_rounds_id_fk;
+        ALTER TABLE ledger DROP CONSTRAINT ledger_user_id_users_id_fk, DROP CONSTRAINT ledger_round_id_rounds_id_fk;
+        ALTER TABLE login_tokens DROP CONSTRAINT login_tokens_user_id_users_id_fk;
+        ALTER TABLE rounds DROP CONSTRAINT rounds_winner_id_users_id_fk;
+        ALTER TABLE tickets DROP CONSTRAINT tickets_round_id_rounds_id_fk, DROP CONSTRAINT tickets_user_id_users_id_fk;
+        ALTER TABLE vault_snapshots DROP CONSTRAINT vault_snapshots_round_id_rounds_id_fk;
+        ALTER TABLE wheel_spins DROP CONSTRAINT wheel_spins_user_id_users_id_fk;
+        ALTER TABLE withdrawals DROP CONSTRAINT withdrawals_user_id_users_id_fk;
+      `);
+
+      const preexistingUser = (
+        await pool.query(
+          "INSERT INTO users (username, display_name, referral_code) VALUES ($1, $2, $3) RETURNING id",
+          [`legacy-${randomUUID()}`, "Preexisting Test User", randomUUID().slice(0, 8)],
+        )
+      ).rows[0];
+      const preexistingRound = (await pool.query("INSERT INTO rounds DEFAULT VALUES RETURNING id")).rows[0];
+      const financialReference = randomUUID();
+      const financialTransactionKey = `test-seed:${randomUUID()}`;
+      const preexistingLedger = (
+        await pool.query(
+          "INSERT INTO ledger (user_id, round_id, type, amount, note, account, reference, transaction_key) VALUES ($1, $2, 'vault_seed', 20, 'preexisting isolated test entry', 'vault_balance', $3, $4) RETURNING id",
+          [preexistingUser.id, preexistingRound.id, financialReference, financialTransactionKey],
+        )
+      ).rows[0];
       await pool.query(migrationSql);
       await pool.query(migrationSql);
 
@@ -49,6 +76,23 @@ test(
         "SELECT count(*)::int AS count FROM pg_constraint WHERE contype = 'f' AND connamespace = current_schema()::regnamespace",
       );
       assert.equal(constraints.rows[0].count, 11);
+      assert.deepEqual(
+        (await pool.query(
+          "SELECT user_id, round_id, type, amount::text, note, account, reference, transaction_key FROM ledger WHERE id = $1",
+          [preexistingLedger.id],
+        )).rows[0],
+        {
+          user_id: preexistingUser.id,
+          round_id: preexistingRound.id,
+          type: "vault_seed",
+          amount: "20.00",
+          note: "preexisting isolated test entry",
+          account: "vault_balance",
+          reference: financialReference,
+          transaction_key: financialTransactionKey,
+        },
+        "Existing isolated financial data must remain unchanged after migration.",
+      );
 
       const user = (
         await pool.query(

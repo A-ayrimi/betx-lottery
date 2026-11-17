@@ -12,7 +12,7 @@ const GUEST_SPIN_KEY = "betx_guest_wheel_at";
 const SPIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export function Wheel() {
-  const { state, spin, setToast, refresh } = useApp();
+  const { state, spin, setToast, refresh, loading, dataUnavailable } = useApp();
   const { d, t, n } = useI18n();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
@@ -64,6 +64,10 @@ export function Wheel() {
   );
 
   const doSpin = async () => {
+    if (loading || dataUnavailable) {
+      setToast(d.errors.unavailable);
+      return;
+    }
     if (spinning) return;
     if (!user) {
       const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
@@ -145,7 +149,7 @@ export function Wheel() {
           <button
             type="button"
             onClick={() => void doSpin()}
-            disabled={spinning}
+            disabled={spinning || loading || dataUnavailable}
             aria-label={d.wheel.spinBtn}
             aria-disabled={!canSpin}
             className={`wheel-shadow focus-ring relative aspect-square w-full rounded-full border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-70 ${!canSpin ? "cursor-not-allowed opacity-70" : ""}`}
@@ -208,7 +212,7 @@ export function Wheel() {
 
           <button
             onClick={doSpin}
-            disabled={spinning}
+            disabled={spinning || loading || dataUnavailable}
             aria-disabled={!canSpin}
             className={`btn-foil focus-ring absolute left-1/2 top-1/2 z-10 h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 rounded-full text-base font-black disabled:opacity-70 ${!canSpin ? "cursor-not-allowed opacity-70" : ""}`}
           >
@@ -252,7 +256,7 @@ export function Wheel() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
               onClick={doSpin}
-              disabled={spinning}
+              disabled={spinning || loading || dataUnavailable}
               aria-disabled={!canSpin}
               className={`btn-neon focus-ring rounded-2xl px-8 py-4 text-base font-bold disabled:opacity-55 ${!canSpin ? "cursor-not-allowed opacity-55" : ""}`}
             >

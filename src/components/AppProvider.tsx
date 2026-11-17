@@ -226,6 +226,10 @@ export function AppProvider({
 
   const connect = useCallback(
     async (username: string, telegram: string, referral: string, acceptTerms: boolean) => {
+      if (dataUnavailable) {
+        setToast(d.errors.unavailable);
+        return false;
+      }
       const json = await post("/api/auth/connect", { username, telegram, referral, acceptTerms });
       if (!json.ok) {
         setToast(json.error || d.toast.connectFail);
@@ -236,11 +240,15 @@ export function AppProvider({
       setToast(d.toast.welcome);
       return true;
     },
-    [refresh, d],
+    [refresh, d, dataUnavailable],
   );
 
   const account = useCallback(
     async (body: Record<string, unknown>) => {
+      if (dataUnavailable) {
+        setToast(d.errors.unavailable);
+        return false;
+      }
       if (isDemoSession && state && isDemoAppState(state) && state.user) {
         let nextUser = state.user;
         if (body.action === "self_exclude") {
@@ -270,7 +278,7 @@ export function AppProvider({
       await refresh();
       return true;
     },
-    [refresh, d, isDemoSession, state],
+    [refresh, d, isDemoSession, state, dataUnavailable],
   );
 
   const logout = useCallback(async () => {
@@ -289,6 +297,10 @@ export function AppProvider({
 
   const buy = useCallback(
     async (count: number) => {
+      if (dataUnavailable) {
+        setToast(d.errors.unavailable);
+        return null;
+      }
       if (isDemoSession && state && isDemoAppState(state)) {
         const result = buyDemoTickets(state, count);
         if (result.error === "insufficient") {
@@ -327,10 +339,14 @@ export function AppProvider({
       setToast(t(d.toast.ticketsAdded, { n: json.serials?.length ?? count }));
       return true as const;
     },
-    [refresh, d, t, isDemoSession, state],
+    [refresh, d, t, isDemoSession, state, dataUnavailable],
   );
 
   const spin = useCallback(async () => {
+    if (dataUnavailable) {
+      setToast(d.errors.unavailable);
+      return { ok: false as const, error: d.errors.unavailable };
+    }
     if (isDemoSession && state && isDemoAppState(state)) {
       const result = spinDemoWheel(state);
       if (!result.ok) {
@@ -353,10 +369,14 @@ export function AppProvider({
       return { ok: false as const, error: json.error };
     }
     return { ok: true as const, index: json.index as number, prize: json.prize as number };
-  }, [d, isDemoSession, state]);
+  }, [d, isDemoSession, state, dataUnavailable]);
 
   const deposit = useCallback(
     async (amount: number) => {
+      if (dataUnavailable) {
+        setToast(d.errors.unavailable);
+        return false;
+      }
       if (isDemoSession && state && isDemoAppState(state)) {
         const next = depositDemoBalance(state, amount);
         if (!next) {
@@ -381,11 +401,15 @@ export function AppProvider({
       setToast(t(d.toast.demoCredited, { amount: `$${Number(json.credited).toFixed(2)}` }));
       return true;
     },
-    [refresh, d, t, isDemoSession, state],
+    [refresh, d, t, isDemoSession, state, dataUnavailable],
   );
 
   const withdraw = useCallback(
     async (amount: number, address: string) => {
+      if (dataUnavailable) {
+        setToast(d.errors.unavailable);
+        return false;
+      }
       if (isDemoSession && state && isDemoAppState(state)) {
         const next = withdrawDemoBalance(state, amount, address);
         if (!next) {
@@ -406,7 +430,7 @@ export function AppProvider({
       setToast(t(d.toast.wdOk, { id: json.id }));
       return true;
     },
-    [refresh, d, t, isDemoSession, state],
+    [refresh, d, t, isDemoSession, state, dataUnavailable],
   );
 
   const value = useMemo(
