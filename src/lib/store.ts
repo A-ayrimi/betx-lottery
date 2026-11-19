@@ -280,21 +280,23 @@ export async function openAdminRound(actor: string) {
 export async function ensureOpenRound() {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(424243)`);
-    const open = await tx
-      .select()
-      .from(rounds)
-      .where(inArray(rounds.status, [
-        ROUND_STATUSES.OPEN,
-        ROUND_STATUSES.FULL,
-        ROUND_STATUSES.AWAITING_ADMIN_APPROVAL,
-        ROUND_STATUSES.APPROVED,
-        "open",
-        "full",
-        "drawn",
-      ]))
-      .orderBy(desc(rounds.id))
-      .limit(1);
-    return open[0] ?? null;
+
+    const open = (
+      await tx
+        .select()
+        .from(rounds)
+        .where(inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]))
+        .orderBy(desc(rounds.id))
+        .limit(1)
+        .for("update")
+    )[0];
+
+    if (open && open.sold < open.capacity) return open;
+
+    const v = (await tx.select({ id: vault.id }).from(vault).limit(1))[0];
+    if (!v) return null;
+
+    return openNewRound(tx);
   });
 }
 
@@ -943,16 +945,19 @@ export async function buyTickets(userId: number, requested: number) {
     if (!me) throw new UserError("userNotFound", 404);
     assertCanPlay(me);
 
-    const round = (
-      await tx
-        .select()
-        .from(rounds)
-        .where(inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]))
-        .orderBy(desc(rounds.id))
-        .limit(1)
-        .for("update")
-    )[0];
-    if (!round) throw new UserError("noActiveRound", 400);
+   let round = (
+  await tx
+    .select()
+    .from(rounds)
+    .where(inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]))
+    .orderBy(desc(rounds.id))
+    .limit(1)
+    .for("update")
+)[0];
+
+if (!round) {
+  round = await openNewRound(tx);
+}
 
     const [sold] = await tx
       .select({ count: sql<number>`count(*)::int` })
@@ -991,10 +996,17 @@ export async function buyTickets(userId: number, requested: number) {
 
     await tx.update(users).set({ balance: sql`${users.balance} - ${cost}` }).where(eq(users.id, me.id));
     const newSold = currentSold + take;
-    await tx.update(rounds).set({
-      sold: newSold,
-      status: newSold === round.capacity ? ROUND_STATUSES.FULL : ROUND_STATUSES.OPEN,
-    }).where(eq(rounds.id, round.id));
+const nextStatus =
+  newSold >= round.capacity ? ROUND_STATUSES.FULL : ROUND_STATUSES.OPEN;
+
+await tx.update(rounds).set({
+  sold: newSold,
+  status: nextStatus,
+}).where(eq(rounds.id, round.id));
+
+if (newSold >= round.capacity) {
+  await openNewRound(tx);
+}
     await tx.update(vault).set({ ticketsSold: sql`${vault.ticketsSold} + ${take}`, updatedAt: new Date() });
     await tx.insert(ledger).values({
       userId: me.id,
