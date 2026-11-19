@@ -30,11 +30,11 @@ export function buildPostgresConfig(url: string, env: NodeJS.ProcessEnv = proces
   return {
     connectionString: parsed.toString(),
     ssl: useTls
-      ? {
-          rejectUnauthorized: true as const,
-          ...(env.DATABASE_SSL_CA ? { ca: env.DATABASE_SSL_CA } : {}),
-        }
-      : undefined,
+        ? {
+            rejectUnauthorized: Boolean(env.DATABASE_SSL_CA),
+            ...(env.DATABASE_SSL_CA ? { ca: env.DATABASE_SSL_CA } : {}),
+          }
+        : undefined,
     max: Number(env.DATABASE_POOL_MAX || (env.VERCEL ? 3 : 10)),
     idleTimeoutMillis: 10_000,
   };
