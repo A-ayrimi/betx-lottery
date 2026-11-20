@@ -21,47 +21,46 @@ function BrandGlyph({ name }: { name: string }) {
 
   if (key.includes("phantom")) {
     return (
-      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
+      <svg viewBox="0 0 40 40" className="block h-full w-full" fill="none" aria-hidden>
         <defs>
-          <linearGradient id="phantomBg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <linearGradient id="phantomModernBg" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#a78bfa" />
             <stop offset="55%" stopColor="#7c3aed" />
             <stop offset="100%" stopColor="#4c1d95" />
           </linearGradient>
         </defs>
-        <rect width="40" height="40" fill="url(#phantomBg)" />
+        <rect width="40" height="40" fill="url(#phantomModernBg)" />
         <path
-          d="M8.5 23.5C8.5 14.387 15.887 7 25 7C30.247 7 34.5 11.253 34.5 16.5V21.5C34.5 26.747 30.247 31 25 31H20.8C17.9 31 16.2 32.4 13.8 32.4C10.871 32.4 8.5 28.415 8.5 23.5Z"
+          d="M9 22.8C9 14.185 15.935 7.2 24.5 7.2C30.023 7.2 34.5 11.677 34.5 17.2V21.2C34.5 26.447 30.247 30.7 25 30.7H21.2C18.5 30.7 16.9 32.5 14.3 32.5C11.373 32.5 9 28.155 9 22.8Z"
           fill="#f5f3ff"
         />
-        <circle cx="19.2" cy="18.2" r="2.2" fill="#4c1d95" />
-        <circle cx="26.5" cy="18.2" r="2.2" fill="#4c1d95" />
+        <circle cx="19.5" cy="18.2" r="2.1" fill="#4c1d95" />
+        <circle cx="26.5" cy="18.2" r="2.1" fill="#4c1d95" />
       </svg>
     );
   }
 
   if (key.includes("trust")) {
     return (
-      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
+      <svg viewBox="0 0 40 40" className="block h-full w-full" fill="none" aria-hidden>
         <defs>
-          <linearGradient id="trustBg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#38bdf8" />
-            <stop offset="50%" stopColor="#2563eb" />
+          <linearGradient id="trustModernShell" x1="20" y1="6" x2="20" y2="34" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#3b82f6" />
             <stop offset="100%" stopColor="#1d4ed8" />
           </linearGradient>
+          <linearGradient id="trustModernShield" x1="20" y1="8.5" x2="20" y2="31.5" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="52%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#10b981" />
+          </linearGradient>
         </defs>
-        <rect width="40" height="40" fill="url(#trustBg)" />
+        <rect width="40" height="40" fill="url(#trustModernShell)" />
         <path
-          d="M20 7.5L31.5 12.4V20.2C31.5 27.3 26.5 32.6 20 34.5C13.5 32.6 8.5 27.3 8.5 20.2V12.4L20 7.5Z"
-          fill="#ffffff"
-          fillOpacity="0.96"
-        />
-        <path
-          d="M15.2 20.6L18.4 23.8L25.2 17"
-          stroke="#1d4ed8"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          d="M20 8.5L30.5 12.9V19.9C30.5 26.4 26 31.3 20 33C14 31.3 9.5 26.4 9.5 19.9V12.9L20 8.5Z"
+          fill="url(#trustModernShield)"
+          stroke="#ffffff"
+          strokeOpacity="0.35"
+          strokeWidth="1.2"
         />
       </svg>
     );
@@ -69,35 +68,36 @@ function BrandGlyph({ name }: { name: string }) {
 
   if (key.includes("okx")) {
     return (
-      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
-        <rect width="40" height="40" fill="#0b0f12" />
-        <rect x="7" y="7" width="11" height="11" rx="2.5" fill="#ffffff" />
-        <rect x="22" y="7" width="11" height="11" rx="2.5" fill="#e5e7eb" />
-        <rect x="14.5" y="14.5" width="11" height="11" rx="2.5" fill="#ffffff" />
-        <rect x="7" y="22" width="11" height="11" rx="2.5" fill="#e5e7eb" />
-        <rect x="22" y="22" width="11" height="11" rx="2.5" fill="#ffffff" />
+      <svg viewBox="0 0 40 40" className="block h-full w-full" fill="none" aria-hidden>
+        <rect width="40" height="40" fill="#090c0f" />
+        <g transform="translate(20 20) rotate(45) translate(-20 -20)">
+          <rect x="9" y="9" width="9" height="9" rx="2" fill="#ffffff" />
+          <rect x="22" y="9" width="9" height="9" rx="2" fill="#ffffff" />
+          <rect x="9" y="22" width="9" height="9" rx="2" fill="#ffffff" />
+          <rect x="22" y="22" width="9" height="9" rx="2" fill="#ffffff" />
+        </g>
       </svg>
     );
   }
 
   if (key.includes("bitget")) {
     return (
-      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
+      <svg viewBox="0 0 40 40" className="block h-full w-full" fill="none" aria-hidden>
         <defs>
-          <linearGradient id="bitgetBg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <linearGradient id="bitgetModernBg" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="60%" stopColor="#0891b2" />
-            <stop offset="100%" stopColor="#155e75" />
+            <stop offset="55%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#0e7490" />
           </linearGradient>
         </defs>
-        <rect width="40" height="40" fill="url(#bitgetBg)" />
+        <rect width="40" height="40" fill="url(#bitgetModernBg)" />
         <path
-          d="M13.5 9.5H24.5C27.538 9.5 30 11.962 30 15C30 17.05 28.88 18.84 27.22 19.78C29.12 20.82 30.4 22.82 30.4 25.1C30.4 28.47 27.67 31.2 24.3 31.2H13.5V9.5Z"
+          d="M13 10.5H23.8C26.8 10.5 29 12.6 29 15.3C29 17.2 27.9 18.8 26.3 19.6C28.3 20.5 29.6 22.3 29.6 24.6C29.6 27.6 27.1 30 23.9 30H13V10.5Z"
           fill="#ffffff"
         />
         <path
-          d="M17.8 14V17.8H24.2C25.5 17.8 26.4 16.9 26.4 15.8C26.4 14.7 25.5 14 24.2 14H17.8ZM17.8 22V26.8H23.8C25.2 26.8 26.2 25.8 26.2 24.4C26.2 23 25.2 22 23.8 22H17.8Z"
-          fill="#0b3b49"
+          d="M17.2 14.5V17.9H23.2C24.3 17.9 25 17.2 25 16.2C25 15.2 24.3 14.5 23.2 14.5H17.2ZM17.2 21.8V26H23.1C24.3 26 25.1 25.2 25.1 23.9C25.1 22.6 24.3 21.8 23.1 21.8H17.2Z"
+          fill="#093846"
         />
       </svg>
     );
