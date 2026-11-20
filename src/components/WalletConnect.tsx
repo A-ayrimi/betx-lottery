@@ -21,42 +21,45 @@ function BrandGlyph({ name }: { name: string }) {
 
   if (key.includes("phantom")) {
     return (
-      <svg viewBox="0 0 32 32" className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" aria-hidden>
+      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
         <defs>
-          <linearGradient id="phantomGrad" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#c4b5fd" />
-            <stop offset="55%" stopColor="#8b5cf6" />
+          <linearGradient id="phantomBg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#a78bfa" />
+            <stop offset="55%" stopColor="#7c3aed" />
             <stop offset="100%" stopColor="#4c1d95" />
           </linearGradient>
         </defs>
+        <rect width="40" height="40" fill="url(#phantomBg)" />
         <path
-          d="M6.5 19.5C6.5 11.768 12.768 5.5 20.5 5.5C24.642 5.5 28 8.858 28 13V17.5C28 21.642 24.642 25 20.5 25H17.2C14.8 25 13.4 26.2 11.4 26.2C8.694 26.2 6.5 23.201 6.5 19.5Z"
-          fill="url(#phantomGrad)"
+          d="M8.5 23.5C8.5 14.387 15.887 7 25 7C30.247 7 34.5 11.253 34.5 16.5V21.5C34.5 26.747 30.247 31 25 31H20.8C17.9 31 16.2 32.4 13.8 32.4C10.871 32.4 8.5 28.415 8.5 23.5Z"
+          fill="#f5f3ff"
         />
-        <circle cx="15.5" cy="14.5" r="1.8" fill="#090714" />
-        <circle cx="21.5" cy="14.5" r="1.8" fill="#090714" />
+        <circle cx="19.2" cy="18.2" r="2.2" fill="#4c1d95" />
+        <circle cx="26.5" cy="18.2" r="2.2" fill="#4c1d95" />
       </svg>
     );
   }
 
   if (key.includes("trust")) {
     return (
-      <svg viewBox="0 0 32 32" className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" aria-hidden>
+      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
         <defs>
-          <linearGradient id="trustGrad" x1="16" y1="4" x2="16" y2="28" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#60a5fa" />
-            <stop offset="55%" stopColor="#2563eb" />
-            <stop offset="100%" stopColor="#1e3a8a" />
+          <linearGradient id="trustBg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="50%" stopColor="#2563eb" />
+            <stop offset="100%" stopColor="#1d4ed8" />
           </linearGradient>
         </defs>
+        <rect width="40" height="40" fill="url(#trustBg)" />
         <path
-          d="M16 4.5L26 8.8V15.6C26 21.8 21.7 26.5 16 28C10.3 26.5 6 21.8 6 15.6V8.8L16 4.5Z"
-          fill="url(#trustGrad)"
+          d="M20 7.5L31.5 12.4V20.2C31.5 27.3 26.5 32.6 20 34.5C13.5 32.6 8.5 27.3 8.5 20.2V12.4L20 7.5Z"
+          fill="#ffffff"
+          fillOpacity="0.96"
         />
         <path
-          d="M12.2 16.2L14.8 18.8L20.2 13.4"
-          stroke="#eff6ff"
-          strokeWidth="2.4"
+          d="M15.2 20.6L18.4 23.8L25.2 17"
+          stroke="#1d4ed8"
+          strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -66,37 +69,42 @@ function BrandGlyph({ name }: { name: string }) {
 
   if (key.includes("okx")) {
     return (
-      <svg viewBox="0 0 32 32" className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" aria-hidden>
-        <rect x="5" y="5" width="9" height="9" rx="2" fill="#ffffff" />
-        <rect x="18" y="5" width="9" height="9" rx="2" fill="#d1d5db" />
-        <rect x="11.5" y="11.5" width="9" height="9" rx="2" fill="#35ffb0" />
-        <rect x="5" y="18" width="9" height="9" rx="2" fill="#d1d5db" />
-        <rect x="18" y="18" width="9" height="9" rx="2" fill="#ffffff" />
+      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
+        <rect width="40" height="40" fill="#0b0f12" />
+        <rect x="7" y="7" width="11" height="11" rx="2.5" fill="#ffffff" />
+        <rect x="22" y="7" width="11" height="11" rx="2.5" fill="#e5e7eb" />
+        <rect x="14.5" y="14.5" width="11" height="11" rx="2.5" fill="#ffffff" />
+        <rect x="7" y="22" width="11" height="11" rx="2.5" fill="#e5e7eb" />
+        <rect x="22" y="22" width="11" height="11" rx="2.5" fill="#ffffff" />
       </svg>
     );
   }
 
   if (key.includes("bitget")) {
     return (
-      <svg viewBox="0 0 32 32" className="h-4 w-4 sm:h-[18px] sm:w-[18px]" fill="none" aria-hidden>
+      <svg viewBox="0 0 40 40" className="h-full w-full block" fill="none" aria-hidden>
         <defs>
-          <linearGradient id="bitgetGrad" x1="5" y1="6" x2="27" y2="26" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#67e8f9" />
-            <stop offset="60%" stopColor="#06b6d4" />
-            <stop offset="100%" stopColor="#0e7490" />
+          <linearGradient id="bitgetBg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#22d3ee" />
+            <stop offset="60%" stopColor="#0891b2" />
+            <stop offset="100%" stopColor="#155e75" />
           </linearGradient>
         </defs>
+        <rect width="40" height="40" fill="url(#bitgetBg)" />
         <path
-          d="M11 7H20.5C22.985 7 25 9.015 25 11.5C25 13.1 24.16 14.5 22.9 15.3C24.35 16.1 25.3 17.65 25.3 19.4C25.3 22.5 22.75 25 19.6 25H11V7Z"
-          fill="url(#bitgetGrad)"
+          d="M13.5 9.5H24.5C27.538 9.5 30 11.962 30 15C30 17.05 28.88 18.84 27.22 19.78C29.12 20.82 30.4 22.82 30.4 25.1C30.4 28.47 27.67 31.2 24.3 31.2H13.5V9.5Z"
+          fill="#ffffff"
         />
-        <path d="M14.5 11V14.2H19.8C20.8 14.2 21.5 13.5 21.5 12.6C21.5 11.7 20.8 11 19.8 11H14.5ZM14.5 17.5V21.5H19.4C20.5 21.5 21.3 20.7 21.3 19.5C21.3 18.3 20.5 17.5 19.4 17.5H14.5Z" fill="#041318" />
+        <path
+          d="M17.8 14V17.8H24.2C25.5 17.8 26.4 16.9 26.4 15.8C26.4 14.7 25.5 14 24.2 14H17.8ZM17.8 22V26.8H23.8C25.2 26.8 26.2 25.8 26.2 24.4C26.2 23 25.2 22 23.8 22H17.8Z"
+          fill="#0b3b49"
+        />
       </svg>
     );
   }
 
   return (
-    <span className="font-display text-xs font-black text-neon-2 sm:text-sm">
+    <span className="flex h-full w-full items-center justify-center bg-neon/15 font-display text-sm font-black text-neon-2">
       {name.slice(0, 1).toUpperCase()}
     </span>
   );
@@ -131,10 +139,10 @@ function WalletIcon({
   return (
     <span
       aria-hidden
-      className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 group-hover:-translate-y-0.5 group-hover:scale-105 group-active:scale-95 sm:h-9 sm:w-9 ${
+      className={`relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border transition-all duration-200 group-hover:-translate-y-0.5 group-hover:scale-105 group-active:scale-95 sm:h-10 sm:w-10 ${
         found
-          ? "border-neon/40 bg-gradient-to-b from-white/[0.12] to-black/50 shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_6px_14px_-4px_rgba(53,255,176,0.35)] group-hover:border-neon/70 group-hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_10px_20px_-6px_rgba(53,255,176,0.5)]"
-          : "border-rule/90 bg-gradient-to-b from-white/[0.08] to-black/55 shadow-[inset_0_1px_1px_rgba(255,255,255,0.14),0_4px_10px_-4px_rgba(0,0,0,0.65)] group-hover:border-mint/50"
+          ? "border-neon/60 shadow-[0_6px_16px_-4px_rgba(53,255,176,0.45)] group-hover:border-neon group-hover:shadow-[0_10px_22px_-4px_rgba(53,255,176,0.65)]"
+          : "border-white/20 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.6)] group-hover:border-white/40"
       }`}
     >
       {validSrc ? (
@@ -143,7 +151,7 @@ function WalletIcon({
           src={icon}
           alt=""
           onError={() => setBroken(true)}
-          className="h-4 w-4 rounded object-contain sm:h-[18px] sm:w-[18px]"
+          className="h-full w-full object-cover"
         />
       ) : (
         <BrandGlyph name={name} />
