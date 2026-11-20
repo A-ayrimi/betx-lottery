@@ -59,7 +59,7 @@ export function Hero() {
             dir="ltr"
             className="micro inline-flex items-center gap-2 rounded-full border border-foil/30 bg-foil/[0.08] px-3.5 py-2 text-foil"
           >
-            PLAY SMART · ADMIN-REVIEWED DRAWS <span className="text-neon-2">◆</span> USDT
+            PLAY SMART · ADMIN-REVIEWED DRAWS <span className="text-neon-2">◆</span> USDC
           </motion.p>
 
           <motion.h1
