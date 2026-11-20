@@ -44,9 +44,12 @@ export function Header() {
   const user = state?.user ?? null;
   const walletAddress = connectedAddress;
   const walletMatchesAccount = !connectedAddress || connectedAddress === user?.walletAddress;
-  const walletBalances = isDemoSession && walletAddress === user?.walletAddress
-    ? { usdt: user.balance, trx: 0 }
-    : walletMatchesAccount && walletBalance?.address === walletAddress ? walletBalance.balances : null;
+  const walletBalances =
+    isDemoSession && walletAddress === user?.walletAddress
+      ? { usdt: user.balance, trx: 0 }
+      : walletMatchesAccount && walletBalance?.address === walletAddress
+        ? walletBalance.balances
+        : null;
   const live = state?.config.live ?? !demoEnabled;
   const vaultAddress = state?.vault.adminWallet ?? state?.config.adminWallet ?? "";
   const tronOnly = state?.config.tronOnly !== false;
@@ -55,7 +58,7 @@ export function Header() {
   const botStart = bot ? `https://t.me/${bot}${pendingRef ? `?start=ref_${pendingRef}` : ""}` : null;
 
   useEffect(() => {
-    if (isDemoSession || !walletAddress || !user?.walletAddress || user.walletAddress !== walletAddress) {
+    if (isDemoSession || !walletAddress) {
       return;
     }
 
@@ -79,12 +82,12 @@ export function Header() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [isDemoSession, walletAddress, user?.walletAddress]);
+  }, [isDemoSession, walletAddress]);
 
   const handleLogout = async () => {
     const wasDemo = isDemoSession;
     await logout();
-    if (wasDemo) await disconnect();
+    if (wasDemo || connectedAddress) await disconnect();
   };
 
   const openModal = () => {
@@ -155,6 +158,7 @@ export function Header() {
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={handleLogout}
                   className="focus-ring rounded-full border border-rule px-3 py-2 text-xs text-mint transition-colors hover:border-mint/50 hover:text-white"
                 >
@@ -162,14 +166,23 @@ export function Header() {
                 </button>
               </div>
             ) : walletAddress ? (
-              <AddressChip
-                address={walletAddress}
-                usdt={walletBalances?.usdt ?? null}
-                trx={walletBalances?.trx ?? null}
-                balanceLabel={d.wc.walletBalance}
-                demo={isDemoSession}
-                onClick={openModal}
-              />
+              <div className="flex items-center gap-2">
+                <AddressChip
+                  address={walletAddress}
+                  usdt={walletBalances?.usdt ?? null}
+                  trx={walletBalances?.trx ?? null}
+                  balanceLabel={d.wc.walletBalance}
+                  demo={isDemoSession}
+                  onClick={openModal}
+                />
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="focus-ring rounded-full border border-rule px-3 py-2 text-xs text-mint transition-colors hover:border-mint/50 hover:text-white"
+                >
+                  {d.header.logout}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={openModal}

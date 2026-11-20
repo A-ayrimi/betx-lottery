@@ -16,6 +16,38 @@ async function post(url: string, body: unknown) {
   return res.json().catch(() => ({ ok: false }));
 }
 
+function WalletIcon({ name, icon }: { name: string; icon?: string }) {
+  const [broken, setBroken] = useState(false);
+  const validSrc =
+    !broken &&
+    typeof icon === "string" &&
+    (icon.startsWith("/") ||
+      icon.startsWith("https://") ||
+      icon.startsWith("http://") ||
+      icon.startsWith("data:image/"));
+
+  if (!validSrc) {
+    return (
+      <span
+        aria-hidden
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-neon/30 bg-neon/10 font-display text-xs font-bold text-neon-2"
+      >
+        {name.slice(0, 1).toUpperCase()}
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={icon}
+      alt=""
+      onError={() => setBroken(true)}
+      className="h-7 w-7 shrink-0 rounded-lg object-contain"
+    />
+  );
+}
+
 /**
  * Wallet picker + Sign-In with Solana.
  * connect -> server nonce -> wallet signs (free, off-chain) -> server verifies.
@@ -119,8 +151,7 @@ export function WalletList({
                       : "border-rule bg-black/20 hover:border-mint/40"
                   } ${needsTerms ? "opacity-70" : ""}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={w.icon} alt="" className="h-7 w-7 rounded-lg" />
+                  <WalletIcon name={w.name} icon={w.icon} />
                   <span className="flex-1 text-sm font-bold text-white">
                     {w.name}
                   </span>
