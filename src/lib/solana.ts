@@ -115,13 +115,12 @@ export function buildSolanaLoginMessage({
   })();
 
   return [
-    `${domain} wants you to sign in with your Solana account:`,
-    cleanAddress,
-    "",
+    "BETX Wallet Verification",
+    `Site: ${domain}`,
+    `Wallet: ${cleanAddress}`,
     `Nonce: ${nonce}`,
-    `URI: ${uri}`,
-    `Issued At: ${issuedAt.toISOString()}`,
-    `Expiration Time: ${expiresAt.toISOString()}`,
+    `Issued: ${issuedAt.toISOString()}`,
+    `Expires: ${expiresAt.toISOString()}`,
   ].join("\n");
 }
 
@@ -283,7 +282,7 @@ export async function buildSolanaUsdcTransferTx(params: {
     )
   );
 
- const rawTx = await tx.serialize({
+  const rawTx = await tx.serialize({
     requireAllSignatures: false,
     verifySignatures: false,
   });
@@ -301,7 +300,10 @@ export async function buildSolanaUsdcPaymentTx(params: {
   destinationAddress: string;
   amountUsd: number;
 }): Promise<BuiltSolanaUsdcTransfer> {
-  if (!isValidSolanaAddress(params.ownerAddress) || !isValidSolanaAddress(params.destinationAddress)) {
+  if (
+    !isValidSolanaAddress(params.ownerAddress) ||
+    !isValidSolanaAddress(params.destinationAddress)
+  ) {
     throw new Error("Invalid Solana address");
   }
   const { usdcMint, decimals } = getSolanaConfig();
@@ -309,20 +311,57 @@ export async function buildSolanaUsdcPaymentTx(params: {
   const ownerPk = new PublicKey(params.ownerAddress);
   const destinationPk = new PublicKey(params.destinationAddress);
   const mintPk = new PublicKey(usdcMint);
-  const amountRaw = BigInt(Math.round(params.amountUsd * Math.pow(10, decimals)));
+  const amountRaw = BigInt(
+    Math.round(params.amountUsd * Math.pow(10, decimals))
+  );
   if (amountRaw <= BigInt(0)) throw new Error("Invalid USDC payout amount");
 
-  const sourceAta = getAssociatedTokenAddressSync(mintPk, ownerPk, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
-  const destinationAta = getAssociatedTokenAddressSync(mintPk, destinationPk, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+  const sourceAta = getAssociatedTokenAddressSync(
+    mintPk,
+    ownerPk,
+    false,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  const destinationAta = getAssociatedTokenAddressSync(
+    mintPk,
+    destinationPk,
+    true,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
   const latest = await connection.getLatestBlockhash("confirmed");
   const tx = new Transaction({
     feePayer: ownerPk,
     blockhash: latest.blockhash,
     lastValidBlockHeight: Number(latest.lastValidBlockHeight),
   });
-  tx.add(createAssociatedTokenAccountIdempotentInstruction(ownerPk, destinationAta, destinationPk, mintPk, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID));
-  tx.add(createTransferCheckedInstruction(sourceAta, mintPk, destinationAta, ownerPk, amountRaw, decimals, [], TOKEN_PROGRAM_ID));
-  const rawTx = await tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  tx.add(
+    createAssociatedTokenAccountIdempotentInstruction(
+      ownerPk,
+      destinationAta,
+      destinationPk,
+      mintPk,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    )
+  );
+  tx.add(
+    createTransferCheckedInstruction(
+      sourceAta,
+      mintPk,
+      destinationAta,
+      ownerPk,
+      amountRaw,
+      decimals,
+      [],
+      TOKEN_PROGRAM_ID
+    )
+  );
+  const rawTx = await tx.serialize({
+    requireAllSignatures: false,
+    verifySignatures: false,
+  });
   return {
     serializedTransactionBase64: Buffer.from(rawTx).toString("base64"),
     blockhash: latest.blockhash,
@@ -472,7 +511,7 @@ export async function verifySolanaUsdcDepositOnChain(params: {
         sourceOwner,
         false,
         TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
       ).toBase58()
     : null;
 
