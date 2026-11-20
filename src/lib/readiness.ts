@@ -1,5 +1,5 @@
 import { config } from "@/lib/config";
-import { isTronAddress, tron } from "@/lib/tron";
+import { isValidSolanaAddress, getSolanaConfig } from "@/lib/solana";
 import { getTreasuryOnchain } from "@/lib/onchain";
 
 export interface ReadinessCheck {
@@ -20,10 +20,9 @@ export async function readinessChecks(): Promise<{ ready: boolean; checks: Readi
     { key: "CRON_SECRET", ok: (env.CRON_SECRET ?? "").length >= 16, level: "critical", detail: "≥16 chars; protects /api/cron" },
     { key: "BETX_MODE", ok: !config.live, level: "warning", detail: config.live ? "live mode is not approved during Phase 1" : "demo mode; live operations are not approved" },
     { key: "PHASE1_LIVE_BLOCKER", ok: false, level: "critical", detail: "financial reconciliation, migration, and database integration tests are incomplete" },
-    { key: "ADMIN_WALLET", ok: isTronAddress(config.adminWallet), level: "critical", detail: config.adminWallet },
-    { key: "TRON_DEPOSIT_ADDRESS", ok: tron.enabled, level: "critical", detail: "receiving wallet for player deposits" },
-    { key: "TRON_NETWORK", ok: tron.network === "mainnet", level: "warning", detail: `now: ${tron.network}` },
-    { key: "TRONGRID_API_KEY", ok: Boolean(env.TRONGRID_API_KEY), level: "warning", detail: "higher TronGrid rate limits" },
+    { key: "SOLANA_TREASURY_ADDRESS", ok: isValidSolanaAddress(config.adminWallet), level: "critical", detail: config.adminWallet },
+    { key: "SOLANA_USDC_MINT", ok: isValidSolanaAddress(getSolanaConfig().usdcMint), level: "critical", detail: getSolanaConfig().usdcMint },
+    { key: "SOLANA_RPC_URL", ok: Boolean(getSolanaConfig().rpcUrl), level: "warning", detail: getSolanaConfig().rpcUrl },
     { key: "DATABASE_URL", ok: !/127\.0\.0\.1|localhost/.test(env.DATABASE_URL ?? ""), level: "critical", detail: "hosted Postgres (Supabase/Neon)" },
     { key: "TELEGRAM_ADMIN_CHAT_ID", ok: Boolean(env.TELEGRAM_ADMIN_CHAT_ID && env.TELEGRAM_BOT_TOKEN), level: "warning", detail: "alerts + daily report" },
     { key: "GEO_BLOCK", ok: env.GEO_BLOCK !== "off", level: "warning", detail: "restricted countries blocked in live mode" },
@@ -33,7 +32,7 @@ export async function readinessChecks(): Promise<{ ready: boolean; checks: Readi
     key: "TREASURY_ONCHAIN",
     ok: t?.status === "ok",
     level: "warning",
-    detail: t ? `${t.status} · ${t.usdt ?? "?"} USDT · ${t.trx ?? "?"} TRX` : "unreachable",
+    detail: t ? `${t.status} · ${t.usdc ?? "?"} USDC · ${t.sol ?? "?"} SOL` : "unreachable",
   });
   const ready = checks.every((c) => c.ok || c.level !== "critical");
   return { ready, checks };

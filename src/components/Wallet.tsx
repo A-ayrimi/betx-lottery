@@ -129,7 +129,7 @@ export function Wallet() {
                 dir="ltr"
                 value={wd.address}
                 onChange={(e) => setWd({ ...wd, address: e.target.value })}
-                placeholder={user?.payoutAddress || "T..."}
+                placeholder={user?.payoutAddress || "Solana address"}
                 className="focus-ring mt-2 w-full rounded-xl border border-rule bg-black/30 px-4 py-3 font-display text-[13px] text-white placeholder:text-mint/40"
               />
             </label>

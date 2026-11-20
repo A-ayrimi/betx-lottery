@@ -5,7 +5,7 @@ import { handleError } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-/** Public: live treasury balance read directly from the TRON blockchain. */
+/** Public: live treasury balance read directly from the Solana blockchain. */
 export async function GET() {
   try {
     await limitByIp("onchain", 60);

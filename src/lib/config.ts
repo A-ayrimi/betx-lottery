@@ -62,17 +62,22 @@ export const config = {
   get adminToken() {
     return process.env.ADMIN_TOKEN || "";
   },
-  /**
-   * TRON-only mode: sign-in and deposits work exclusively via the user's own
-   * TRON wallet (USDT-TRC20). Telegram / username login and exchange (invoice)
-   * deposits are disabled and shown as "coming soon". Re-enable with TRON_ONLY=off.
-   */
+  /** Legacy compatibility getter for Solana-only mode. */
   get tronOnly() {
-    return process.env.TRON_ONLY !== "off";
+    return process.env.SOLANA_ONLY !== "off" && process.env.TRON_ONLY !== "off";
+  },
+  /** Solana-only mode: only Solana wallets and SPL-USDC are used. */
+  get solanaOnly() {
+    return process.env.SOLANA_ONLY !== "off";
   },
   /** Treasury destination for verified transfers. */
   get adminWallet() {
-    return (process.env.ADMIN_WALLET || "").trim();
+    return (
+      process.env.SOLANA_TREASURY_ADDRESS ||
+      process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS ||
+      process.env.ADMIN_WALLET ||
+      ""
+    ).trim();
   },
   fees: {
     get autoSweep() {
@@ -95,6 +100,11 @@ export const config = {
 };
 
 export function publicConfig() {
+  const solanaTreasury = (
+    process.env.SOLANA_TREASURY_ADDRESS ||
+    process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS ||
+    ""
+  ).trim();
   return {
     company: process.env.COMPANY_NAME || "BETX",
     license: process.env.LICENSE_INFO || null,
@@ -108,6 +118,16 @@ export function publicConfig() {
     referralDepositBonus: config.limits.referralDepositBonus,
     adminWallet: config.adminWallet,
     tronOnly: config.tronOnly,
+    solanaOnly: config.solanaOnly,
+    solana: {
+      enabled: Boolean(solanaTreasury),
+      network: process.env.SOLANA_CLUSTER || "mainnet-beta",
+      treasuryAddress: solanaTreasury || null,
+      usdcMint: (process.env.SOLANA_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").trim(),
+      decimals: 6,
+      rpcUrl: (process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com").trim(),
+      explorer: "https://solscan.io",
+    },
     totalRoundRevenue: 20,
     prizePerRound: 15,
     treasuryContributionPerRound: 3,

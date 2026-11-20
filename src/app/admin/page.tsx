@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Transaction } from "@solana/web3.js";
 import { Logo } from "@/components/Logo";
 import { WalletProvider, useWallet, walletErrorMessage } from "@/components/WalletProvider";
 
@@ -101,7 +102,12 @@ function AdminInner() {
         return j;
       };
       const built = await call({ step: "build", id, from: wallet.address });
-      const signed = await wallet.signTransaction(built.transaction);
+      const serialized = built.transaction?.serializedTransactionBase64;
+      if (!serialized) throw new Error("Invalid Solana transaction");
+      const transaction = Transaction.from(
+        Uint8Array.from(atob(serialized), (c) => c.charCodeAt(0)),
+      );
+      const signed = await wallet.signTransaction(transaction);
       const sent = await call({ step: "submit", id, signedTransaction: signed });
       setErr(`Paid ✓ ${sent.txid}`);
       await load(token);
@@ -160,7 +166,7 @@ function AdminInner() {
           <FeesPanel token={token} />
 
           <div className="panel mt-6 flex flex-wrap items-center gap-3 rounded-2xl p-5">
-            <p className="micro text-mint">PAYOUT WALLET (USDT-TRC20)</p>
+            <p className="micro text-mint">PAYOUT WALLET (USDC-SPL)</p>
             {wallet.address ? (
               <>
                 <code className="font-display text-sm text-neon-2">{wallet.address}</code>
@@ -181,7 +187,7 @@ function AdminInner() {
                 ))
             )}
             {!wallet.address && wallet.ready && wallet.wallets.every((w) => w.readyState !== "Found") ? (
-              <span className="text-xs text-mint">Install TronLink to pay withdrawals from your own wallet.</span>
+              <span className="text-xs text-mint">Install a Solana wallet to pay withdrawals from your own wallet.</span>
             ) : null}
           </div>
 

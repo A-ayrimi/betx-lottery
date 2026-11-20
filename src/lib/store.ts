@@ -26,6 +26,7 @@ import { headers } from "next/headers";
 import { isTronAddress, lookupUsdtTransfers, toUnits, tron } from "@/lib/tron";
 import { getRoundAccountingEntries, getTicketPurchaseCount } from "@/lib/roundAccounting";
 import { effectiveLimit } from "@/lib/responsibleGaming";
+import { isValidSolanaAddress } from "@/lib/solana";
 
 export { money } from "@/lib/format";
 export { effectiveLimit } from "@/lib/responsibleGaming";
@@ -1143,14 +1144,12 @@ export async function creditDeposit(depositId: number, status = "finished") {
 
 /* ------------------------------------------------------------ withdrawals */
 
-export const TRC20_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
-
 export async function requestWithdrawal(userId: number, amount: number, address: string) {
   const amt = Math.round(amount * 100) / 100;
   if (!Number.isFinite(amt) || amt < config.limits.minWithdraw) {
     throw new UserError("withdrawMin", 400, { min: usd(config.limits.minWithdraw) });
   }
-  if (!TRC20_RE.test(address) || !isTronAddress(address)) {
+  if (!isValidSolanaAddress(address)) {
     throw new UserError("badAddress");
   }
   return db.transaction(async (tx) => {
@@ -1470,6 +1469,15 @@ export async function getState() {
   return {
     config: {
       ...publicConfig(),
+      solana: {
+        enabled: Boolean(process.env.SOLANA_TREASURY_ADDRESS),
+        network: process.env.SOLANA_CLUSTER || "mainnet-beta",
+        treasuryAddress: process.env.SOLANA_TREASURY_ADDRESS || null,
+        usdcMint: process.env.SOLANA_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        decimals: 6,
+        rpcUrl: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
+        explorer: "https://solscan.io",
+      },
       tron: {
         enabled: tron.enabled,
         network: tron.network,

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   // Titles are fully composed per page (each dictionary already ends with “| BETX”).
   title: "BETX | One ticket. One chance. Administrator-reviewed draws.",
   description:
-    "BETX lucky pool: $1 tickets, 20-ticket provably-fair draws with administrator review, a free daily wheel and reviewed USDT-TRC20 withdrawals.",
+    "BETX lucky pool: $1 tickets, 20-ticket provably-fair draws with administrator review, a free daily wheel and reviewed SPL-USDC withdrawals on Solana.",
   applicationName: "BETX",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "BETX", statusBarStyle: "black-translucent" },

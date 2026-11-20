@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, UserError } from "@/lib/store";
-import { getBalances, tron } from "@/lib/tron";
+import { getSolanaUsdcBalance, getSolanaConfig, getSolanaConnection } from "@/lib/solana";
+import { PublicKey } from "@solana/web3.js";
 import { handleError, unauthorized } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,12 @@ export async function GET() {
     const me = await getSessionUser();
     if (!me) return unauthorized();
     if (!me.walletAddress) throw new UserError("walletRequired");
-    const balances = await getBalances(me.walletAddress);
-    return NextResponse.json({ ok: true, address: me.walletAddress, network: tron.network, balances });
+    const [usdc, lamports] = await Promise.all([
+      getSolanaUsdcBalance(me.walletAddress),
+      getSolanaConnection().getBalance(new PublicKey(me.walletAddress), "confirmed"),
+    ]);
+    const balances = { usdc, usdt: usdc, sol: lamports / 1e9, trx: lamports / 1e9 };
+    return NextResponse.json({ ok: true, address: me.walletAddress, network: getSolanaConfig().cluster, balances });
   } catch (e) {
     return handleError(e);
   }

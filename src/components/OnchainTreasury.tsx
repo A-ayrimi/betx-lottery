@@ -9,13 +9,15 @@ interface Onchain {
   ok: boolean;
   address: string;
   status: "ok" | "inactive" | "unavailable" | "invalid";
-  usdt: number | null;
-  trx: number | null;
+  usdc: number | null;
+  sol: number | null;
+  usdt?: number | null;
+  trx?: number | null;
   fetchedAt: string;
   explorerUrl: string;
 }
 
-/** Live treasury balance read from the TRON blockchain (refreshes every 60s). */
+/** Live treasury balance read from the Solana blockchain (refreshes every 60s). */
 export function OnchainTreasury({ demo, compact = false }: { demo: boolean; compact?: boolean }) {
   const { d, t, locale } = useI18n();
   const [data, setData] = useState<Onchain | null>(null);
@@ -82,11 +84,11 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
       {data && ok ? (
         <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-1">
           <p dir="ltr" className="font-display tnum text-2xl font-bold text-white">
-            {data.usdt === null ? "—" : `$${money(data.usdt)}`}
-            <span className="ms-1 text-[11px] font-medium text-mint">{d.onchain.usdt}</span>
+            {data.usdc === null ? "—" : `$${money(data.usdc)}`}
+            <span className="ms-1 text-[11px] font-medium text-mint">USDC</span>
           </p>
           <p dir="ltr" className="font-display tnum text-[12px] text-mint">
-            {data.trx === null ? "—" : `${data.trx.toFixed(2)} TRX`} · {d.onchain.trx}
+            {data.sol === null ? "—" : `${data.sol.toFixed(3)} SOL`} · SOL
           </p>
         </div>
       ) : (

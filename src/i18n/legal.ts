@@ -28,8 +28,8 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
           "Draws are provably fair: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so results can be independently verified.",
         ] },
         { h: "4. Deposits and withdrawals", p: [
-          "Deposits are accepted in USDT on the Tron network (TRC20) through a third-party payment processor. Funds sent on the wrong network or to the wrong address cannot be recovered.",
-          "Withdrawals are processed to a TRC20 address you provide after a security review. We may request identity verification (KYC) and proof of source of funds before processing withdrawals, in line with anti-money-laundering rules.",
+          "Deposits are accepted in SPL-USDC on the Solana network. Funds sent on the wrong network or to the wrong address cannot be recovered.",
+          "Withdrawals are processed to a Solana address you provide after a security review. We may request identity verification (KYC) and proof of source of funds before processing withdrawals, in line with anti-money-laundering rules.",
           "Bonus spins and referral rewards have no cash value until converted into balance by a prize.",
         ] },
         { h: "5. Prohibited conduct", p: [

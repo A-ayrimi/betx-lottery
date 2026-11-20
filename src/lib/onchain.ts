@@ -1,11 +1,17 @@
 import { config } from "@/lib/config";
-import { getBalances, isTronAddress, tron } from "@/lib/tron";
+import {
+  getSolanaUsdcBalance,
+  getSolanaConnection,
+  isValidSolanaAddress,
+  solanaExplorerAddressUrl,
+} from "@/lib/solana";
+import { PublicKey } from "@solana/web3.js";
 
 /**
- * Live, on-chain balance of the treasury wallet (ADMIN_WALLET) on TRON.
+ * Live, on-chain SPL-USDC balance of the Solana treasury wallet.
  * This is the money that really sits in the address — independent of the
  * internal ledger — so any top-up to the address shows up automatically.
- * Cached briefly per instance to respect TronGrid rate limits.
+ * Cached briefly per instance to avoid excessive RPC load.
  */
 
 const TTL_MS = 60_000;
@@ -16,8 +22,10 @@ export interface OnchainTreasury {
   address: string;
   network: string;
   status: OnchainStatus;
-  usdt: number | null;
-  trx: number | null;
+  usdc: number | null;
+  sol: number | null;
+  usdt?: number | null;
+  trx?: number | null;
   fetchedAt: string;
   explorerUrl: string;
 }
@@ -26,22 +34,27 @@ let cache: { at: number; value: OnchainTreasury } | null = null;
 let inflight: Promise<OnchainTreasury> | null = null;
 
 export function addressExplorerUrl(address: string) {
-  return tron.explorer.replace(/transaction\/?$/, "address/") + address;
+  return solanaExplorerAddressUrl(address);
 }
 
 async function fetchTreasury(): Promise<OnchainTreasury> {
   const address = config.adminWallet;
   const base = {
     address,
-    network: tron.network,
+    network: "solana",
     fetchedAt: new Date().toISOString(),
     explorerUrl: addressExplorerUrl(address),
   };
-  if (!isTronAddress(address)) return { ...base, status: "invalid", usdt: null, trx: null };
-  const bal = await getBalances(address);
-  if (!bal) return { ...base, status: "unavailable", usdt: null, trx: null };
-  if (!bal.activated) return { ...base, status: "inactive", usdt: 0, trx: 0 };
-  return { ...base, status: "ok", usdt: bal.usdt, trx: bal.trx };
+  if (!isValidSolanaAddress(address)) return { ...base, status: "invalid", usdc: null, sol: null };
+  try {
+    const [usdc, lamports] = await Promise.all([
+      getSolanaUsdcBalance(address),
+      getSolanaConnection().getBalance(new PublicKey(address), "confirmed"),
+    ]);
+    return { ...base, status: "ok", usdc, sol: lamports / 1e9 };
+  } catch {
+    return { ...base, status: "unavailable", usdc: null, sol: null };
+  }
 }
 
 export async function getTreasuryOnchain(force = false): Promise<OnchainTreasury> {

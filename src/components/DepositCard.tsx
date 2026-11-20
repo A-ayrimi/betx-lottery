@@ -6,6 +6,7 @@ import { useWallet, walletErrorMessage } from "./WalletProvider";
 import { SoonBadge, WalletList } from "./WalletConnect";
 import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
+import { Transaction } from "@solana/web3.js";
 
 const AMOUNTS = [1, 3, 5, 10];
 type Method = "wallet" | "invoice" | "demo";
@@ -125,7 +126,7 @@ export function DepositCard() {
       />
 
       {method === "wallet" ? (
-        <TronDeposit amount={chosen} dataUnavailable={dataUnavailable} />
+        <SolanaDeposit amount={chosen} dataUnavailable={dataUnavailable} />
       ) : (
         <>
           <button
@@ -142,7 +143,7 @@ export function DepositCard() {
   );
 }
 
-function TronDeposit({ amount, dataUnavailable }: { amount: number; dataUnavailable: boolean }) {
+function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavailable: boolean }) {
   const { state, refresh, setToast } = useApp();
   const wallet = useWallet();
   const { d, t } = useI18n();
@@ -151,7 +152,7 @@ function TronDeposit({ amount, dataUnavailable }: { amount: number; dataUnavaila
   const [phase, setPhase] = useState<Phase>("");
   const [link, setLink] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
-  const [bal, setBal] = useState<{ usdt: number; trx: number } | null>(null);
+  const [bal, setBal] = useState<{ usdc: number; sol: number } | null>(null);
   const [txid, setTxid] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -211,7 +212,12 @@ function TronDeposit({ amount, dataUnavailable }: { amount: number; dataUnavaila
       });
       if (!built.ok) throw new Error(built.error);
       setPhase("sign");
-      const signed = await wallet.signTransaction(built.transaction);
+      const serialized = built.transaction?.serializedTransactionBase64;
+      if (!serialized) throw new Error("Invalid Solana transaction");
+      const transaction = Transaction.from(
+        Uint8Array.from(atob(serialized), (c) => c.charCodeAt(0)),
+      );
+      const signed = await wallet.signTransaction(transaction);
       setPhase("broadcast");
       const sent = await post("/api/wallet/deposit", { step: "submit", depositId: built.depositId, signedTransaction: signed });
       if (!sent.ok) throw new Error(sent.error);
@@ -247,7 +253,7 @@ function TronDeposit({ amount, dataUnavailable }: { amount: number; dataUnavaila
       <div className="flex items-center justify-between gap-3 rounded-xl border border-rule bg-black/25 px-4 py-2.5 text-[12px]">
         <span className="text-mint">{d.wc.walletBalance}</span>
         <span dir="ltr" className="font-display tnum text-white">
-          {bal ? `${money(bal.usdt)} USDT · ${bal.trx.toFixed(1)} TRX` : "—"}
+          {bal ? `${money(bal.usdc)} USDC · ${bal.sol.toFixed(3)} SOL` : "—"}
         </span>
       </div>
 

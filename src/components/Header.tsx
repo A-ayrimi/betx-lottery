@@ -208,7 +208,7 @@ export function Header() {
             >
               <div className="guilloche pointer-events-none absolute inset-0 opacity-60" />
               <div className="relative">
-                <p className="micro text-neon-2">USDT · TRC20 · TRON</p>
+                <p className="micro text-neon-2">USDC · SPL · SOLANA</p>
                 <h2 className="mt-3 text-2xl font-black leading-snug text-white">{d.wc.title}</h2>
                 <p className="mt-2 text-sm leading-7 text-mint">{d.wc.body}</p>
 

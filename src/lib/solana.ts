@@ -296,6 +296,41 @@ export async function buildSolanaUsdcTransferTx(params: {
   };
 }
 
+export async function buildSolanaUsdcPaymentTx(params: {
+  ownerAddress: string;
+  destinationAddress: string;
+  amountUsd: number;
+}): Promise<BuiltSolanaUsdcTransfer> {
+  if (!isValidSolanaAddress(params.ownerAddress) || !isValidSolanaAddress(params.destinationAddress)) {
+    throw new Error("Invalid Solana address");
+  }
+  const { usdcMint, decimals } = getSolanaConfig();
+  const connection = getSolanaConnection();
+  const ownerPk = new PublicKey(params.ownerAddress);
+  const destinationPk = new PublicKey(params.destinationAddress);
+  const mintPk = new PublicKey(usdcMint);
+  const amountRaw = BigInt(Math.round(params.amountUsd * Math.pow(10, decimals)));
+  if (amountRaw <= BigInt(0)) throw new Error("Invalid USDC payout amount");
+
+  const sourceAta = getAssociatedTokenAddressSync(mintPk, ownerPk, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+  const destinationAta = getAssociatedTokenAddressSync(mintPk, destinationPk, true, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+  const latest = await connection.getLatestBlockhash("confirmed");
+  const tx = new Transaction({
+    feePayer: ownerPk,
+    blockhash: latest.blockhash,
+    lastValidBlockHeight: Number(latest.lastValidBlockHeight),
+  });
+  tx.add(createAssociatedTokenAccountIdempotentInstruction(ownerPk, destinationAta, destinationPk, mintPk, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID));
+  tx.add(createTransferCheckedInstruction(sourceAta, mintPk, destinationAta, ownerPk, amountRaw, decimals, [], TOKEN_PROGRAM_ID));
+  const rawTx = await tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  return {
+    serializedTransactionBase64: Buffer.from(rawTx).toString("base64"),
+    blockhash: latest.blockhash,
+    lastValidBlockHeight: Number(latest.lastValidBlockHeight),
+    amountRaw: amountRaw.toString(),
+  };
+}
+
 function parseSignedTransactionBytes(signedTx: unknown): Uint8Array | null {
   if (!signedTx) return null;
   if (signedTx instanceof Uint8Array) return signedTx;
@@ -387,6 +422,14 @@ export function solanaExplorerTxUrl(txid: string): string {
     : base;
 }
 
+export function solanaExplorerAddressUrl(address: string): string {
+  const { cluster } = getSolanaConfig();
+  const base = `https://solscan.io/account/${encodeURIComponent(address)}`;
+  return cluster && cluster !== "mainnet-beta"
+    ? `${base}?cluster=${encodeURIComponent(cluster)}`
+    : base;
+}
+
 export async function verifySolanaUsdcDepositOnChain(params: {
   txHash: string;
   expectedFromAddress: string;
@@ -420,6 +463,19 @@ export async function verifySolanaUsdcDepositOnChain(params: {
     ASSOCIATED_TOKEN_PROGRAM_ID
   ).toBase58();
 
+  const sourceOwner = isValidSolanaAddress(params.expectedFromAddress)
+    ? new PublicKey(params.expectedFromAddress)
+    : null;
+  const sourceAta = sourceOwner
+    ? getAssociatedTokenAddressSync(
+        new PublicKey(usdcMint),
+        sourceOwner,
+        false,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      ).toBase58()
+    : null;
+
   const preBalances = txInfo.meta?.preTokenBalances ?? [];
   const postBalances = txInfo.meta?.postTokenBalances ?? [];
   const accountKeys = txInfo.transaction.message.accountKeys.map((k) =>
@@ -427,20 +483,38 @@ export async function verifySolanaUsdcDepositOnChain(params: {
   );
 
   let receivedRaw = BigInt(0);
+  let sentRaw = BigInt(0);
 
   for (const post of postBalances) {
     if (post.mint !== usdcMint) continue;
     const accKey = accountKeys[post.accountIndex];
-    if (accKey !== destAta && post.owner !== treasuryAddress) continue;
-
     const pre = preBalances.find(
       (p) => p.accountIndex === post.accountIndex && p.mint === usdcMint
     );
     const postAmount = BigInt(post.uiTokenAmount?.amount ?? "0");
     const preAmount = BigInt(pre?.uiTokenAmount?.amount ?? "0");
+
+    if (accKey === sourceAta) {
+      if (preAmount > postAmount) sentRaw += preAmount - postAmount;
+      continue;
+    }
+    if (accKey !== destAta && post.owner !== treasuryAddress) continue;
     if (postAmount > preAmount) {
       receivedRaw += postAmount - preAmount;
     }
+  }
+  if (!sourceOwner || sentRaw <= BigInt(0)) {
+    return {
+      status: "failed",
+      reason: "USDC transfer origin does not match the connected wallet",
+    };
+  }
+
+  if (sentRaw < receivedRaw) {
+    return {
+      status: "failed",
+      reason: "USDC transfer amount could not be verified",
+    };
   }
 
   const receivedUsd = Number(receivedRaw) / Math.pow(10, decimals);
