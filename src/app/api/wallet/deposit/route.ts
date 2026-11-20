@@ -1,21 +1,85 @@
 import { NextRequest, NextResponse } from "next/server";
-import { limitByIp, rateLimit } from "@/lib/ratelimit";
+import { rateLimit } from "@/lib/ratelimit";
 import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
-import { deposits } from "@/db/schema";
+import { deposits, users } from "@/db/schema";
 import { config } from "@/lib/config";
 import { assertCanPlay, getSessionUser, UserError } from "@/lib/store";
-import { DepositReservationError, isValidDepositIdempotencyKey, reserveDeposit } from "@/lib/depositReservations";
-import { broadcast, buildUsdtTransfer, tron } from "@/lib/tron";
-import { settleTronDeposit } from "@/lib/tronDeposits";
+import {
+  DepositReservationError,
+  isValidDepositIdempotencyKey,
+  reserveDeposit,
+} from "@/lib/depositReservations";
+import {
+  broadcastSolanaSignedTransaction,
+  buildSolanaUsdcTransferTx,
+  getSolanaConfig,
+  solanaExplorerTxUrl,
+  verifySolanaUsdcDepositOnChain,
+} from "@/lib/solana";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+async function settleSolanaDepositIfConfirmed(depositId: number): Promise<void> {
+  const dep = (
+    await db.select().from(deposits).where(eq(deposits.id, depositId)).limit(1)
+  )[0];
+  if (!dep || dep.provider !== "solana" || !dep.txHash) return;
+  if (dep.credited || dep.status === "confirmed") return;
+
+  const check = await verifySolanaUsdcDepositOnChain({
+    txHash: dep.txHash,
+    expectedFromAddress: dep.fromAddress ?? "",
+    minAmountUsd: Number(dep.amountUsd),
+  });
+
+  if (check.status === "pending") return;
+
+  if (check.status === "failed") {
+    await db
+      .update(deposits)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(eq(deposits.id, dep.id));
+    return;
+  }
+
+  const creditedAmount = check.amountUsd ?? Number(dep.amountUsd);
+  await db.transaction(async (tx) => {
+    const current = (
+      await tx.select().from(deposits).where(eq(deposits.id, dep.id)).limit(1)
+    )[0];
+    if (!current || current.credited) return;
+
+    const userRow = (
+      await tx.select().from(users).where(eq(users.id, current.userId)).limit(1)
+    )[0];
+    if (!userRow) return;
+
+    const prevBalance = Number(userRow.balance ?? 0);
+    const nextBalance = Math.round((prevBalance + creditedAmount) * 100) / 100;
+    const nextBalanceStr = nextBalance.toFixed(2);
+
+    await tx
+      .update(users)
+      .set({ balance: nextBalanceStr })
+      .where(eq(users.id, userRow.id));
+
+    await tx
+      .update(deposits)
+      .set({
+        status: "confirmed",
+        credited: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(deposits.id, current.id));
+  });
+}
+
 /**
- * Direct USDT-TRC20 deposit from the connected wallet.
- *   POST { step: "build",  amount }                       -> unsigned transaction
+ * Direct USDC (SPL) deposit from the connected Solana wallet.
+ *   POST { step: "build",  amount, idempotencyKey }       -> unsigned transaction
  *   POST { step: "submit", depositId, signedTransaction } -> broadcast, returns txid
  *   GET  ?id=                                             -> on-chain status (credits once confirmed)
  */
@@ -25,7 +89,10 @@ export async function POST(req: NextRequest) {
     if (!me) return unauthorized("loginToDeposit");
     await rateLimit("wdeposit", me.id, 20);
     if (!me.walletAddress) throw new UserError("walletRequired");
-    if (!tron.enabled) throw new UserError("gatewayOff", 503);
+
+    const solCfg = getSolanaConfig();
+    if (!solCfg.treasuryAddress) throw new UserError("gatewayOff", 503);
+
     const body = await req.json().catch(() => ({}));
 
     if (body.step === "build") {
@@ -34,26 +101,50 @@ export async function POST(req: NextRequest) {
       if (!isValidDepositIdempotencyKey(body.idempotencyKey)) {
         throw new UserError("depositRequestKey", 400);
       }
+
       const amount = Math.round(Number(body.amount) * 100) / 100;
       const { minDeposit, maxDeposit } = config.limits;
-      if (!Number.isFinite(amount) || amount < minDeposit || amount > maxDeposit) {
-        throw new UserError("depositRange", 400, { min: `$${minDeposit}`, max: `$${maxDeposit}` });
+      const effectiveMin = Math.max(minDeposit, solCfg.minDepositUsd);
+      if (
+        !Number.isFinite(amount) ||
+        amount < effectiveMin ||
+        amount > maxDeposit
+      ) {
+        throw new UserError("depositRange", 400, {
+          min: `$${effectiveMin}`,
+          max: `$${maxDeposit}`,
+        });
       }
+
       const dep = await reserveDeposit(db, {
         userId: me.id,
-        provider: "tron",
+        provider: "solana",
         amount,
-        orderId: `TRX-${me.id}-${Date.now()}-${randomBytes(3).toString("hex")}`,
+        orderId: `SOL-${me.id}-${Date.now()}-${randomBytes(3).toString("hex")}`,
         idempotencyKey: body.idempotencyKey.toLowerCase(),
         fromAddress: me.walletAddress,
       });
+
       try {
-        const transaction = await buildUsdtTransfer(me.walletAddress, tron.depositAddress, amount);
+        const built = await buildSolanaUsdcTransferTx({
+          ownerAddress: me.walletAddress,
+          amountUsd: amount,
+        });
         await db
           .update(deposits)
-          .set({ expectedTxId: transaction.txID, updatedAt: new Date() })
+          .set({
+            expectedTxId: built.blockhash,
+            updatedAt: new Date(),
+          })
           .where(eq(deposits.id, dep.id));
-        return NextResponse.json({ ok: true, depositId: dep.id, transaction });
+
+        return NextResponse.json({
+          ok: true,
+          depositId: dep.id,
+          treasuryAddress: solCfg.treasuryAddress,
+          usdcMint: solCfg.usdcMint,
+          transaction: built,
+        });
       } catch (error) {
         try {
           await db
@@ -61,40 +152,74 @@ export async function POST(req: NextRequest) {
             .set({ status: "failed", updatedAt: new Date() })
             .where(eq(deposits.id, dep.id));
         } catch (cleanupError) {
-          console.error("Could not release the failed TRON deposit reservation", cleanupError);
+          console.error(
+            "Could not release the failed Solana deposit reservation",
+            cleanupError
+          );
         }
         throw error;
       }
     }
 
     if (body.step === "submit") {
-      const dep = (await db.select().from(deposits).where(eq(deposits.id, Number(body.depositId))).limit(1))[0];
-      if (!dep || dep.userId !== me.id || dep.provider !== "tron") throw new UserError("txMismatch");
-      if (dep.status !== "waiting") return NextResponse.json({ ok: true, txid: dep.txHash, status: dep.status });
-
-      const signed = body.signedTransaction;
-      if (!signed || signed.txID !== dep.expectedTxId || !Array.isArray(signed.signature) || signed.signature.length === 0) {
+      const dep = (
+        await db
+          .select()
+          .from(deposits)
+          .where(eq(deposits.id, Number(body.depositId)))
+          .limit(1)
+      )[0];
+      if (!dep || dep.userId !== me.id || dep.provider !== "solana") {
         throw new UserError("txMismatch");
       }
-      const r = await broadcast(signed);
-      if (!r.ok) {
-        await db.update(deposits).set({ status: "failed", updatedAt: new Date() }).where(eq(deposits.id, dep.id));
+      if (dep.status !== "waiting") {
+        return NextResponse.json({
+          ok: true,
+          txid: dep.txHash,
+          status: dep.status,
+          explorer: dep.txHash ? solanaExplorerTxUrl(dep.txHash) : null,
+        });
+      }
+
+      const r = await broadcastSolanaSignedTransaction(body.signedTransaction);
+      if (!r.ok || !r.txid) {
+        await db
+          .update(deposits)
+          .set({ status: "failed", updatedAt: new Date() })
+          .where(eq(deposits.id, dep.id));
         throw new UserError("broadcastFailed", 400, { reason: r.error ?? "" });
       }
-      const txid = r.txid ?? dep.expectedTxId!;
+
       await db
         .update(deposits)
-        .set({ txHash: txid, status: "confirming", updatedAt: new Date() })
+        .set({
+          txHash: r.txid,
+          status: "confirming",
+          updatedAt: new Date(),
+        })
         .where(eq(deposits.id, dep.id));
-      return NextResponse.json({ ok: true, txid, explorer: tron.explorer + txid });
+
+      return NextResponse.json({
+        ok: true,
+        txid: r.txid,
+        explorer: solanaExplorerTxUrl(r.txid),
+      });
     }
 
     throw new UserError("txMismatch");
   } catch (e) {
     if (e instanceof DepositReservationError) {
-      if (e.code === "user_not_found") return handleError(new UserError("userNotFound", 404));
-      if (e.code === "idempotency_conflict") return handleError(new UserError("depositRequestKey", 409));
-      return handleError(new UserError("depositLimit", 403, { limit: `$${e.limit?.toFixed(2) ?? "0.00"}` }));
+      if (e.code === "user_not_found") {
+        return handleError(new UserError("userNotFound", 404));
+      }
+      if (e.code === "idempotency_conflict") {
+        return handleError(new UserError("depositRequestKey", 409));
+      }
+      return handleError(
+        new UserError("depositLimit", 403, {
+          limit: `$${e.limit?.toFixed(2) ?? "0.00"}`,
+        })
+      );
     }
     return handleError(e);
   }
@@ -106,19 +231,25 @@ export async function GET(req: NextRequest) {
     if (!me) return unauthorized();
     await rateLimit("wstatus", me.id, 40);
     const id = Number(req.nextUrl.searchParams.get("id"));
-    let dep = (await db.select().from(deposits).where(eq(deposits.id, id)).limit(1))[0];
+    let dep = (
+      await db.select().from(deposits).where(eq(deposits.id, id)).limit(1)
+    )[0];
     if (!dep || dep.userId !== me.id) throw new UserError("txMismatch", 404);
-    if (dep.status === "confirming") {
-      await settleTronDeposit(dep.id);
-      dep = (await db.select().from(deposits).where(eq(deposits.id, id)).limit(1))[0];
+
+    if (dep.provider === "solana" && dep.status === "confirming") {
+      await settleSolanaDepositIfConfirmed(dep.id);
+      dep = (
+        await db.select().from(deposits).where(eq(deposits.id, id)).limit(1)
+      )[0];
     }
+
     return NextResponse.json({
       ok: true,
       status: dep.status,
       credited: dep.credited,
       amount: Number(dep.amountUsd),
       txid: dep.txHash,
-      explorer: dep.txHash ? tron.explorer + dep.txHash : null,
+      explorer: dep.txHash ? solanaExplorerTxUrl(dep.txHash) : null,
     });
   } catch (e) {
     return handleError(e);
