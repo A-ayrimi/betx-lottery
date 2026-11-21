@@ -1,4 +1,4 @@
-import type { Dict } from "./en";
+﻿import type { Dict } from "./en";
 
 export const fa: Dict = {
   meta: {
@@ -545,7 +545,7 @@ export const fa: Dict = {
   },
   onchain: {
     title: "خزانه روی بلاکچین · تأییدشده",
-    usdt: "USDC روی سولانا",
+    USDC: "USDC روی سولانا",
     trx: "SOL برای کارمزد شبکه",
     view: "مشاهده در Solscan",
     checked: "بررسی {time}",

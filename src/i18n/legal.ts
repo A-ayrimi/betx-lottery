@@ -5,7 +5,7 @@
 export type LegalDoc = { title: string; updated: string; sections: { h: string; p: string[] }[] };
 
 const company = () => process.env.COMPANY_NAME || "BETX";
-const support = () => process.env.SUPPORT_EMAIL?.trim() || null;
+const support = () => process.env.SUPPORT_EMAIL?.trim() || "support.betx@gmail.com";
 const licence = () => process.env.LICENSE_INFO || "Licensing information is not configured.";
 
 export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): LegalDoc {

@@ -39,7 +39,7 @@ export const config = {
       ).replace(/\/$/, "");
     },
     get payCurrency() {
-      return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdttrc20";
+      return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdtsol";
     },
     get enabled() {
       return Boolean(process.env.NOWPAYMENTS_API_KEY && process.env.NOWPAYMENTS_IPN_SECRET);
@@ -108,7 +108,7 @@ export function publicConfig() {
   return {
     company: process.env.COMPANY_NAME || "BETX",
     license: process.env.LICENSE_INFO || null,
-    supportEmail: process.env.SUPPORT_EMAIL || null,
+   supportEmail: process.env.SUPPORT_EMAIL || "support.betx@gmail.com",
     helpUrl: process.env.GAMBLING_HELP_URL || "https://www.begambleaware.org",
     live: config.live,
     paymentsEnabled: config.nowpayments.enabled,

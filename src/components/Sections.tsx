@@ -362,7 +362,7 @@ export function Faq() {
           <h2 className="mt-4 text-[clamp(1.9rem,4.4vw,3rem)] font-black leading-[1.15] text-white">{d.faq.title}</h2>
           <p className="mt-5 max-w-[38ch] text-[15px] leading-8 text-mint">{d.faq.body}</p>
           <div className="mt-8 flex flex-wrap gap-2.5">
-            {["Play Smart. Win Instant.", "Pure Luck. Zero Delays.", "Your Ticket to Instant USDT."].map((s) => (
+            {["Play Smart. Win Instant.", "Pure Luck. Zero Delays.", "Your Ticket to Instant USDC."].map((s) => (
               <span key={s} dir="ltr" className="micro rounded-full border border-rule px-3.5 py-2 text-mint">{s}</span>
             ))}
           </div>

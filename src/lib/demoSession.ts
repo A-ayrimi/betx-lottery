@@ -114,7 +114,7 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
     config: {
       company: "BETX",
       license: null,
-      supportEmail: null,
+      supportEmail: "support.betx@gmail.com",
       helpUrl: "https://www.begambleaware.org",
       live: false,
       paymentsEnabled: false,

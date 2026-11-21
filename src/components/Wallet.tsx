@@ -196,7 +196,8 @@ export function Wallet() {
                 amount: x.amount,
                 status: x.status,
                 at: x.createdAt,
-                link: x.txHash && state?.config.tron.explorer ? `${state.config.tron.explorer}${x.txHash}` : null,
+               
+                link: x.txHash ? `https://solscan.io/tx/${x.txHash}` : null,
                 linkLabel: d.wc.viewTx,
                 sign: "−",
               })),
