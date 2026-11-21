@@ -14,7 +14,11 @@ type Phase = "" | "build" | "sign" | "broadcast" | "confirm" | "done";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function post(url: string, body: unknown) {
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   return res.json().catch(() => ({ ok: false }));
 }
 
@@ -25,28 +29,31 @@ export function DepositCard() {
   const user = state?.user;
   const live = Boolean(cfg?.live);
 
-  const tronOnly = cfg?.tronOnly !== false;
-  // TRON-only mode: the TRON wallet tab is the only enabled method; the
-  // others stay visible but disabled with a "coming soon" badge.
-  const methods: { id: Method; enabled: boolean }[] = tronOnly
-    ? [
-        { id: "wallet", enabled: true },
-        ...(live
-          ? [{ id: "invoice" as Method, enabled: false }]
-          : [{ id: "demo" as Method, enabled: false }]),
-      ]
-    : [
-        ...(cfg?.tron.enabled ? [{ id: "wallet" as Method, enabled: true }] : []),
-        ...(live && cfg?.paymentsEnabled ? [{ id: "invoice" as Method, enabled: true }] : []),
-        ...(!live ? [{ id: "demo" as Method, enabled: true }] : []),
-      ];
+  const solanaOnly = cfg?.solanaOnly !== false;
+const methods: { id: Method; enabled: boolean }[] = solanaOnly
+  ? [
+      { id: "wallet", enabled: true },
+      ...(live
+        ? [{ id: "invoice" as Method, enabled: false }]
+        : [{ id: "demo" as Method, enabled: false }]),
+    ]
+  : [
+      ...(cfg?.solana?.enabled ? [{ id: "wallet" as Method, enabled: true }] : []),
+      ...(live && cfg?.paymentsEnabled ? [{ id: "invoice" as Method, enabled: true }] : []),
+      ...(!live ? [{ id: "demo" as Method, enabled: true }] : []),
+    ];
+
   const [method, setMethod] = useState<Method>(methods[0]?.id ?? "wallet");
   const [amount, setAmount] = useState(1);
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
   const chosen = custom ? Number(custom) : amount;
 
-  const labels: Record<Method, string> = { wallet: d.wc.methodWallet, invoice: d.wc.methodInvoice, demo: "Demo" };
+  const labels: Record<Method, string> = {
+    wallet: d.wc.methodWallet,
+    invoice: d.wc.methodInvoice,
+    demo: "Demo",
+  };
 
   if (isDemoSession) {
     return (
@@ -54,7 +61,7 @@ export function DepositCard() {
         <p className="micro text-neon-2">{d.wallet.depositKicker} · {d.wc.demoBadge}</p>
         <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
         <p dir="ltr" className="font-display tnum mt-4 text-3xl font-bold text-white">
-          ${money(user?.balance ?? 0)} USDT
+          ${money(user?.balance ?? 0)} USDC
         </p>
         <p className="mt-3 text-[12px] leading-6 text-mint/80">{d.wc.demoWalletNote}</p>
       </div>
@@ -108,13 +115,16 @@ export function DepositCard() {
               setCustom("");
             }}
             className={`focus-ring rounded-xl border px-2 py-2.5 font-display tnum text-base font-bold transition-colors ${
-              !custom && amount === a ? "border-neon bg-neon/15 text-neon-2" : "border-rule bg-black/25 text-white hover:border-mint/40"
+              !custom && amount === a
+                ? "border-neon bg-neon/15 text-neon-2"
+                : "border-rule bg-black/25 text-white hover:border-mint/40"
             }`}
           >
             ${a}
           </button>
         ))}
       </div>
+
       <input
         dir="ltr"
         inputMode="decimal"
@@ -134,9 +144,15 @@ export function DepositCard() {
             disabled={busy || !chosen || Boolean(user?.selfExcludedUntil)}
             className="btn-neon focus-ring mt-4 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
           >
-            {busy ? d.wallet.creating : t(method === "invoice" ? d.wallet.payLive : d.wallet.payDemo, { amount: `$${money(chosen || 0)}` })}
+            {busy
+              ? d.wallet.creating
+              : t(method === "invoice" ? d.wallet.payLive : d.wallet.payDemo, {
+                  amount: `$${money(chosen || 0)}`,
+                })}
           </button>
-          <p className="mt-3 text-[12px] leading-6 text-mint/80">{method === "invoice" ? d.wc.invoiceNote : d.wallet.hintDemo}</p>
+          <p className="mt-3 text-[12px] leading-6 text-mint/80">
+            {method === "invoice" ? d.wc.invoiceNote : d.wallet.hintDemo}
+          </p>
         </>
       )}
     </div>
@@ -148,7 +164,7 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
   const wallet = useWallet();
   const { d, t } = useI18n();
   const user = state?.user;
-  const tronCfg = state?.config.tron;
+  const treasuryAddress = state?.config?.tron?.depositAddress ?? "";
   const [phase, setPhase] = useState<Phase>("");
   const [link, setLink] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -182,7 +198,9 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
   const poll = async (id: number) => {
     for (let i = 0; i < 45; i++) {
       await sleep(4000);
-      const r = await fetch(`/api/wallet/deposit?id=${id}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      const r = await fetch(`/api/wallet/deposit?id=${id}`, { cache: "no-store" })
+        .then((x) => x.json())
+        .catch(() => null);
       if (r?.ok && r.credited) {
         setPhase("done");
         await refresh();
@@ -219,7 +237,11 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
       );
       const signed = await wallet.signTransaction(transaction);
       setPhase("broadcast");
-      const sent = await post("/api/wallet/deposit", { step: "submit", depositId: built.depositId, signedTransaction: signed });
+      const sent = await post("/api/wallet/deposit", {
+        step: "submit",
+        depositId: built.depositId,
+        signedTransaction: signed,
+      });
       if (!sent.ok) throw new Error(sent.error);
       setLink(sent.explorer);
       setPendingId(built.depositId);
@@ -232,7 +254,9 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
   };
 
   const claim = async () => {
-    const r = await post("/api/wallet/claim", { txid: txid.trim() });
+    const trimmed = txid.trim();
+    if (!trimmed) return;
+    const r = await post("/api/wallet/claim", { txid: trimmed });
     if (!r.ok) return setToast(r.error);
     setTxid("");
     await refresh();
@@ -268,19 +292,31 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
       {phase ? (
         <ol className="mt-3 space-y-1.5" aria-live="polite">
           {steps.map((s, i) => (
-            <li key={s} className={`flex items-center gap-2 text-[12px] ${i < idx ? "text-neon-2" : i === idx ? "text-foil" : "text-mint/50"}`}>
+            <li
+              key={s}
+              className={`flex items-center gap-2 text-[12px] ${
+                i < idx ? "text-neon-2" : i === idx ? "text-foil" : "text-mint/50"
+              }`}
+            >
               <span className="w-4 text-center">{i < idx ? "✓" : i === idx ? "●" : "○"}</span>
               {stepLabel[s]}
             </li>
           ))}
-          {phase === "done" ? <li className="text-[12px] font-bold text-neon-2">{d.wc.step_done}</li> : null}
+          {phase === "done" ? (
+            <li className="text-[12px] font-bold text-neon-2">{d.wc.step_done}</li>
+          ) : null}
         </ol>
       ) : null}
+
       {link ? (
         <div className="mt-2 flex items-center gap-3 text-[12px]">
-          <a href={link} target="_blank" rel="noopener noreferrer" className="text-neon-2 hover:underline">{d.wc.viewTx} ↗</a>
+          <a href={link} target="_blank" rel="noopener noreferrer" className="text-neon-2 hover:underline">
+            {d.wc.viewTx} ↗
+          </a>
           {phase === "confirm" && pendingId ? (
-            <button onClick={() => poll(pendingId)} className="text-mint hover:text-white">{d.wc.checkAgain}</button>
+            <button onClick={() => poll(pendingId)} className="text-mint hover:text-white">
+              {d.wc.checkAgain}
+            </button>
           ) : null}
         </div>
       ) : null}
@@ -292,11 +328,11 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
         <p className="mt-2 text-[12px] leading-6 text-mint">{d.wc.manualBody}</p>
         <div className="mt-2 flex items-center gap-2">
           <code dir="ltr" className="min-w-0 flex-1 truncate rounded-lg bg-black/40 px-3 py-2 font-display text-[11px] text-neon-2">
-            {tronCfg?.depositAddress}
+            {treasuryAddress}
           </code>
           <button
             onClick={async () => {
-              await navigator.clipboard.writeText(tronCfg?.depositAddress ?? "").catch(() => {});
+              await navigator.clipboard.writeText(treasuryAddress).catch(() => {});
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             }}
@@ -313,7 +349,11 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
             placeholder={d.wc.txidPlaceholder}
             className="focus-ring min-w-0 flex-1 rounded-lg border border-rule bg-black/30 px-3 py-2 font-display text-[11px] text-white placeholder:text-mint/40"
           />
-          <button onClick={claim} disabled={txid.trim().length !== 64} className="btn-foil rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50">
+          <button
+            onClick={claim}
+            disabled={txid.trim().length < 32}
+            className="btn-foil rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50"
+          >
             {d.wc.claim}
           </button>
         </div>

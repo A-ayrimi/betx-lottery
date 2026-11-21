@@ -1,8 +1,8 @@
 import type { AppState, DrawResult, UserState } from "@/lib/types";
 import { WHEEL_SECTORS } from "@/lib/wheel";
 
-export const DEMO_WALLET_ADDRESS = "TX_DEMO_WALLET_9999";
-export const DEMO_TREASURY_ADDRESS = "TX_DEMO_TREASURY_9999";
+export const DEMO_WALLET_ADDRESS = "SOL_DEMO_WALLET_9999";
+export const DEMO_TREASURY_ADDRESS = "SOL_DEMO_TREASURY_9999";
 export const DEMO_SESSION_KEY = "betx_demo_session_v1";
 export const DEMO_STARTING_BALANCE = 100;
 
@@ -123,7 +123,6 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       minWithdraw: 5,
       referralDepositBonus: 0.5,
       adminWallet: DEMO_TREASURY_ADDRESS,
-      tronOnly: true,
       solanaOnly: true,
       totalRoundRevenue: 20,
       prizePerRound: 15,
@@ -133,9 +132,9 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       ticketPrice: 1,
       tron: {
         enabled: false,
-        network: "nile",
+        network: "mainnet",
         depositAddress: null,
-        explorer: "https://nile.tronscan.org/#/transaction/",
+        explorer: "https://tronscan.org/#/transaction/",
       },
       solana: {
         enabled: false,

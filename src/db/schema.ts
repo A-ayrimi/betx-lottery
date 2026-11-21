@@ -129,16 +129,16 @@ export const wheelSpins = pgTable("wheel_spins", {
 export const deposits = pgTable("deposits", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
-  provider: text("provider").notNull().default("nowpayments"), // nowpayments | demo
+  provider: text("provider").notNull().default("nowpayments"), // nowpayments | solana_spl
   orderId: text("order_id").notNull().unique(),
   invoiceId: text("invoice_id"),
   paymentId: text("payment_id"),
   amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
-  payCurrency: text("pay_currency").notNull().default("usdttrc20"),
+  payCurrency: text("pay_currency").notNull().default("USDC"),
   status: text("status").notNull().default("waiting"),
   credited: boolean("credited").notNull().default(false),
   invoiceUrl: text("invoice_url"),
-  // on-chain (direct wallet) deposits
+  // on-chain (direct Solana wallet) deposits
   txHash: text("tx_hash").unique(),
   fromAddress: text("from_address"),
   expectedTxId: text("expected_tx_id"),
@@ -153,7 +153,7 @@ export const withdrawals = pgTable("withdrawals", {
   username: text("username").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   address: text("address").notNull(),
-  network: text("network").notNull().default("TRC20"),
+  network: text("network").notNull().default("Solana"),
   status: text("status").notNull().default("pending"), // pending | processing | paid | rejected
   auto: boolean("auto").notNull().default(false),
   reviewReason: text("review_reason"),
@@ -171,7 +171,7 @@ export const loginTokens = pgTable("login_tokens", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
-/** One-time sign-in challenges for wallet login (Sign-In with TRON). */
+/** One-time sign-in challenges for wallet login (Sign-In with Solana). */
 export const walletNonces = pgTable("wallet_nonces", {
   nonce: text("nonce").primaryKey(),
   address: text("address").notNull(),
@@ -202,7 +202,7 @@ export const jobRuns = pgTable("job_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** On-chain USDT that reached the deposit address from a wallet no user has linked (yet). */
+/** On-chain USDC that reached the deposit address from a wallet no user has linked (yet). */
 export const unmatchedTransfers = pgTable("unmatched_transfers", {
   txHash: text("tx_hash").primaryKey(),
   fromAddress: text("from_address").notNull(),
@@ -222,9 +222,9 @@ export const rateLimits = pgTable(
 );
 
 /**
- * One row per settled round for the $3 treasury allocation. The separate
- * $2 gross administrator revenue is recorded in the accounting ledger.
- * `paid` is set only after a verified on-chain transfer.
+- One row per settled round for the $3 treasury allocation. The separate
+- $2 gross administrator revenue is recorded in the accounting ledger.
+- `paid` is set only after a verified on-chain transfer.
  */
 export const feeTransfers = pgTable("fee_transfers", {
   id: serial("id").primaryKey(),
@@ -241,10 +241,10 @@ export const feeTransfers = pgTable("fee_transfers", {
 }, (t) => [uniqueIndex("fee_transfers_tx_hash_unique").on(t.txHash)]);
 
 /**
- * Every real change of the vault balance, recorded in the same transaction
- * as the change itself. This is the source of truth for the candle chart —
- * charts are never invented from random numbers.
- * reason: draw | spin | referral | seed | backfill
+- Every real change of the vault balance, recorded in the same transaction
+- as the change itself. This is the source of truth for the candle chart —
+- charts are never invented from random numbers.
+- reason: draw | spin | referral | seed | backfill
  */
 export const vaultSnapshots = pgTable("vault_snapshots", {
   id: serial("id").primaryKey(),

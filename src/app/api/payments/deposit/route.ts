@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { limitByIp, rateLimit } from "@/lib/ratelimit";
+import { rateLimit } from "@/lib/ratelimit";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -8,14 +8,18 @@ import { config } from "@/lib/config";
 import { assertCanPlay, creditDeposit, getSessionUser, UserError } from "@/lib/store";
 import { createInvoice } from "@/lib/nowpayments";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
-import { DepositReservationError, isValidDepositIdempotencyKey, reserveDeposit } from "@/lib/depositReservations";
+import {
+  DepositReservationError,
+  isValidDepositIdempotencyKey,
+  reserveDeposit,
+} from "@/lib/depositReservations";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Creates a USDT deposit.
- *  - live + NOWPayments configured -> hosted invoice, credited later by the IPN webhook
- *  - demo mode                     -> simulated top-up, credited instantly
+ * Creates a USDC deposit order.
+ * - live + NOWPayments configured -> hosted invoice, credited later by the IPN webhook
+ * - non-live mode                 -> simulated top-up, credited instantly
  */
 export async function POST(req: NextRequest) {
   try {
@@ -24,9 +28,6 @@ export async function POST(req: NextRequest) {
     await rateLimit("deposit", me.id, 10);
     await assertRegion();
     assertCanPlay(me);
-    // TRON-only mode: exchange invoices and demo top-ups are paused;
-    // direct TRON wallet deposits (/api/wallet/deposit) stay enabled.
-    if (config.tronOnly) throw new UserError("comingSoon", 503);
 
     const body = await req.json().catch(() => ({}));
     const amount = Math.round(Number(body.amount) * 100) / 100;
@@ -43,11 +44,11 @@ export async function POST(req: NextRequest) {
 
     const dep = await reserveDeposit(db, {
       userId: me.id,
-      provider: config.live ? "nowpayments" : "demo",
+      provider: config.live ? "nowpayments" : "solana_spl",
       amount,
       orderId,
       idempotencyKey: body.idempotencyKey.toLowerCase(),
-      payCurrency: config.nowpayments.payCurrency,
+      payCurrency: config.nowpayments.payCurrency || "USDC",
     });
 
     if (!config.live) {
@@ -83,7 +84,9 @@ export async function POST(req: NextRequest) {
     if (e instanceof DepositReservationError) {
       if (e.code === "user_not_found") return handleError(new UserError("userNotFound", 404));
       if (e.code === "idempotency_conflict") return handleError(new UserError("depositRequestKey", 409));
-      return handleError(new UserError("depositLimit", 403, { limit: `$${e.limit?.toFixed(2) ?? "0.00"}` }));
+      return handleError(
+        new UserError("depositLimit", 403, { limit: `$${e.limit?.toFixed(2) ?? "0.00"}` }),
+      );
     }
     return handleError(e);
   }

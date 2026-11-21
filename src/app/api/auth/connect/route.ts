@@ -15,7 +15,6 @@ const slug = (s: string) =>
 
 export async function POST(req: NextRequest) {
   try {
-    if (config.tronOnly) throw new UserError("comingSoon", 503);
     const country = await assertRegion();
     await limitByIp("connect", 10);
     const locale = await getRequestLocale();

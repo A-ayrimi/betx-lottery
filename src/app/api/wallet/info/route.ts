@@ -16,8 +16,13 @@ export async function GET() {
       getSolanaUsdcBalance(me.walletAddress),
       getSolanaConnection().getBalance(new PublicKey(me.walletAddress), "confirmed"),
     ]);
-    const balances = { usdc, usdt: usdc, sol: lamports / 1e9, trx: lamports / 1e9 };
-    return NextResponse.json({ ok: true, address: me.walletAddress, network: getSolanaConfig().cluster, balances });
+    const balances = { usdc, sol: lamports / 1e9 };
+    return NextResponse.json({
+      ok: true,
+      address: me.walletAddress,
+      network: getSolanaConfig().cluster,
+      balances,
+    });
   } catch (e) {
     return handleError(e);
   }

@@ -39,7 +39,7 @@ export const config = {
       ).replace(/\/$/, "");
     },
     get payCurrency() {
-      return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdtsol";
+      return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdc";
     },
     get enabled() {
       return Boolean(process.env.NOWPAYMENTS_API_KEY && process.env.NOWPAYMENTS_IPN_SECRET);
@@ -62,7 +62,7 @@ export const config = {
   get adminToken() {
     return process.env.ADMIN_TOKEN || "";
   },
-  /** Legacy compatibility getter for Solana-only mode. */
+  /** Compatibility getter for Solana-only mode. */
   get tronOnly() {
     return process.env.SOLANA_ONLY !== "off" && process.env.TRON_ONLY !== "off";
   },
@@ -108,7 +108,7 @@ export function publicConfig() {
   return {
     company: process.env.COMPANY_NAME || "BETX",
     license: process.env.LICENSE_INFO || null,
-   supportEmail: process.env.SUPPORT_EMAIL || "support.betx@gmail.com",
+    supportEmail: process.env.SUPPORT_EMAIL || "support.betx@gmail.com",
     helpUrl: process.env.GAMBLING_HELP_URL || "https://www.begambleaware.org",
     live: config.live,
     paymentsEnabled: config.nowpayments.enabled,
@@ -117,7 +117,6 @@ export function publicConfig() {
     minWithdraw: config.limits.minWithdraw,
     referralDepositBonus: config.limits.referralDepositBonus,
     adminWallet: config.adminWallet,
-    tronOnly: config.tronOnly,
     solanaOnly: config.solanaOnly,
     solana: {
       enabled: Boolean(solanaTreasury),

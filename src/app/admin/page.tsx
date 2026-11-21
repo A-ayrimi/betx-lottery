@@ -41,7 +41,6 @@ function AdminInner() {
   const [data, setData] = useState<{ withdrawals: W[]; deposits: D[]; vault: { balance: number; totalFees: number; adminEarnings: number } } | null>(null);
   const [err, setErr] = useState("");
 
-
   const load = useCallback(async (t: string) => {
     setErr("");
     try {
@@ -268,7 +267,7 @@ interface Auto {
 
 interface Readiness {
   readiness: { ready: boolean; checks: { key: string; ok: boolean; level: "critical" | "warning"; detail: string }[] };
-  onchain: { address: string; status: string; usdt: number | null; trx: number | null; fetchedAt: string; explorerUrl: string } | null;
+  onchain: { address: string; status: string; usdc?: number | null; usdt?: number | null; sol?: number | null; trx?: number | null; fetchedAt: string; explorerUrl: string } | null;
 }
 
 function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: number }) {
@@ -306,7 +305,8 @@ function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: 
     );
   }
   const oc = r.onchain;
-  const diff = oc && oc.usdt !== null ? Math.round((oc.usdt - vaultBalance) * 100) / 100 : null;
+  const onchainBalance = oc ? (oc.usdc ?? oc.usdt ?? null) : null;
+  const diff = oc && onchainBalance !== null ? Math.round((onchainBalance - vaultBalance) * 100) / 100 : null;
   return (
     <div className="panel mt-6 rounded-2xl p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -327,7 +327,7 @@ function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: 
       </div>
       <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
         <Stat k="LEDGER VAULT" v={`$${vaultBalance.toFixed(2)}`} />
-        <Stat k="ON-CHAIN TREASURY" v={oc && oc.usdt !== null ? `$${oc.usdt.toFixed(2)} · ${oc.status}` : oc ? oc.status : "n/a"} bad={!oc || oc.status === "unavailable" || oc.status === "invalid"} />
+        <Stat k="ON-CHAIN TREASURY (USDC)" v={oc && onchainBalance !== null ? `$${onchainBalance.toFixed(2)} · ${oc.status}` : oc ? oc.status : "n/a"} bad={!oc || oc.status === "unavailable" || oc.status === "invalid"} />
         <Stat k="ON-CHAIN − LEDGER" v={diff === null ? "n/a" : `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)}`} bad={diff !== null && diff < 0} />
       </div>
       {oc ? (
@@ -512,7 +512,7 @@ function AutomationPanel({ token }: { token: string }) {
           <span className={`h-3 w-3 rounded-full ${healthy ? "bg-neon-2 shadow-[0_0_12px_rgba(53,255,176,0.8)]" : "bg-foil"}`} />
           <p className="text-lg font-black text-white">Autopilot</p>
           <p className="text-xs text-mint">
-            {st.lastRunAt ? `last run ${st.ageSeconds}s ago` : "never ran"} · round timeout {st.roundTimeoutHours}h · TRON {st.tron.network}
+            {st.lastRunAt ? `last run ${st.ageSeconds}s ago` : "never ran"} · round timeout {st.roundTimeoutHours}h · Solana {st.tron.network}
             {st.tron.enabled ? "" : " (direct deposits off)"}
           </p>
         </div>

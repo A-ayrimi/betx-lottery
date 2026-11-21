@@ -16,8 +16,15 @@ export function Compliance() {
   const { d, href } = useI18n();
   const [denied, setDenied] = useState(false);
   const [busy, setBusy] = useState(false);
-  const ageOk = useStored(AGE_KEY, "1") === "1";
-  const cookieOk = useStored(COOKIE_KEY, "1") === "1";
+  const [ageAccepted, setAgeAccepted] = useState(false);
+  const [cookieAccepted, setCookieAccepted] = useState(false);
+
+  const storedAgeOk = useStored(AGE_KEY, "0") === "1";
+  const storedCookieOk = useStored(COOKIE_KEY, "1") === "1";
+
+  const ageOk = storedAgeOk || ageAccepted;
+  const cookieOk = storedCookieOk || cookieAccepted;
+
   const age: "unknown" | "ok" | "denied" = denied ? "denied" : ageOk ? "ok" : "unknown";
 
   const needsTerms = Boolean(state?.user && !state.user.termsAccepted) && age === "ok";
@@ -58,6 +65,8 @@ export function Compliance() {
                       <button
                         onClick={() => {
                           writeStored(AGE_KEY, "1");
+                          setAgeAccepted(true);
+                          setDenied(false);
                         }}
                         className="btn-neon focus-ring rounded-xl px-4 py-3.5 text-sm font-bold"
                       >
@@ -117,6 +126,7 @@ export function Compliance() {
           <button
             onClick={() => {
               writeStored(COOKIE_KEY, "1");
+              setCookieAccepted(true);
             }}
             className="btn-neon focus-ring rounded-lg px-4 py-2 text-sm font-bold"
           >

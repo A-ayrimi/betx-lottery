@@ -29,7 +29,7 @@ export function Header() {
   const [form, setForm] = useState({ username: "", telegram: "", referral: "", accept: false });
   const [walletBalance, setWalletBalance] = useState<{
     address: string;
-    balances: { usdt: number; trx: number } | null;
+    balances: { usdc: number; sol: number } | null;
   } | null>(null);
 
   const NAV = [
@@ -46,14 +46,14 @@ export function Header() {
   const walletMatchesAccount = !connectedAddress || connectedAddress === user?.walletAddress;
   const walletBalances =
     isDemoSession && walletAddress === user?.walletAddress
-      ? { usdt: user.balance, trx: 0 }
+      ? { usdc: user.balance, sol: 0 }
       : walletMatchesAccount && walletBalance?.address === walletAddress
         ? walletBalance.balances
         : null;
   const live = state?.config.live ?? !demoEnabled;
   const vaultAddress = state?.vault.adminWallet ?? state?.config.adminWallet ?? "";
-  const tronOnly = state?.config.tronOnly !== false;
-  const testnet = state?.config.tron.network && state.config.tron.network !== "mainnet";
+  const networkName = state?.config?.tron?.network;
+ const testnet = Boolean(networkName && String(networkName) !== "mainnet" && String(networkName) !== "mainnet-beta");
   const bot = state?.config.botUsername;
   const botStart = bot ? `https://t.me/${bot}${pendingRef ? `?start=ref_${pendingRef}` : ""}` : null;
 
@@ -146,8 +146,8 @@ export function Header() {
                 {walletAddress ? (
                   <AddressChip
                     address={walletAddress}
-                    usdt={walletBalances?.usdt ?? null}
-                    trx={walletBalances?.trx ?? null}
+                    usdc={walletBalances?.usdc ?? null}
+                    sol={walletBalances?.sol ?? null}
                     balanceLabel={d.wc.walletBalance}
                     demo={isDemoSession}
                     onClick={() => (window.location.hash = "wallet")}
@@ -169,8 +169,8 @@ export function Header() {
               <div className="flex items-center gap-2">
                 <AddressChip
                   address={walletAddress}
-                  usdt={walletBalances?.usdt ?? null}
-                  trx={walletBalances?.trx ?? null}
+                  usdc={walletBalances?.usdc ?? null}
+                  sol={walletBalances?.sol ?? null}
                   balanceLabel={d.wc.walletBalance}
                   demo={isDemoSession}
                   onClick={openModal}
@@ -246,65 +246,34 @@ export function Header() {
                 </div>
 
                 {!user && botStart ? (
-                  tronOnly ? (
-                    <button
-                      type="button"
-                      onClick={() => setToast(d.wc.comingSoonToast)}
-                      aria-disabled="true"
-                      title={d.wc.comingSoonToast}
-                      className="mt-4 flex w-full cursor-not-allowed items-center justify-center gap-2.5 rounded-xl border border-rule bg-black/20 px-6 py-3 text-sm font-bold text-mint/50"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
-                        <path d="M21.9 4.3 18.7 19.4c-.2 1-.9 1.3-1.7.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.6 13.2 1.9 11.7c-1-.3-1-1 .2-1.5L20.6 3c.9-.3 1.6.2 1.3 1.3Z" />
-                      </svg>
-                      {d.wc.telegramAlt}
-                      <SoonBadge label={d.wc.comingSoon} />
-                    </button>
-                  ) : (
-                    <a
-                      href={botStart}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-ring mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl border border-[#229ED9]/50 px-6 py-3 text-sm font-bold text-[#7cc8ef] transition hover:bg-[#229ED9]/10"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
-                        <path d="M21.9 4.3 18.7 19.4c-.2 1-.9 1.3-1.7.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.6 13.2 1.9 11.7c-1-.3-1-1 .2-1.5L20.6 3c.9-.3 1.6.2 1.3 1.3Z" />
-                      </svg>
-                      {d.wc.telegramAlt}
-                    </a>
-                  )
+                  <a
+                    href={botStart}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="focus-ring mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl border border-[#229ED9]/50 px-6 py-3 text-sm font-bold text-[#7cc8ef] transition hover:bg-[#229ED9]/10"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+                      <path d="M21.9 4.3 18.7 19.4c-.2 1-.9 1.3-1.7.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.6 13.2 1.9 11.7c-1-.3-1-1 .2-1.5L20.6 3c.9-.3 1.6.2 1.3 1.3Z" />
+                    </svg>
+                    {d.wc.telegramAlt}
+                  </a>
                 ) : null}
 
-                {!user && !live && !demoEnabled ? (
-                  tronOnly ? (
-                    <div className="mt-4 rounded-xl border border-dashed border-rule bg-black/20 px-4 py-3 opacity-70">
+                {!user && !live && demoEnabled ? (
+                  <details className="mt-4 rounded-xl border border-dashed border-rule px-4 py-3">
+                    <summary className="text-[12px] text-mint hover:text-white">{d.wc.demoAlt}</summary>
+                    <form onSubmit={submitDemo} className="mt-3 space-y-3">
+                      <Field label={d.header.username} value={form.username} onChange={(v) => setForm({ ...form, username: v })} placeholder="lucky_alex" />
+                      <Field label={d.header.referral} value={form.referral} onChange={(v) => setForm({ ...form, referral: v })} placeholder="BETX01" />
                       <button
-                        type="button"
-                        onClick={() => setToast(d.wc.comingSoonToast)}
-                        aria-disabled="true"
-                        title={d.wc.comingSoonToast}
-                        className="flex w-full cursor-not-allowed items-center justify-between gap-2 text-start"
+                        type="submit"
+                        disabled={busy || !form.accept}
+                        className="btn-neon focus-ring w-full rounded-xl px-6 py-3 text-sm font-bold disabled:opacity-60"
                       >
-                        <span className="text-[12px] text-mint/60">{d.wc.demoAlt}</span>
-                        <SoonBadge label={d.wc.comingSoon} />
+                        {busy ? d.header.submitting : d.header.submit}
                       </button>
-                    </div>
-                  ) : (
-                    <details className="mt-4 rounded-xl border border-dashed border-rule px-4 py-3">
-                      <summary className="text-[12px] text-mint hover:text-white">{d.wc.demoAlt}</summary>
-                      <form onSubmit={submitDemo} className="mt-3 space-y-3">
-                        <Field label={d.header.username} value={form.username} onChange={(v) => setForm({ ...form, username: v })} placeholder="lucky_alex" />
-                        <Field label={d.header.referral} value={form.referral} onChange={(v) => setForm({ ...form, referral: v })} placeholder="BETX01" />
-                        <button
-                          type="submit"
-                          disabled={busy || !form.accept}
-                          className="btn-neon focus-ring w-full rounded-xl px-6 py-3 text-sm font-bold disabled:opacity-60"
-                        >
-                          {busy ? d.header.submitting : d.header.submit}
-                        </button>
-                      </form>
-                    </details>
-                  )
+                    </form>
+                  </details>
                 ) : null}
 
                 <button
