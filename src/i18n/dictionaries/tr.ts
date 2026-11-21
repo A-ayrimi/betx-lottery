@@ -270,7 +270,7 @@ export const tr: Dict = {
     copied: "Kopyalandı",
     yourWallet: "Cüzdanın",
     walletBalance: "Cüzdan bakiyesi",
-    trxFee: "Ağ ücreti SOL ile ödenir. Cüzdanında küçük bir SOL bakiyesi bulundur.",
+    solFee: "Ağ ücreti SOL ile ödenir. Cüzdanında küçük bir SOL bakiyesi bulundur.",
     methodWallet: "Cüzdanımdan",
     methodInvoice: "Borsadan",
     payFromWallet: "Cüzdandan {amount} USDC öde",
@@ -511,7 +511,7 @@ export const tr: Dict = {
   onchain: {
     title: "Zincir üstü hazine · doğrulanmış",
     USDC: "Solana'da USDC",
-    trx: "Ağ ücreti için SOL",
+    solFee: "Ağ ücreti için SOL",
     view: "Solscan'de gör",
     checked: "Kontrol: {time}",
     inactive: "Adres Solana'da henüz aktif değil — gerçek bakiye 0",

@@ -270,7 +270,7 @@ export const ar: Dict = {
     copied: "تم النسخ",
     yourWallet: "محفظتك",
     walletBalance: "رصيد المحفظة",
-    trxFee: "تُدفع رسوم الشبكة بعملة TRX (الطاقة). احتفظ بحوالي 15–30 TRX في محفظتك.",
+    solFee: "????? ???? ?????? ????? SOL. ????? ????? SOL ???? ?? ?????? ?????? ???? ??????? Solana.",
     methodWallet: "من محفظتي",
     methodInvoice: "من منصة تداول",
     payFromWallet: "ادفع {amount} USDC من المحفظة",
@@ -511,7 +511,7 @@ export const ar: Dict = {
   onchain: {
     title: "الخزنة على البلوكشين · موثّقة",
     USDC: "USDC على Solana",
-    trx: "TRX لرسوم الشبكة",
+    solFee: "SOL لرسوم الشبكة",
     view: "عرض على Solscan",
     checked: "فُحص {time}",
     inactive: "العنوان غير مُفعّل على Solana بعد — الرصيد الحقيقي 0",

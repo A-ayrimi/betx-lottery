@@ -287,7 +287,7 @@ export const fa: Dict = {
     copied: "کپی شد",
     yourWallet: "کیف پول تو",
     walletBalance: "موجودی کیف پول",
-    trxFee: "کارمزد شبکه سولانا با SOL پرداخت می‌شود. مقداری SOL برای کارمزد در کیف پولت داشته باش.",
+    solFee: "کارمزد شبکه سولانا با SOL پرداخت می‌شود. مقداری SOL برای کارمزد در کیف پولت داشته باش.",
     methodWallet: "از کیف پول من",
     methodInvoice: "از صرافی",
     payFromWallet: "پرداخت {amount} USDC از کیف پول",
@@ -546,7 +546,7 @@ export const fa: Dict = {
   onchain: {
     title: "خزانه روی بلاکچین · تأییدشده",
     USDC: "USDC روی سولانا",
-    trx: "SOL برای کارمزد شبکه",
+    solFee: "SOL برای کارمزد شبکه",
     view: "مشاهده در Solscan",
     checked: "بررسی {time}",
     inactive: "این آدرس هنوز روی سولانا فعال نشده — موجودی واقعی ۰ است",

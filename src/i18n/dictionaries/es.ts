@@ -270,7 +270,7 @@ export const es: Dict = {
     copied: "Copiado",
     yourWallet: "Tu billetera",
     walletBalance: "Saldo de la billetera",
-    trxFee: "La comisión de red se paga en TRX (energía). Mantén ~15–30 TRX en tu billetera.",
+    solFee: "La comisión de red se paga en SOL. Mantén un pequeño saldo de SOL en tu billetera para las comisiones de Solana.",
     methodWallet: "Desde mi billetera",
     methodInvoice: "Desde un exchange",
     payFromWallet: "Pagar {amount} USDC desde la billetera",
@@ -511,7 +511,7 @@ export const es: Dict = {
   onchain: {
     title: "Tesoro on-chain · verificado",
     USDC: "USDC en Solana",
-    trx: "TRX para comisiones de red",
+    solFee: "SOL para comisiones de red",
     view: "Ver en Solscan",
     checked: "Comprobado {time}",
     inactive: "Dirección aún no activada en Solana: el saldo real es 0",

@@ -1,5 +1,5 @@
-/* BETX service worker — generated at build time (build 61fa2QWOfW6pxhsyg1fAg) */
-const VERSION = "betx-61fa2QWOfW6pxhsyg1fAg";
+/* BETX service worker — generated at build time (build _3N1_W9lnl3zp5tiIY27G) */
+const VERSION = "betx-_3N1_W9lnl3zp5tiIY27G";
 const SHELL = ["/","/en","/en/install","/offline.html","/manifest.webmanifest","/icons/icon-192.png","/icons/icon-512.png","/icons/maskable-512.png","/icons/apple-touch-icon.png","/og.png"];
 
 self.addEventListener("install", (event) => {

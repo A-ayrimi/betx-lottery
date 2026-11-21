@@ -321,7 +321,7 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
         </div>
       ) : null}
 
-      <p className="mt-3 text-[11px] leading-5 text-mint/70">{d.wc.trxFee}</p>
+      <p className="mt-3 text-[11px] leading-5 text-mint/70">{d.wc.solFee}</p>
 
       <details className="mt-3 rounded-xl border border-dashed border-rule px-4 py-3">
         <summary className="text-[12px] text-mint hover:text-white">{d.wc.manualTitle}</summary>

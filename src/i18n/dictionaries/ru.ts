@@ -270,7 +270,7 @@ export const ru: Dict = {
     copied: "Скопировано",
     yourWallet: "Твой кошелёк",
     walletBalance: "Баланс кошелька",
-    trxFee: "Комиссия сети оплачивается в TRX (энергия). Держи на кошельке ~15–30 TRX.",
+    solFee: "Комиссия сети оплачивается в SOL. Держите небольшой баланс SOL на кошельке для комиссий Solana.",
     methodWallet: "С моего кошелька",
     methodInvoice: "С биржи",
     payFromWallet: "Оплатить {amount} USDC с кошелька",
@@ -511,7 +511,7 @@ export const ru: Dict = {
   onchain: {
     title: "Казна в блокчейне · проверено",
     USDC: "USDC в Solana",
-    trx: "TRX для комиссий сети",
+    solFee: "SOL для комиссий сети",
     view: "Открыть в Solscan",
     checked: "Проверено {time}",
     inactive: "Адрес ещё не активирован в Solana — реальный баланс 0",
