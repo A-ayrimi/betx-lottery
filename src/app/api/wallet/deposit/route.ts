@@ -87,6 +87,9 @@ export async function POST(req: NextRequest) {
   try {
     const me = await getSessionUser();
     if (!me) return unauthorized("loginToDeposit");
+    if (config.maintenanceMode) {
+      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+    }
     await rateLimit("wdeposit", me.id, 20);
     if (!me.walletAddress) throw new UserError("walletRequired");
 

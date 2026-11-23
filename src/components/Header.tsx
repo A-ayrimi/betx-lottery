@@ -52,7 +52,7 @@ export function Header() {
         : null;
   const live = state?.config.live ?? !demoEnabled;
   const vaultAddress = state?.vault.adminWallet ?? state?.config.adminWallet ?? "";
-  const networkName = state?.config?.tron?.network;
+  const networkName = state?.config?.solana?.network;
  const testnet = Boolean(networkName && String(networkName) !== "mainnet" && String(networkName) !== "mainnet-beta");
   const bot = state?.config.botUsername;
   const botStart = bot ? `https://t.me/${bot}${pendingRef ? `?start=ref_${pendingRef}` : ""}` : null;

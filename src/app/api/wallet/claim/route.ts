@@ -7,6 +7,7 @@ import { deposits } from "@/db/schema";
 import { creditDeposit, getSessionUser, UserError } from "@/lib/store";
 import { getSolanaConfig, solanaExplorerTxUrl, verifySolanaUsdcDepositOnChain } from "@/lib/solana";
 import { handleError, unauthorized } from "@/lib/api";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
   try {
     const me = await getSessionUser();
     if (!me) return unauthorized("loginToDeposit");
+    if (config.maintenanceMode) {
+      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+    }
     await rateLimit("claim", me.id, 10);
     if (!me.walletAddress) throw new UserError("walletRequired");
     const solana = getSolanaConfig();

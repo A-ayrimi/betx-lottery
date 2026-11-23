@@ -1,17 +1,36 @@
+import {
+  MAX_DEPOSIT,
+  MIN_DEPOSIT,
+  MIN_WITHDRAW,
+  REFERRAL_DEPOSIT_BONUS,
+  SOLANA_CLUSTER,
+  SOLANA_EXPLORER,
+  SOLANA_MIN_DEPOSIT_USD,
+  SOLANA_RPC_URL,
+  SOLANA_USDC_MINT,
+  ADMIN_GROSS_REVENUE,
+  POOL_CAPACITY,
+  PRIZE,
+  TICKET_PRICE,
+  TOTAL_TICKET_REVENUE,
+  TREASURY_CONTRIBUTION,
+  isMaintenanceMode,
+} from "@/lib/gameConfig";
+
 /**
  * Central runtime configuration. Everything sensitive comes from env vars.
  *
- * BETX_MODE=live  -> live application mode.
- * BETX_MODE=demo  -> browser-local demo mode.
+ * BETX_MODE=live  -> live application mode (production default).
+ * BETX_MODE=demo  -> legacy browser-local preview (no longer the default).
  */
 export function getBetxMode(): "live" | "demo" {
   const mode = process.env.BETX_MODE;
   if (mode === "live" || mode === "demo") return mode;
-  throw new Error("BETX_MODE must be explicitly set to live or demo");
+  return "live";
 }
 
 export const config = {
-  /** Mode must be explicitly configured; ambiguous values fail closed. */
+  /** Live is the production default; the legacy demo preview is opt-in. */
   get live() {
     return getBetxMode() === "live";
   },
@@ -39,7 +58,8 @@ export const config = {
       ).replace(/\/$/, "");
     },
     get payCurrency() {
-      return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdc";
+      // Solana SPL-USDC (NOWPayments symbol "usdcsol"); verify in the gateway dashboard.
+      return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdcsol";
     },
     get enabled() {
       return Boolean(process.env.NOWPAYMENTS_API_KEY && process.env.NOWPAYMENTS_IPN_SECRET);
@@ -62,22 +82,21 @@ export const config = {
   get adminToken() {
     return process.env.ADMIN_TOKEN || "";
   },
-  /** Compatibility getter for Solana-only mode. */
-  get tronOnly() {
-    return process.env.SOLANA_ONLY !== "off" && process.env.TRON_ONLY !== "off";
-  },
-  /** Solana-only mode: only Solana wallets and SPL-USDC are used. */
+  /** Solana-only mode is always on: only Solana wallets and SPL-USDC are used. */
   get solanaOnly() {
     return process.env.SOLANA_ONLY !== "off";
   },
-  /** Treasury destination for verified transfers. */
+  /** Treasury destination (Solana) for verified transfers. */
   get adminWallet() {
     return (
       process.env.SOLANA_TREASURY_ADDRESS ||
       process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS ||
-      process.env.ADMIN_WALLET ||
       ""
     ).trim();
+  },
+  /** Temporary pre-launch maintenance switch (default ON until treasury is funded). */
+  get maintenanceMode() {
+    return isMaintenanceMode();
   },
   fees: {
     get autoSweep() {
@@ -91,11 +110,11 @@ export const config = {
     },
   },
   limits: {
-    minDeposit: 1,
-    maxDeposit: 500,
-    minWithdraw: 5,
+    minDeposit: MIN_DEPOSIT,
+    maxDeposit: MAX_DEPOSIT,
+    minWithdraw: MIN_WITHDRAW,
     /** referral reward paid to the inviter when an invitee's first deposit lands */
-    referralDepositBonus: 0.5,
+    referralDepositBonus: REFERRAL_DEPOSIT_BONUS,
   },
 };
 
@@ -111,6 +130,8 @@ export function publicConfig() {
     supportEmail: process.env.SUPPORT_EMAIL || "support.betx@gmail.com",
     helpUrl: process.env.GAMBLING_HELP_URL || "https://www.begambleaware.org",
     live: config.live,
+    maintenance: config.maintenanceMode,
+    maintenanceMode: config.maintenanceMode,
     paymentsEnabled: config.nowpayments.enabled,
     botUsername: config.telegram.username || null,
     minDeposit: config.limits.minDeposit,
@@ -120,18 +141,18 @@ export function publicConfig() {
     solanaOnly: config.solanaOnly,
     solana: {
       enabled: Boolean(solanaTreasury),
-      network: process.env.SOLANA_CLUSTER || "mainnet-beta",
+      network: process.env.SOLANA_CLUSTER || SOLANA_CLUSTER,
       treasuryAddress: solanaTreasury || null,
-      usdcMint: (process.env.SOLANA_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").trim(),
+      usdcMint: (process.env.SOLANA_USDC_MINT || SOLANA_USDC_MINT).trim(),
       decimals: 6,
-      rpcUrl: (process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com").trim(),
-      explorer: "https://solscan.io",
+      rpcUrl: (process.env.SOLANA_RPC_URL || SOLANA_RPC_URL).trim(),
+      explorer: SOLANA_EXPLORER,
     },
-    totalRoundRevenue: 20,
-    prizePerRound: 15,
-    treasuryContributionPerRound: 3,
-    adminGrossRevenuePerRound: 2,
-    roundCapacity: 20,
-    ticketPrice: 1,
+    totalRoundRevenue: TOTAL_TICKET_REVENUE,
+    prizePerRound: PRIZE,
+    treasuryContributionPerRound: TREASURY_CONTRIBUTION,
+    adminGrossRevenuePerRound: ADMIN_GROSS_REVENUE,
+    roundCapacity: POOL_CAPACITY,
+    ticketPrice: TICKET_PRICE,
   };
 }

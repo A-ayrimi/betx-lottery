@@ -1,9 +1,8 @@
-import { eq } from "drizzle-orm";
+﻿import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { deposits } from "@/db/schema";
 import { creditDeposit } from "@/lib/store";
 import type { NpPayment } from "@/lib/nowpayments";
-import { afterCredit } from "@/lib/tronDeposits";
 
 type Deposit = typeof deposits.$inferSelect;
 
@@ -23,13 +22,13 @@ export async function applyNowPayment(dep: Deposit, payment: NpPayment): Promise
 
   if (payment.payment_status === "finished" && amountMatches) {
     const result = await creditDeposit(dep.id, "finished");
-    await afterCredit(result, Number(dep.amountUsd));
-    return "credited";
+        return "credited";
   }
   if (payment.payment_status === "finished" && !amountMatches) {
-    console.error("NOWPayments amount/currency mismatch — manual review", dep.orderId, payment);
+    console.error("NOWPayments amount/currency mismatch â€” manual review", dep.orderId, payment);
     await db.update(deposits).set({ status: "review", updatedAt: new Date() }).where(eq(deposits.id, dep.id));
     return "review";
   }
   return "updated";
 }
+

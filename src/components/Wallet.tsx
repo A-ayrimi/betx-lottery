@@ -17,6 +17,7 @@ export function Wallet() {
   const user = state?.user;
   const cfg = state?.config;
   const live = Boolean(cfg?.live);
+  const maintenance = Boolean(cfg?.maintenanceMode ?? cfg?.maintenance);
   const excluded = user?.selfExcludedUntil ?? null;
   const statusLabel = (s: string) => (d.wallet.status as Record<string, string>)[s] ?? s;
 
@@ -135,7 +136,7 @@ export function Wallet() {
             </label>
             <button
               type="submit"
-              disabled={busy !== null || dataUnavailable}
+              disabled={busy !== null || dataUnavailable || maintenance}
               className="btn-foil focus-ring mt-5 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
             >
               {busy === "wd" ? d.wallet.submitting : d.wallet.submit}

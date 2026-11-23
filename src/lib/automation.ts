@@ -1,3 +1,4 @@
+﻿
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -17,8 +18,7 @@ import {
 } from "@/db/schema";
 import { config } from "@/lib/config";
 import { autoDrawFullRounds, refundRound, TICKET_PRICE } from "@/lib/store";
-import { getBalances, listIncomingUsdt, tron } from "@/lib/tron";
-import { creditOnchain, settleTronDeposit } from "@/lib/tronDeposits";
+import { creditOnchain } from "@/lib/tronDeposits";
 import { getPayment } from "@/lib/nowpayments";
 import { applyNowPayment } from "@/lib/nowpaymentsApply";
 import { payoutConfig, processAutoPayouts } from "@/lib/payout";
@@ -99,16 +99,44 @@ async function reconcileDeposits() {
     .returning({ id: deposits.id });
   expired += stale.length;
 
-  if (tron.enabled) {
+  const solanaRpcUrl = (process.env.SOLANA_RPC_URL || "").trim();
+  if (solanaRpcUrl) {
     const confirming = await db
-      .select({ id: deposits.id })
+      .select({
+        id: deposits.id,
+        txHash: deposits.txHash,
+      })
       .from(deposits)
-      .where(and(eq(deposits.provider, "tron"), eq(deposits.status, "confirming")))
+      .where(and(eq(deposits.provider, "solana"), eq(deposits.status, "confirming")))
       .limit(25);
+
     for (const d of confirming) {
-      const r = await settleTronDeposit(d.id);
-      if (r?.credited) credited++;
-      if (r?.status === "expired") expired++;
+      if (!d.txHash) continue;
+      try {
+        const res = await fetch(solanaRpcUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getSignatureStatuses",
+            params: [[d.txHash], { searchTransactionHistory: true }],
+          }),
+        });
+        if (!res.ok) continue;
+        const json = await res.json();
+        const st = json?.result?.value?.[0];
+        if (!st || st.err) continue;
+        if (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized") {
+          await db
+            .update(deposits)
+            .set({ status: "confirmed", updatedAt: new Date() })
+            .where(eq(deposits.id, d.id));
+          credited++;
+        }
+      } catch {
+        // Skip transient RPC error and retry on next tick
+      }
     }
   }
 
@@ -147,25 +175,46 @@ async function reconcileDeposits() {
   return { credited, nowpayments, expired };
 }
 
-/** Finds USDT that reached the deposit address and credits it automatically. */
+/** Finds incoming Solana USDC transfers and reconciles unmatched items. */
 async function scanIncoming() {
-  if (!tron.enabled) return { skipped: "direct deposits disabled" };
+  const solanaDepositAddr = (process.env.SOLANA_TREASURY_ADDRESS || process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS || "").trim();
+  const solanaRpcUrl = (process.env.SOLANA_RPC_URL || "").trim();
+  if (!solanaDepositAddr || !solanaRpcUrl) return { skipped: "direct deposits disabled" };
+
+  let credited = 0;
+  let unmatched = 0;
   const st = await stateRow();
   const since = Math.max((st.scanCursor ?? Date.now() - 24 * 3600_000) - 10 * 60_000, Date.now() - 7 * 24 * 3600_000);
-  const incoming = await listIncomingUsdt(tron.depositAddress, since);
-  let credited = 0, unmatched = 0, cursor = st.scanCursor ?? 0;
+  const solanaDecimals = Number(process.env.SOLANA_TOKEN_DECIMALS || 6);
+  const incoming: Array<{ txid: string; from: string; units: bigint | number | string; blockTime: number }> = [];
+  void since;
 
   for (const t of incoming) {
-    cursor = Math.max(cursor, t.blockTime);
-    const known = (await db.select({ id: deposits.id }).from(deposits).where(eq(deposits.txHash, t.txid)).limit(1))[0];
-    if (known) continue;
-    const owner = (await db.select({ id: users.id }).from(users).where(eq(users.walletAddress, t.from)).limit(1))[0];
-    if (owner) {
-      if (await creditOnchain(owner.id, t.txid, t.from)) credited++;
+    const existing = await db
+      .select({ id: deposits.id })
+      .from(deposits)
+      .where(eq(deposits.txHash, t.txid))
+      .limit(1);
+    if (existing.length > 0) continue;
+
+    const owner = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.walletAddress, t.from))
+      .limit(1);
+
+    if (owner[0]) {
+      const creditedOk = await creditOnchain(owner[0].id, t.txid, t.from);
+      if (creditedOk) credited++;
     } else {
       const ins = await db
         .insert(unmatchedTransfers)
-        .values({ txHash: t.txid, fromAddress: t.from, amount: String(Number(t.units) / 10 ** tron.decimals), blockTime: new Date(t.blockTime) })
+        .values({
+          txHash: t.txid,
+          fromAddress: t.from,
+          amount: String(Number(t.units) / 10 ** solanaDecimals),
+          blockTime: new Date(t.blockTime),
+        })
         .onConflictDoNothing()
         .returning();
       unmatched += ins.length;
@@ -181,8 +230,8 @@ async function scanIncoming() {
     await db.delete(unmatchedTransfers).where(eq(unmatchedTransfers.txHash, p.txHash));
   }
 
-  await db.update(automationState).set({ scanCursor: cursor || Date.now() }).where(eq(automationState.id, ID));
-  if (unmatched > 0) await alert("unmatched", `📥 ${unmatched} USDT transfer(s) arrived from wallets not linked to any account. See /admin.`);
+  await db.update(automationState).set({ scanCursor: Date.now() }).where(eq(automationState.id, ID));
+  if (unmatched > 0) await alert("unmatched", `📥 ${unmatched} transfer(s) arrived from wallets not linked to any account. See /admin.`);
   return { seen: incoming.length, credited, unmatched };
 }
 
@@ -270,10 +319,34 @@ export async function healthChecks(sendAlerts = true) {
 
   let holdings: number | null = null;
   const cfg = payoutConfig();
-  if (tron.enabled) {
-    const dep = await getBalances(tron.depositAddress);
-    const hot = cfg.hotWallet ? await getBalances(cfg.hotWallet) : { usdt: 0, trx: 0 };
-    if (dep && hot) holdings = Math.round((dep.usdt + hot.usdt) * 100) / 100;
+  const solanaDepositAddress = (process.env.SOLANA_TREASURY_ADDRESS || process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS || "").trim();
+  const solanaRpc = (process.env.SOLANA_RPC_URL || "").trim();
+  const solanaMint = (process.env.SOLANA_USDC_MINT || "").trim();
+  if (solanaRpc && solanaMint && (solanaDepositAddress || cfg.hotWallet)) {
+    const readUsdcBalance = async (owner: string): Promise<number> => {
+      try {
+        const res = await fetch(solanaRpc, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getTokenAccountsByOwner",
+            params: [owner, { mint: solanaMint }, { encoding: "jsonParsed" }],
+          }),
+        });
+        if (!res.ok) return 0;
+        const json = await res.json();
+        const accounts: Array<{ account?: { data?: { parsed?: { info?: { tokenAmount?: { uiAmount?: number | null } } } } } }> =
+          json?.result?.value ?? [];
+        return accounts.reduce((sum, acc) => sum + Number(acc?.account?.data?.parsed?.info?.tokenAmount?.uiAmount ?? 0), 0);
+      } catch {
+        return 0;
+      }
+    };
+    const depUsdc = solanaDepositAddress ? await readUsdcBalance(solanaDepositAddress) : 0;
+    const hotUsdc = cfg.hotWallet ? await readUsdcBalance(cfg.hotWallet) : 0;
+    holdings = Math.round((depUsdc + hotUsdc) * 100) / 100;
   }
   const [reviewQ] = await db
     .select({ c: sql<number>`count(*)::int` })
@@ -424,7 +497,11 @@ export async function automationStatus() {
       dailyMax: cfg.dailyMax,
     },
     roundTimeoutHours: Number(process.env.ROUND_TIMEOUT_HOURS ?? 24),
-    tron: { enabled: tron.enabled, network: tron.network, depositAddress: tron.depositAddress || null },
+    solana: {
+      enabled: Boolean((process.env.SOLANA_TREASURY_ADDRESS || process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS || "").trim()),
+      network: process.env.SOLANA_CLUSTER || "mainnet-beta",
+      depositAddress: (process.env.SOLANA_TREASURY_ADDRESS || process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS || "").trim() || null,
+    },
     fees: {
       autoSweep: fc.enabled,
       adminWallet: fc.adminWallet,

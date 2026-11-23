@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
     await assertRegion();
     assertCanPlay(me);
 
+    if (config.maintenanceMode) {
+      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const amount = Math.round(Number(body.amount) * 100) / 100;
     const { minDeposit, maxDeposit } = config.limits;

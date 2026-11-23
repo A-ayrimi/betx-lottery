@@ -1,8 +1,8 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 import { buildPostgresConfig } from "../src/lib/postgresConfig.ts";
 import { DepositReservationError, isValidDepositIdempotencyKey } from "../src/lib/depositReservations.ts";
-import { broadcast, isTronBroadcastAuthorized } from "../src/lib/tron.ts";
+import { broadcast, isSolanaBroadcastAuthorized } from "../src/lib/solana.ts";
 
 test("remote PostgreSQL connections always use certificate verification", () => {
   const config = buildPostgresConfig(
@@ -26,14 +26,14 @@ test("local PostgreSQL connections remain unencrypted unless explicitly configur
   );
 });
 
-test("DEMO mode blocks the TRON broadcast before the sender can run", async () => {
+test("DEMO mode blocks the SOLANA broadcast before the sender can run", async () => {
   const previousMode = process.env.BETX_MODE;
-  const previousAuthorization = process.env.TRON_BROADCAST_ENABLED;
+  const previousAuthorization = process.env.SOLANA_BROADCAST_ENABLED;
   let senderCalls = 0;
   try {
     process.env.BETX_MODE = "demo";
-    process.env.TRON_BROADCAST_ENABLED = "true";
-    assert.equal(isTronBroadcastAuthorized(), false);
+    process.env.SOLANA_BROADCAST_ENABLED = "true";
+    assert.equal(isSolanaBroadcastAuthorized(), false);
     const result = await broadcast({ signature: ["test-only"] }, async () => {
       senderCalls++;
       return { result: true };
@@ -43,19 +43,19 @@ test("DEMO mode blocks the TRON broadcast before the sender can run", async () =
   } finally {
     if (previousMode === undefined) delete process.env.BETX_MODE;
     else process.env.BETX_MODE = previousMode;
-    if (previousAuthorization === undefined) delete process.env.TRON_BROADCAST_ENABLED;
-    else process.env.TRON_BROADCAST_ENABLED = previousAuthorization;
+    if (previousAuthorization === undefined) delete process.env.SOLANA_BROADCAST_ENABLED;
+    else process.env.SOLANA_BROADCAST_ENABLED = previousAuthorization;
   }
 });
 
 test("LIVE broadcast stays disabled without explicit server authorization", async () => {
   const previousMode = process.env.BETX_MODE;
-  const previousAuthorization = process.env.TRON_BROADCAST_ENABLED;
+  const previousAuthorization = process.env.SOLANA_BROADCAST_ENABLED;
   let senderCalls = 0;
   try {
     process.env.BETX_MODE = "live";
-    delete process.env.TRON_BROADCAST_ENABLED;
-    assert.equal(isTronBroadcastAuthorized(), false);
+    delete process.env.SOLANA_BROADCAST_ENABLED;
+    assert.equal(isSolanaBroadcastAuthorized(), false);
     const result = await broadcast({ signature: ["test-only"] }, async () => {
       senderCalls++;
       return { result: true };
@@ -65,13 +65,13 @@ test("LIVE broadcast stays disabled without explicit server authorization", asyn
   } finally {
     if (previousMode === undefined) delete process.env.BETX_MODE;
     else process.env.BETX_MODE = previousMode;
-    if (previousAuthorization === undefined) delete process.env.TRON_BROADCAST_ENABLED;
-    else process.env.TRON_BROADCAST_ENABLED = previousAuthorization;
+    if (previousAuthorization === undefined) delete process.env.SOLANA_BROADCAST_ENABLED;
+    else process.env.SOLANA_BROADCAST_ENABLED = previousAuthorization;
   }
 });
 
 test("deposit reservation keys are UUIDs and duplicate reservations have an explicit error", () => {
-  assert.equal(isValidDepositIdempotencyKey("550e8400-e29b-41d4-a716-446655440000"), true);
+  assert.equal(isValidDepositIdempotencyKey("550e8400-e29b-41d4-8716-446655440000"), true);
   assert.equal(isValidDepositIdempotencyKey("not-a-key"), false);
   assert.ok(new DepositReservationError("idempotency_conflict") instanceof Error);
 });

@@ -19,6 +19,7 @@ export function PoolBand() {
   const sold = round?.sold ?? 0;
   const capacity = round?.capacity ?? 1;
   const remaining = Math.max(0, capacity - sold);
+  const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
 
   // stubs sold after first render get the flash animation (keyed remount)
   const [initialMaxId] = useState(() => (state?.round?.tickets ?? []).reduce((m, x) => Math.max(m, x.id), 0));
@@ -36,6 +37,10 @@ export function PoolBand() {
   }, [sold, capacity, dir]);
 
   const purchase = async (count: number, btn?: HTMLElement) => {
+    if (maintenance) {
+      setToast(d.errors.unavailable);
+      return;
+    }
     if (!round) {
       setToast(d.errors.noActiveRound);
       return;
@@ -303,7 +308,7 @@ export function PoolBand() {
                   {[1, 3, 5].map((c) => (
                     <button
                       key={c}
-                      disabled={busy || remaining === 0}
+                      disabled={busy || remaining === 0 || maintenance}
                       onClick={(e) => purchase(c, e.currentTarget)}
                       className={`focus-ring rounded-2xl px-6 py-4 font-bold disabled:opacity-50 ${
                         c === 3 ? "btn-foil" : "btn-neon"

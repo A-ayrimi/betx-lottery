@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { InstallBanner } from "@/components/InstallPrompt";
 import { Leaderboard, Faq, HowItWorks, Invite, Prizes, SiteFooter, WinnersTicker } from "@/components/Sections";
+import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 import { PoolBand } from "@/components/PoolBand";
 import { Toasts } from "@/components/Toasts";
 import { VaultCandleChart } from "@/components/VaultCandleChart";
@@ -32,6 +33,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
 
   const dict = getDictionary(locale);
   const demoMode = !publicConfig().live;
+  const maintenance = publicConfig().maintenance;
   const databaseTestMode =
     demoMode && process.env.NODE_ENV === "development" && process.env.BETX_TEST_DATABASE_UI === "true";
   const demoEnabled = demoMode && !databaseTestMode;
@@ -45,6 +47,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               {dict.wc.demoBadge}
             </p>
           ) : null}
+          <MaintenanceBanner enabled={maintenance} />
           <Header />
           <main>
             <Hero />

@@ -178,29 +178,30 @@ export function WalletProvider({
       setReady(true);
     };
 
-    detect();
+    const initTimer = window.setTimeout(detect, 0);
     const timer = window.setTimeout(detect, 300);
     window.addEventListener("load", detect);
 
     const demoSession = demoEnabled ? loadDemoSession() : null;
     if (demoSession) {
-      window.setTimeout(() => {
+      const demoTimer = window.setTimeout(() => {
         if (!alive) return;
         setAdapterName(DEMO_ADAPTER_NAME);
         setAddress(demoSession.address);
       }, 0);
       return () => {
         alive = false;
+        window.clearTimeout(initTimer);
         window.clearTimeout(timer);
+        window.clearTimeout(demoTimer);
         window.removeEventListener("load", detect);
       };
     }
 
     if (demoEnabled) {
-      setAdapterName(null);
-      setAddress(null);
       return () => {
         alive = false;
+        window.clearTimeout(initTimer);
         window.clearTimeout(timer);
         window.removeEventListener("load", detect);
       };
@@ -225,6 +226,7 @@ export function WalletProvider({
 
     return () => {
       alive = false;
+      window.clearTimeout(initTimer);
       window.clearTimeout(timer);
       window.removeEventListener("load", detect);
     };

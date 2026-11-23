@@ -117,6 +117,8 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       supportEmail: "support.betx@gmail.com",
       helpUrl: "https://www.begambleaware.org",
       live: false,
+      maintenance: false,
+      maintenanceMode: false,
       paymentsEnabled: false,
       botUsername: null,
       minDeposit: 1,
@@ -130,12 +132,6 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       adminGrossRevenuePerRound: 2,
       roundCapacity: 20,
       ticketPrice: 1,
-      tron: {
-        enabled: false,
-        network: "mainnet",
-        depositAddress: null,
-        explorer: "https://tronscan.org/#/transaction/",
-      },
       solana: {
         enabled: false,
         network: "mainnet-beta",

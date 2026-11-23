@@ -1,13 +1,34 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+﻿import { and, eq, gte, sql } from "drizzle-orm";
+import { Keypair } from "@solana/web3.js";
+import bs58 from "bs58";
 import { db } from "@/db";
 import { ledger, users, withdrawals } from "@/db/schema";
-import { addressFromKey } from "@/lib/tron";
 
 /** Automatic payouts are disabled until financial reconciliation is complete. */
 
+function solanaAddressFromKey(rawKey: string): string | null {
+  const trimmed = rawKey.trim();
+  if (!trimmed) return null;
+
+  try {
+    if (trimmed.startsWith("[")) {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return null;
+      const kp = Keypair.fromSecretKey(Uint8Array.from(parsed));
+      return kp.publicKey.toBase58();
+    }
+
+    const decoded = bs58.decode(trimmed);
+    const kp = Keypair.fromSecretKey(decoded);
+    return kp.publicKey.toBase58();
+  } catch {
+    return null;
+  }
+}
+
 export function payoutConfig() {
-  const key = process.env.TRON_PAYOUT_PRIVATE_KEY || "";
-  const hot = key ? addressFromKey(key) : null;
+  const key = process.env.SOLANA_PAYOUT_PRIVATE_KEY || "";
+  const hot = key ? solanaAddressFromKey(key) : null;
   return {
     enabled: false,
     keyConfigured: Boolean(key),

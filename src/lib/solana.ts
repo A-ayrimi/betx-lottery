@@ -566,3 +566,23 @@ export async function verifySolanaUsdcDepositOnChain(params: {
 
   return { status: "confirmed", amountUsd: receivedUsd };
 }
+export function isSolanaBroadcastAuthorized(): boolean {
+  const mode = (process.env.BETX_MODE || "").trim().toLowerCase();
+  if (mode === "demo") return false;
+  const flag = (process.env.SOLANA_BROADCAST_ENABLED || "").trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}
+
+export async function broadcast<T>(
+  signedTx: unknown,
+  sender?: (tx: unknown) => Promise<T>
+): Promise<{ ok: boolean; result?: T; txid?: string; error?: string }> {
+  if (!isSolanaBroadcastAuthorized()) {
+    return { ok: false, error: "Solana broadcast is not authorized" };
+  }
+  if (sender) {
+    const result = await sender(signedTx);
+    return { ok: true, result };
+  }
+  return broadcastSolanaSignedTransaction(signedTx);
+}
