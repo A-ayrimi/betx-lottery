@@ -251,7 +251,7 @@ export function PoolBand() {
               <p className="micro text-mint">
                 {sold} TICKETS SOLD · {remaining} LEFT
                 {round?.seedHash ? (
-                  <span className="ml-3 normal-case tracking-normal text-mint/60" title="SHA-256 commitment of this round's server seed">
+                  <span className="ms-3 normal-case tracking-normal text-mint/60" title="SHA-256 commitment of this round's server seed">
                     · {d.pool.fairHash} {round.seedHash.slice(0, 16)}…
                   </span>
                 ) : null}

@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/phase1-safety.test.mjs tests/regression-safety.test.mjs tests/postgres-regressions.test.mjs tests/postgres-tls-regressions.test.mjs"
+    "test": "node --experimental-strip-types --test tests/phase1-safety.test.mjs tests/regression-safety.test.mjs tests/legacy-payment-safety.test.mjs tests/postgres-regressions.test.mjs tests/postgres-tls-regressions.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
@@ -18,12 +18,6 @@
     "@fontsource-variable/vazirmatn": "^5.3.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.95.8",
-    "@tronweb3/tronwallet-abstract-adapter": "^1.3.0",
-    "@tronweb3/tronwallet-adapter-bitkeep": "^1.3.0",
-    "@tronweb3/tronwallet-adapter-okxwallet": "^1.2.0",
-    "@tronweb3/tronwallet-adapter-tokenpocket": "^1.2.0",
-    "@tronweb3/tronwallet-adapter-tronlink": "^1.3.0",
-    "@tronweb3/tronwallet-adapter-trust": "^1.3.0",
     "@types/three": "^0.187.0",
     "bs58": "^6.0.0",
     "dotenv": "17.3.1",
@@ -34,7 +28,6 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "three": "^0.187.0",
-    "tronweb": "^6.5.2",
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
@@ -49,8 +42,5 @@
     "postcss": "8.5.23",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3"
-  },
-  "overrides": {
-    "tronweb": "$tronweb"
   }
 }

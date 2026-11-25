@@ -1,18 +1,17 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ledger, users, withdrawals } from "@/db/schema";
-import { addressFromKey } from "@/lib/tron";
 
 /** Automatic payouts are disabled until financial reconciliation is complete. */
 
 export function payoutConfig() {
-  const key = process.env.TRON_PAYOUT_PRIVATE_KEY || "";
-  const hot = key ? addressFromKey(key) : null;
+  // Solana migration: automatic payouts remain disabled.
+  // Never read or expose a private key through the status configuration.
   return {
     enabled: false,
-    keyConfigured: Boolean(key),
-    keyValid: Boolean(hot),
-    hotWallet: hot,
+    keyConfigured: false,
+    keyValid: false,
+    hotWallet: null,
     maxPerTx: Number(process.env.AUTO_PAYOUT_MAX || 50),
     dailyMax: Number(process.env.AUTO_PAYOUT_DAILY_MAX || 300),
     maxPerUserDay: Number(process.env.AUTO_PAYOUT_MAX_PER_USER_DAY || 3),
@@ -48,7 +47,7 @@ export async function evaluate(w: W, cfg = payoutConfig()): Promise<Verdict> {
     .from(ledger)
     .where(eq(ledger.userId, u.id));
   if (Number(agg.spent) < deposited * cfg.minPlayRatio) {
-    return { ok: false, reason: `low play-through (${Number(agg.spent).toFixed(2)} of ${deposited.toFixed(2)} deposited) — AML check` };
+    return { ok: false, reason: `low play-through (${Number(agg.spent).toFixed(2)} of ${deposited.toFixed(2)} deposited) â€” AML check` };
   }
   if (Math.abs(Number(u.balance) - Number(agg.total)) > 0.009) {
     return { ok: false, reason: "balance does not match ledger" };
@@ -73,3 +72,5 @@ export async function evaluate(w: W, cfg = payoutConfig()): Promise<Verdict> {
 export async function processAutoPayouts(_alert: (key: string, text: string) => Promise<void>) {
   return { enabled: false, skipped: "automatic payouts are disabled pending financial reconciliation" };
 }
+
+

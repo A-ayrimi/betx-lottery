@@ -97,34 +97,19 @@ git push -u origin main
 
 ---
 
-## ۵) درگاه پرداخت تتر (NOWPayments)
+## ۵) واریز مستقیم USDC روی Solana (SPL)
 
-**این بخش غیرفعال است؛ کلید درگاه، کیف پول یا پرداخت sandbox/live تنظیم نکن.** توضیحات زیر legacy و تأییدنشده‌اند و برای اجرای عملیات استفاده نشوند.
+بیت‌کس فقط از **Solana Mainnet-Beta و توکن رسمی USDC (SPL)** برای واریزهای جدید استفاده می‌کند. هیچ وابستگی به ترون یا NOWPayments باقی نمی‌ماند.
 
-1. در <https://nowpayments.io> ثبت‌نام کن (برای تست اول از sandbox استفاده کن: <https://account-sandbox.nowpayments.io>).
-2. **Settings → Payments → Payout wallets:** آدرس کیف پول TRC20 خودت را اضافه کن. پول‌ها مستقیم به همین کیف پول می‌آیند (non-custodial).
-3. **Settings → API keys:** یک API Key بساز ← `NOWPAYMENTS_API_KEY`
-4. **Settings → Payments → IPN:** یک IPN Secret بساز ← `NOWPAYMENTS_IPN_SECRET`
-5. برای sandbox مقدار `NOWPAYMENTS_API_BASE=https://api-sandbox.nowpayments.io/v1` را بگذار.
-6. **این مرحله را انجام نده.** راه‌اندازی live در فاز ۱ تأیید نشده است.
-
-### جریان پرداخت در کد
-```
-کاربر «پرداخت $10 با تتر» را می‌زند
-  → POST /api/payments/deposit      ردیف deposit با order_id یکتا + ساخت invoice
-  → کاربر به صفحه پرداخت NOWPayments می‌رود و USDT-TRC20 می‌فرستد
-  → NOWPayments ← POST /api/payments/ipn
-       ۱. بررسی امضای x-nowpayments-sig (HMAC-SHA512 روی JSON با کلیدهای مرتب‌شده)
-       ۲. خواندن دوباره وضعیت پرداخت از API خود NOWPayments (به بدنه webhook اعتماد نمی‌کنیم)
-       ۳. تطبیق order_id، ارز و مبلغ با ردیف خودمان
-       ۴. فقط در وضعیت "finished" و فقط یک بار (قفل ردیف + فلگ credited) شارژ می‌شود
-  → ربات تلگرام به کاربر پیام «واریز تأیید شد» می‌فرستد
-```
+1. یک آدرس خزانه Solana بساز و کلید عمومی آن را در `SOLANA_TREASURY_ADDRESS` و `NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS` قرار ده (فقط آدرس عمومی، کلید خصوصی هرگز در env نمی‌رود).
+2. `SOLANA_USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` (استاندارد USDC روی سولانا) را تنظیم کن.
+3. کاربر کیف‌پول Solana (Phantom / Trust / OKX / Bitget) را وصل می‌کند، مبلغ را انتخاب می‌کند و تراکنش-transfer USDC را از کیف‌پول خودش به آدرس خزانه امضا می‌کند.
+4. سایت امضا و تراکنش را روی زنجیره تأیید می‌کند و فقط پس از تأیید واقعی، مبلغ از طریق `creditDeposit()` به حساب کاربر افزوده می‌شود (یک‌بار و idempotent).
+5. `POST /api/payments/deposit` ردیف واریز می‌سازد و تراکنش unsigned را برمی‌گرداند؛ کاربر امضا و ارسال می‌کند و `GET /api/wallet/deposit?id=` وضعیت و اعتباردهی را برمی‌گرداند.
 
 ### برداشت
-- کاربر مبلغ و آدرس TRC20 را وارد می‌کند. مبلغ همان لحظه از موجودی کسر و درخواست در صف قرار می‌گیرد.
-- تو در `https://YOUR-APP.vercel.app/admin` با `ADMIN_TOKEN` وارد می‌شوی، از کیف پول خودت پرداخت می‌کنی، tx hash را وارد می‌کنی و «پرداخت شد» را می‌زنی. با «رد»، مبلغ به کاربر برمی‌گردد.
-- عمداً دستی است: برداشت خودکار یعنی کلید کیف پول روی سرور، که بزرگ‌ترین ریسک امنیتی است.
+- برداشتهای خودکار در فاز ۱ غیرفعال است (`AUTO_PAYOUT=off`). درخواست برداشت در پنل ادمین با `ADMIN_TOKEN` تایید/رد می‌شود و تراکنش سولانا مربوطه ثبت می‌گردد.
+- کلید خصوصی خزانه هرگز در کد سمت کلاینت یا پاسخ API نشان داده نمی‌شود.
 
 ---
 

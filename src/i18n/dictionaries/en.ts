@@ -12,7 +12,7 @@
     logout: "Log out",
     kicker: "CONNECT · FREE TICKET",
     title: "Connect and unlock your first free spin",
-    body: "Sign in with Telegram, your Solana wallet, or a username in seconds and access the daily wheel and live pool.",
+    body: "Sign in with Telegram, your Solana wallet, or a username in seconds to access the daily wheel and live pool.",
     tgButton: "Continue with Telegram",
     tgHint: "Press Start in @BetxLotteryBot, then open BETX or log in on the web.",
     or: "or create an account with a username",
@@ -38,7 +38,7 @@
     statRounds: "Rounds settled",
     statPlayers: "Players",
     liveVault: "LIVE VAULT",
-    cashNote: "Internal ledger balance ? distinct from live on-chain treasury balance",
+    cashNote: "Internal ledger balance — distinct from live on-chain treasury balance",
     cellFee: "Treasury + admin allocation",
     cellFeeNote: "$3 treasury + $2 gross admin revenue per settled round",
     cellPrize: "Winner prize",
@@ -214,7 +214,7 @@
     ],
   },
   how: {
-    kicker: "HOW IT WORKS ? 3 STEPS",
+    kicker: "HOW IT WORKS · 3 STEPS",
     title1: "Quick sign-in, daily wheel, and a",
     titleGold: " transparent 20-ticket pool.",
     steps: [
@@ -295,7 +295,7 @@
     kicker: "LIVE ACTIVITY",
     bought: "{user} bought {n} tickets",
     won: "{user} won {amount}",
-    empty: "Pool is live ? ready for the first ticket entries in this round.",
+    empty: "Pool is live — ready for the first ticket entries in this round.",
   },
   invite: {
     kicker: "REFERRAL PROGRAM · INVITE FRIENDS",

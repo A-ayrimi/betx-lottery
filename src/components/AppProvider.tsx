@@ -388,20 +388,10 @@ export function AppProvider({
         setToast(t(d.toast.demoCredited, { amount: `$${Number(amount).toFixed(2)}` }));
         return true;
       }
-      const json = await post("/api/payments/deposit", { amount, idempotencyKey: crypto.randomUUID() });
-      if (!json.ok) {
-        setToast(json.error || d.toast.payFail);
-        return false;
-      }
-      if (json.invoiceUrl) {
-        window.location.href = json.invoiceUrl;
-        return true;
-      }
-      await refresh();
-      setToast(t(d.toast.demoCredited, { amount: `$${Number(json.credited).toFixed(2)}` }));
-      return true;
+      setToast(d.wc.comingSoonToast);
+      return false;
     },
-    [refresh, d, t, isDemoSession, state, dataUnavailable],
+    [d, t, isDemoSession, state, dataUnavailable],
   );
 
   const withdraw = useCallback(

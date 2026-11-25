@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
+﻿import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { deposits, users } from "../db/schema.ts";
 import { effectiveLimit } from "./responsibleGaming.ts";
@@ -79,7 +79,7 @@ export async function reserveDeposit(
       .where(
         and(
           eq(deposits.userId, params.userId),
-          eq(deposits.provider, "tron"),
+          eq(deposits.provider, "solana"),
           eq(deposits.status, "waiting"),
           lt(deposits.createdAt, new Date(now.getTime() - 2 * 60 * 1000)),
         ),
@@ -119,3 +119,4 @@ export async function reserveDeposit(
     )[0];
   });
 }
+

@@ -1,93 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
-import { rateLimit } from "@/lib/ratelimit";
-import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { deposits } from "@/db/schema";
-import { config } from "@/lib/config";
-import { assertCanPlay, creditDeposit, getSessionUser, UserError } from "@/lib/store";
-import { createInvoice } from "@/lib/nowpayments";
-import { assertRegion, handleError, unauthorized } from "@/lib/api";
-import {
-  DepositReservationError,
-  isValidDepositIdempotencyKey,
-  reserveDeposit,
-} from "@/lib/depositReservations";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Creates a USDC deposit order.
- * - live + NOWPayments configured -> hosted invoice, credited later by the IPN webhook
- * - non-live mode                 -> simulated top-up, credited instantly
- */
-export async function POST(req: NextRequest) {
-  try {
-    const me = await getSessionUser();
-    if (!me) return unauthorized("loginToDeposit");
-    await rateLimit("deposit", me.id, 10);
-    await assertRegion();
-    assertCanPlay(me);
+function gone() {
+  return NextResponse.json(
+    { ok: false, error: "legacy_payment_provider_disabled" },
+    { status: 410 },
+  );
+}
 
-    const body = await req.json().catch(() => ({}));
-    const amount = Math.round(Number(body.amount) * 100) / 100;
-    const { minDeposit, maxDeposit } = config.limits;
-    if (!Number.isFinite(amount) || amount < minDeposit || amount > maxDeposit) {
-      throw new UserError("depositRange", 400, { min: `$${minDeposit}`, max: `$${maxDeposit}` });
-    }
-    if (!isValidDepositIdempotencyKey(body.idempotencyKey)) {
-      throw new UserError("depositRequestKey", 400);
-    }
+export async function GET() {
+  return gone();
+}
 
-    const orderId = `BTX-${me.id}-${Date.now()}-${randomBytes(3).toString("hex")}`;
-    if (config.live && !config.nowpayments.enabled) throw new UserError("gatewayOff", 503);
+export async function POST() {
+  return gone();
+}
 
-    const dep = await reserveDeposit(db, {
-      userId: me.id,
-      provider: config.live ? "nowpayments" : "solana_spl",
-      amount,
-      orderId,
-      idempotencyKey: body.idempotencyKey.toLowerCase(),
-      payCurrency: config.nowpayments.payCurrency || "USDC",
-    });
+export async function PUT() {
+  return gone();
+}
 
-    if (!config.live) {
-      await creditDeposit(dep.id, "finished");
-      return NextResponse.json({ ok: true, mode: "demo", credited: amount });
-    }
+export async function PATCH() {
+  return gone();
+}
 
-    try {
-      const invoice = await createInvoice({
-        amountUsd: amount,
-        orderId,
-        description: `BETX wallet top-up · ${me.username}`,
-      });
+export async function DELETE() {
+  return gone();
+}
 
-      await db
-        .update(deposits)
-        .set({ invoiceId: String(invoice.id), invoiceUrl: invoice.invoice_url, updatedAt: new Date() })
-        .where(eq(deposits.id, dep.id));
+export async function OPTIONS() {
+  return gone();
+}
 
-      return NextResponse.json({ ok: true, mode: "live", invoiceUrl: invoice.invoice_url });
-    } catch (error) {
-      try {
-        await db
-          .update(deposits)
-          .set({ status: "failed", updatedAt: new Date() })
-          .where(eq(deposits.id, dep.id));
-      } catch (cleanupError) {
-        console.error("Could not release the failed payment deposit reservation", cleanupError);
-      }
-      throw error;
-    }
-  } catch (e) {
-    if (e instanceof DepositReservationError) {
-      if (e.code === "user_not_found") return handleError(new UserError("userNotFound", 404));
-      if (e.code === "idempotency_conflict") return handleError(new UserError("depositRequestKey", 409));
-      return handleError(
-        new UserError("depositLimit", 403, { limit: `$${e.limit?.toFixed(2) ?? "0.00"}` }),
-      );
-    }
-    return handleError(e);
-  }
+export async function HEAD() {
+  return new Response(null, { status: 410 });
 }

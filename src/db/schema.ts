@@ -129,7 +129,7 @@ export const wheelSpins = pgTable("wheel_spins", {
 export const deposits = pgTable("deposits", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
-  provider: text("provider").notNull().default("nowpayments"), // nowpayments | solana_spl
+  provider: text("provider").notNull().default("solana"), // solana (SPL-USDC); historical NOWPayments rows preserved
   orderId: text("order_id").notNull().unique(),
   invoiceId: text("invoice_id"),
   paymentId: text("payment_id"),

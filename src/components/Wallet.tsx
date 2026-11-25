@@ -189,7 +189,7 @@ export function Wallet() {
           >
             <p className="micro border-b border-rule px-6 py-4 text-mint">{d.wallet.transactions}</p>
             {[
-              ...user.deposits.map((x) => ({ key: `d${x.id}`, kind: d.wallet.deposit, amount: x.amount, status: x.status, at: x.createdAt, link: x.invoiceUrl, linkLabel: d.wallet.continuePay, sign: "+" })),
+              ...user.deposits.map((x) => ({ key: `d${x.id}`, kind: d.wallet.deposit, amount: x.amount, status: x.status, at: x.createdAt, link: null, linkLabel: d.wc.viewTx, sign: "+" })),
               ...user.withdrawals.map((x) => ({
                 key: `w${x.id}`,
                 kind: d.wallet.withdrawal,

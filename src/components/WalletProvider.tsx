@@ -150,7 +150,7 @@ export function WalletProvider({
       readyState: "Loading",
     }))
   );
-  const [ready, setReady] = useState(false);
+  const ready = wallets.some((w) => w.readyState !== "Loading");
   const [address, setAddress] = useState<string | null>(null);
   const [adapterName, setAdapterName] = useState<string | null>(null);
 
@@ -175,7 +175,6 @@ export function WalletProvider({
     const detect = () => {
       if (!alive) return;
       refreshWallets();
-      setReady(true);
     };
 
     detect();
@@ -189,16 +188,6 @@ export function WalletProvider({
         setAdapterName(DEMO_ADAPTER_NAME);
         setAddress(demoSession.address);
       }, 0);
-      return () => {
-        alive = false;
-        window.clearTimeout(timer);
-        window.removeEventListener("load", detect);
-      };
-    }
-
-    if (demoEnabled) {
-      setAdapterName(null);
-      setAddress(null);
       return () => {
         alive = false;
         window.clearTimeout(timer);

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -23,8 +23,110 @@ import { WHEEL_SECTORS } from "@/lib/wheel";
 import type { Dict } from "@/i18n/dictionaries/en";
 import { regionStatus } from "@/lib/geo";
 import { headers } from "next/headers";
-import { isTronAddress, lookupUsdtTransfers, toUnits, tron } from "@/lib/tron";
-import { getRoundAccountingEntries, getTicketPurchaseCount } from "@/lib/roundAccounting";
+const STORE_SOLANA_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const STORE_SOLANA_TREASURY =
+  process.env.NEXT_PUBLIC_SOLANA_TREASURY ||
+  "5TekXvxKMMhhHea399Kyf28Paun9pY3QhAtUte4N8xdy";
+const STORE_SOLANA_RPC_URL =
+  process.env.SOLANA_RPC_URL ||
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  "https://api.mainnet-beta.solana.com";
+
+function isSolanaAddress(addr: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test((addr || "").trim());
+}
+
+function toSolanaUsdcUnits(amount: number): bigint {
+  if (!Number.isFinite(amount) || amount <= 0) return BigInt(0);
+  return BigInt(Math.round(amount * 1_000_000));
+}
+
+async function lookupSolanaUsdcTransfers(
+  signature: string
+): Promise<{ status: "confirmed" | "pending" | "not_found"; transfers: Array<{ to: string; units: bigint }> }> {
+  const sig = (signature || "").trim();
+  if (!sig) return { status: "not_found", transfers: [] };
+
+  try {
+    const res = await fetch(STORE_SOLANA_RPC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getParsedTransaction",
+        params: [sig, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }],
+      }),
+    });
+    if (!res.ok) return { status: "pending", transfers: [] };
+    const json = (await res.json()) as {
+      result?: {
+        meta?: {
+          err?: unknown;
+          preTokenBalances?: Array<{
+            accountIndex: number;
+            mint?: string;
+            owner?: string;
+            uiTokenAmount?: { amount?: string };
+          }>;
+          postTokenBalances?: Array<{
+            accountIndex: number;
+            mint?: string;
+            owner?: string;
+            uiTokenAmount?: { amount?: string };
+          }>;
+        };
+        transaction?: {
+          message?: {
+            accountKeys?: Array<string | { pubkey?: string }>;
+          };
+        };
+      } | null;
+    };
+
+    if (!json.result) return { status: "pending", transfers: [] };
+    if (json.result.meta && json.result.meta.err) return { status: "not_found", transfers: [] };
+
+    const rawKeys =
+      (json.result.transaction &&
+        json.result.transaction.message &&
+        json.result.transaction.message.accountKeys) ||
+      [];
+    const keys = rawKeys.map((k) =>
+      typeof k === "string" ? k : k && k.pubkey ? String(k.pubkey) : ""
+    );
+
+    const map = new Map<string, { owner: string; pre: bigint; post: bigint }>();
+    for (const b of (json.result.meta && json.result.meta.preTokenBalances) || []) {
+      if (b.mint !== STORE_SOLANA_USDC_MINT) continue;
+      const owner = b.owner || keys[b.accountIndex] || "";
+      const key = `${b.accountIndex}:${owner}`;
+      const amt = b.uiTokenAmount && b.uiTokenAmount.amount ? b.uiTokenAmount.amount : "0";
+      map.set(key, { owner, pre: BigInt(amt), post: BigInt(0) });
+    }
+    for (const b of (json.result.meta && json.result.meta.postTokenBalances) || []) {
+      if (b.mint !== STORE_SOLANA_USDC_MINT) continue;
+      const owner = b.owner || keys[b.accountIndex] || "";
+      const key = `${b.accountIndex}:${owner}`;
+      const cur = map.get(key) || { owner, pre: BigInt(0), post: BigInt(0) };
+      const amt = b.uiTokenAmount && b.uiTokenAmount.amount ? b.uiTokenAmount.amount : "0";
+      cur.post = BigInt(amt);
+      map.set(key, cur);
+    }
+
+    const transfers: Array<{ to: string; units: bigint }> = [];
+    for (const entry of Array.from(map.values())) {
+      const delta = entry.post - entry.pre;
+      if (delta > BigInt(0) && entry.owner) {
+        transfers.push({ to: entry.owner, units: delta });
+      }
+    }
+
+    return { status: "confirmed", transfers };
+  } catch {
+    return { status: "pending", transfers: [] };
+  }
+}import { getRoundAccountingEntries, getTicketPurchaseCount } from "@/lib/roundAccounting";
 import { effectiveLimit } from "@/lib/responsibleGaming";
 import { isValidSolanaAddress } from "@/lib/solana";
 
@@ -356,7 +458,7 @@ export async function recordVaultSnapshot(q: Q, reason: string, delta: number, r
 /* ---------------------------------------------------------------- session */
 
 /* Signed session token: "v1.<userId>.<expiresAt>.<hmac>" (HMAC-SHA256).
- * A raw user id is never trusted — editing the cookie invalidates it. */
+ * A raw user id is never trusted â€” editing the cookie invalidates it. */
 const SESSION_TTL_S = 60 * 60 * 24 * 30;
 
 function sessionSecret() {
@@ -631,7 +733,7 @@ async function drawRound(
  * Safety net for full automation: draws EVERY open round whose ticket count
  * has reached capacity. Called by the buy flow (fast path) and by the
  * autopilot cron (catches crashes, manual DB edits, or any missed trigger).
- * Each round is drawn in its own locked transaction — never twice.
+ * Each round is drawn in its own locked transaction â€” never twice.
  */
 export async function autoDrawFullRounds(triggerUserId = 0): Promise<DrawOutcome[]> {
   const open = await db
@@ -922,7 +1024,7 @@ export async function getDrawHistory(limit = 20, offset = 0) {
     draws: rows.map(({ round: w, displayName, username }) => ({
       roundId: w.id,
       winnerName: displayName ?? username ?? "Unknown User",
-      winningSerial: w.winningSerial ?? "—",
+      winningSerial: w.winningSerial ?? "â€”",
       prize: Number(w.prize),
       fee: Number(w.fee),
       capacity: w.capacity,
@@ -1014,7 +1116,7 @@ if (newSold >= round.capacity) {
       username: me.username,
       type: "ticket_buy",
       amount: String(-cost),
-      note: `${take} golden tickets · round ${round.id}`,
+      note: `${take} golden tickets آ· round ${round.id}`,
       account: "user",
       roundId: round.id,
       reference: randomUUID(),
@@ -1104,7 +1206,7 @@ export async function creditDeposit(depositId: number, status = "finished") {
       transactionKey: `deposit:${dep.id}:credit`,
     });
 
-    // referral cash bonus on the invitee's first deposit — paid from vault profit only
+    // referral cash bonus on the invitee's first deposit â€” paid from vault profit only
     let inviter: User | null = null;
     if (firstDeposit && me.referredBy && dep.provider !== "demo") {
       const bonus = config.limits.referralDepositBonus;
@@ -1200,11 +1302,11 @@ export async function processWithdrawal(
     const pending = (await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1))[0];
     if (!pending) throw new UserError("wdNotFound", 404);
     if (pending.expectedTxId !== clean) throw new UserError("txMismatch");
-    const chain = await lookupUsdtTransfers(clean);
+    const chain = await lookupSolanaUsdcTransfers(clean);
     const matchingUnits = chain.status === "confirmed"
-      ? chain.transfers.filter((transfer) => transfer.to === pending.address).reduce((sum, transfer) => sum + transfer.units, BigInt(0))
+      ? chain.transfers.filter((transfer: { to: string; units: bigint }) => transfer.to === pending.address).reduce((sum: bigint, transfer: { to: string; units: bigint }) => sum + transfer.units, BigInt(0))
       : BigInt(0);
-    if (matchingUnits !== toUnits(Number(pending.amount))) throw new UserError("txMismatch");
+    if (matchingUnits !== toSolanaUsdcUnits(Number(pending.amount))) throw new UserError("txMismatch");
     verifiedTxHash = clean;
   }
   return db.transaction(async (tx) => {
@@ -1233,7 +1335,7 @@ export async function processWithdrawal(
         username: w.username,
         type: "withdraw_paid",
         amount: String(-Number(w.amount)),
-        note: `Verified withdrawal #${w.id} · tx ${verifiedTxHash}`,
+        note: `Verified withdrawal #${w.id} آ· tx ${verifiedTxHash}`,
         account: "withdrawal_settlement",
         reference: randomUUID(),
         transactionKey: `withdrawal:${w.id}:paid`,
@@ -1478,12 +1580,12 @@ export async function getState() {
         rpcUrl: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
         explorer: "https://solscan.io",
       },
-      tron: {
-        enabled: tron.enabled,
-        network: tron.network,
-        depositAddress: tron.enabled ? tron.depositAddress : null,
-        explorer: tron.explorer,
-      },
+        tron: {
+          enabled: true,
+          network: "mainnet-beta",
+          depositAddress: STORE_SOLANA_TREASURY,
+          explorer: "https://solscan.io",
+        },
     },
     region,
     vault: {
@@ -1526,7 +1628,7 @@ export async function getState() {
     winners: winners.map(({ round: w, displayName, username }) => ({
       roundId: w.id,
       winnerName: displayName ?? username ?? "Unknown User",
-      winningSerial: w.winningSerial ?? "—",
+      winningSerial: w.winningSerial ?? "â€”",
       prize: Number(w.prize),
       fee: Number(w.fee),
       capacity: w.capacity,
@@ -1555,3 +1657,6 @@ export async function getState() {
     user,
   };
 }
+
+
+

@@ -14,8 +14,6 @@ import {
 import bs58 from "bs58";
 import nacl from "tweetnacl";
 
-export const DEFAULT_SOLANA_TREASURY =
-  "5TekXvxKMMhhHea399Kyf28Paun9pY3QhAtUte4N8xdy";
 export const DEFAULT_SOLANA_USDC_MINT =
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export const DEFAULT_SOLANA_DECIMALS = 6;
@@ -56,7 +54,7 @@ export function getSolanaConfig(): SolanaConfig {
     treasuryAddress: (
       process.env.SOLANA_TREASURY_ADDRESS ||
       process.env.NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS ||
-      DEFAULT_SOLANA_TREASURY
+      ""
     ).trim(),
     usdcMint: (
       process.env.SOLANA_USDC_MINT || DEFAULT_SOLANA_USDC_MINT

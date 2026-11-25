@@ -42,7 +42,7 @@ export const config = {
       return process.env.NOWPAYMENTS_PAY_CURRENCY || "usdc";
     },
     get enabled() {
-      return Boolean(process.env.NOWPAYMENTS_API_KEY && process.env.NOWPAYMENTS_IPN_SECRET);
+      return false;
     },
   },
   telegram: {
@@ -111,7 +111,9 @@ export function publicConfig() {
     supportEmail: process.env.SUPPORT_EMAIL || "support.betx@gmail.com",
     helpUrl: process.env.GAMBLING_HELP_URL || "https://www.begambleaware.org",
     live: config.live,
-    paymentsEnabled: config.nowpayments.enabled,
+    maintenance:
+      process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true" || process.env.MAINTENANCE_MODE === "true",
+    paymentsEnabled: false,
     botUsername: config.telegram.username || null,
     minDeposit: config.limits.minDeposit,
     minWithdraw: config.limits.minWithdraw,

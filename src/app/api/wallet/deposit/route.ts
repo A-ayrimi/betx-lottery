@@ -3,9 +3,9 @@ import { rateLimit } from "@/lib/ratelimit";
 import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
-import { deposits, users } from "@/db/schema";
+import { deposits } from "@/db/schema";
 import { config } from "@/lib/config";
-import { assertCanPlay, getSessionUser, UserError } from "@/lib/store";
+import { assertCanPlay, creditDeposit, getSessionUser, UserError } from "@/lib/store";
 import {
   DepositReservationError,
   isValidDepositIdempotencyKey,
@@ -26,8 +26,8 @@ async function settleSolanaDepositIfConfirmed(depositId: number): Promise<void> 
   const dep = (
     await db.select().from(deposits).where(eq(deposits.id, depositId)).limit(1)
   )[0];
-  if (!dep || dep.provider !== "solana" || !dep.txHash) return;
-  if (dep.credited || dep.status === "confirmed") return;
+
+  if (!dep || dep.provider !== "solana" || !dep.txHash || dep.credited) return;
 
   const check = await verifySolanaUsdcDepositOnChain({
     txHash: dep.txHash,
@@ -45,38 +45,9 @@ async function settleSolanaDepositIfConfirmed(depositId: number): Promise<void> 
     return;
   }
 
-  const creditedAmount = check.amountUsd ?? Number(dep.amountUsd);
-  await db.transaction(async (tx) => {
-    const current = (
-      await tx.select().from(deposits).where(eq(deposits.id, dep.id)).limit(1)
-    )[0];
-    if (!current || current.credited) return;
-
-    const userRow = (
-      await tx.select().from(users).where(eq(users.id, current.userId)).limit(1)
-    )[0];
-    if (!userRow) return;
-
-    const prevBalance = Number(userRow.balance ?? 0);
-    const nextBalance = Math.round((prevBalance + creditedAmount) * 100) / 100;
-    const nextBalanceStr = nextBalance.toFixed(2);
-
-    await tx
-      .update(users)
-      .set({ balance: nextBalanceStr })
-      .where(eq(users.id, userRow.id));
-
-    await tx
-      .update(deposits)
-      .set({
-        status: "confirmed",
-        credited: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(deposits.id, current.id));
-  });
+  // Use the central transactional credit function.
+  await creditDeposit(depositId, "finished");
 }
-
 /**
  * Direct USDC (SPL) deposit from the connected Solana wallet.
  *   POST { step: "build",  amount, idempotencyKey }       -> unsigned transaction

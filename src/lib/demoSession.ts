@@ -1,4 +1,4 @@
-import type { AppState, DrawResult, UserState } from "@/lib/types";
+﻿import type { AppState, DrawResult, UserState } from "@/lib/types";
 import { WHEEL_SECTORS } from "@/lib/wheel";
 
 export const DEMO_WALLET_ADDRESS = "SOL_DEMO_WALLET_9999";
@@ -117,6 +117,7 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       supportEmail: "support.betx@gmail.com",
       helpUrl: "https://www.begambleaware.org",
       live: false,
+      maintenance: false,
       paymentsEnabled: false,
       botUsername: null,
       minDeposit: 1,
@@ -133,16 +134,16 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       tron: {
         enabled: false,
         network: "mainnet",
-        depositAddress: null,
+        depositAddress: "5TekXvxKMMhhHea399Kyf28Paun9pY3QhAtUte4N8xdy",
         explorer: "https://tronscan.org/#/transaction/",
       },
       solana: {
         enabled: false,
         network: "mainnet-beta",
-        treasuryAddress: null,
-        usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-        decimals: 6,
-        rpcUrl: "https://api.mainnet-beta.solana.com",
+        treasuryAddress: "5TekXvxKMMhhHea399Kyf28Paun9pY3QhAtUte4N8xdy",
+usdcMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+decimals: 6,
+rpcUrl: "https://api.mainnet-beta.solana.com",
         explorer: "https://solscan.io",
       },
     },
@@ -450,3 +451,5 @@ export function withdrawDemoBalance(state: DemoAppState, amount: number, address
     },
   } satisfies DemoAppState;
 }
+
+

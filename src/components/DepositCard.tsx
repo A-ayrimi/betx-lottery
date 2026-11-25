@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import { useApp } from "./AppProvider";
 import { useWallet, walletErrorMessage } from "./WalletProvider";
-import { SoonBadge, WalletList } from "./WalletConnect";
+import { WalletList } from "./WalletConnect";
 import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import { Transaction } from "@solana/web3.js";
 
 const AMOUNTS = [1, 3, 5, 10];
-type Method = "wallet" | "invoice" | "demo";
 type Phase = "" | "build" | "sign" | "broadcast" | "confirm" | "done";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -23,42 +22,22 @@ async function post(url: string, body: unknown) {
 }
 
 export function DepositCard() {
-  const { state, deposit, setToast, isDemoSession, dataUnavailable } = useApp();
-  const { d, t } = useI18n();
+  const { state, setToast, isDemoSession, dataUnavailable } = useApp();
+  const { d } = useI18n();
   const cfg = state?.config;
   const user = state?.user;
-  const live = Boolean(cfg?.live);
+  const paymentsReady = Boolean(
+    cfg?.paymentsEnabled && cfg?.solana?.enabled && !cfg?.maintenance,
+  );
 
-  const solanaOnly = cfg?.solanaOnly !== false;
-const methods: { id: Method; enabled: boolean }[] = solanaOnly
-  ? [
-      { id: "wallet", enabled: true },
-      ...(live
-        ? [{ id: "invoice" as Method, enabled: false }]
-        : [{ id: "demo" as Method, enabled: false }]),
-    ]
-  : [
-      ...(cfg?.solana?.enabled ? [{ id: "wallet" as Method, enabled: true }] : []),
-      ...(live && cfg?.paymentsEnabled ? [{ id: "invoice" as Method, enabled: true }] : []),
-      ...(!live ? [{ id: "demo" as Method, enabled: true }] : []),
-    ];
-
-  const [method, setMethod] = useState<Method>(methods[0]?.id ?? "wallet");
   const [amount, setAmount] = useState(1);
   const [custom, setCustom] = useState("");
-  const [busy, setBusy] = useState(false);
   const chosen = custom ? Number(custom) : amount;
-
-  const labels: Record<Method, string> = {
-    wallet: d.wc.methodWallet,
-    invoice: d.wc.methodInvoice,
-    demo: "Demo",
-  };
 
   if (isDemoSession) {
     return (
       <div className="panel min-w-0 rounded-2xl p-6">
-        <p className="micro text-neon-2">{d.wallet.depositKicker} · {d.wc.demoBadge}</p>
+        <p className="micro text-neon-2">{d.wallet.depositKicker} آ· {d.wc.demoBadge}</p>
         <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
         <p dir="ltr" className="font-display tnum mt-4 text-3xl font-bold text-white">
           ${money(user?.balance ?? 0)} USDC
@@ -68,43 +47,10 @@ const methods: { id: Method; enabled: boolean }[] = solanaOnly
     );
   }
 
-  const payOther = async () => {
-    if (!user) return setToast(d.errors.loginToDeposit);
-    setBusy(true);
-    await deposit(chosen);
-    setBusy(false);
-  };
-
   return (
     <div className="panel min-w-0 rounded-2xl p-6">
       <p className="micro text-neon-2">{d.wallet.depositKicker}</p>
       <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
-
-      {methods.length > 1 ? (
-        <div className="mt-4 grid grid-flow-col gap-1 rounded-xl border border-rule bg-black/30 p-1">
-          {methods.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => {
-                if (m.enabled) setMethod(m.id);
-                else setToast(d.wc.comingSoonToast);
-              }}
-              aria-disabled={!m.enabled}
-              title={m.enabled ? undefined : d.wc.comingSoonToast}
-              className={`focus-ring flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[12px] font-bold transition-colors ${
-                method === m.id
-                  ? "bg-neon/15 text-neon-2"
-                  : m.enabled
-                    ? "text-mint hover:text-white"
-                    : "cursor-not-allowed text-mint/50"
-              }`}
-            >
-              {labels[m.id]}
-              {!m.enabled ? <SoonBadge label={d.wc.comingSoon} /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
 
       <div dir="ltr" className="mt-4 grid grid-cols-4 gap-2">
         {AMOUNTS.map((a) => (
@@ -130,41 +76,34 @@ const methods: { id: Method; enabled: boolean }[] = solanaOnly
         inputMode="decimal"
         value={custom}
         onChange={(e) => setCustom(e.target.value.replace(/[^0-9.]/g, ""))}
-        placeholder={`${d.wallet.custom} · min ${cfg?.minDeposit ?? 1}`}
+        placeholder={`${d.wallet.custom} آ· min ${cfg?.minDeposit ?? 1}`}
         aria-label={d.wallet.custom}
         className="focus-ring mt-2 w-full rounded-xl border border-rule bg-black/30 px-4 py-2.5 font-display text-sm text-white placeholder:text-mint/40"
       />
 
-      {method === "wallet" ? (
-        <SolanaDeposit amount={chosen} dataUnavailable={dataUnavailable} />
-      ) : (
-        <>
-          <button
-            onClick={payOther}
-            disabled={busy || !chosen || Boolean(user?.selfExcludedUntil)}
-            className="btn-neon focus-ring mt-4 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
-          >
-            {busy
-              ? d.wallet.creating
-              : t(method === "invoice" ? d.wallet.payLive : d.wallet.payDemo, {
-                  amount: `$${money(chosen || 0)}`,
-                })}
-          </button>
-          <p className="mt-3 text-[12px] leading-6 text-mint/80">
-            {method === "invoice" ? d.wc.invoiceNote : d.wallet.hintDemo}
-          </p>
-        </>
-      )}
+      <SolanaDeposit
+        amount={chosen}
+        dataUnavailable={dataUnavailable}
+        paymentsReady={paymentsReady}
+      />
     </div>
   );
 }
 
-function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavailable: boolean }) {
+function SolanaDeposit({
+  amount,
+  dataUnavailable,
+  paymentsReady,
+}: {
+  amount: number;
+  dataUnavailable: boolean;
+  paymentsReady: boolean;
+}) {
   const { state, refresh, setToast } = useApp();
   const wallet = useWallet();
   const { d, t } = useI18n();
   const user = state?.user;
-  const treasuryAddress = state?.config?.tron?.depositAddress ?? "";
+  const treasuryAddress = state?.config?.solana?.treasuryAddress ?? "";
   const [phase, setPhase] = useState<Phase>("");
   const [link, setLink] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -187,7 +126,7 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
       <div className="mt-4">
         <p className="mb-3 text-[13px] leading-6 text-mint">
           {user.walletAddress && wallet.address && wallet.address !== user.walletAddress
-            ? `${d.wc.yourWallet}: ${user.walletAddress.slice(0, 6)}…${user.walletAddress.slice(-4)}`
+            ? `${d.wc.yourWallet}: ${user.walletAddress.slice(0, 6)}â€¦${user.walletAddress.slice(-4)}`
             : d.wc.needWallet}
         </p>
         <WalletList acceptTerms />
@@ -218,6 +157,10 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
   const pay = async () => {
     if (dataUnavailable) {
       setToast(d.errors.unavailable);
+      return;
+    }
+    if (!paymentsReady) {
+      setToast(d.wc.comingSoonToast);
       return;
     }
     setLink(null);
@@ -254,6 +197,10 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
   };
 
   const claim = async () => {
+    if (!paymentsReady) {
+      setToast(d.wc.comingSoonToast);
+      return;
+    }
     const trimmed = txid.trim();
     if (!trimmed) return;
     const r = await post("/api/wallet/claim", { txid: trimmed });
@@ -277,13 +224,13 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
       <div className="flex items-center justify-between gap-3 rounded-xl border border-rule bg-black/25 px-4 py-2.5 text-[12px]">
         <span className="text-mint">{d.wc.walletBalance}</span>
         <span dir="ltr" className="font-display tnum text-white">
-          {bal ? `${money(bal.usdc)} USDC · ${bal.sol.toFixed(3)} SOL` : "—"}
+          {bal ? `${money(bal.usdc)} USDC آ· ${bal.sol.toFixed(3)} SOL` : "â€”"}
         </span>
       </div>
 
       <button
         onClick={pay}
-        disabled={dataUnavailable || (phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
+        disabled={!paymentsReady || dataUnavailable || (phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
         className="btn-neon focus-ring mt-3 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
       >
         {t(d.wc.payFromWallet, { amount: money(amount || 0) })}
@@ -298,7 +245,7 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
                 i < idx ? "text-neon-2" : i === idx ? "text-foil" : "text-mint/50"
               }`}
             >
-              <span className="w-4 text-center">{i < idx ? "✓" : i === idx ? "●" : "○"}</span>
+              <span className="w-4 text-center">{i < idx ? "âœ“" : i === idx ? "â—ڈ" : "â—‹"}</span>
               {stepLabel[s]}
             </li>
           ))}
@@ -311,7 +258,7 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
       {link ? (
         <div className="mt-2 flex items-center gap-3 text-[12px]">
           <a href={link} target="_blank" rel="noopener noreferrer" className="text-neon-2 hover:underline">
-            {d.wc.viewTx} ↗
+            {d.wc.viewTx} â†—
           </a>
           {phase === "confirm" && pendingId ? (
             <button onClick={() => poll(pendingId)} className="text-mint hover:text-white">
@@ -351,7 +298,7 @@ function SolanaDeposit({ amount, dataUnavailable }: { amount: number; dataUnavai
           />
           <button
             onClick={claim}
-            disabled={txid.trim().length < 32}
+            disabled={!paymentsReady || txid.trim().length < 32}
             className="btn-foil rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50"
           >
             {d.wc.claim}

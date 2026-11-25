@@ -17,10 +17,166 @@ import {
 } from "@/db/schema";
 import { config } from "@/lib/config";
 import { autoDrawFullRounds, refundRound, TICKET_PRICE } from "@/lib/store";
-import { getBalances, listIncomingUsdt, tron } from "@/lib/tron";
-import { creditOnchain, settleTronDeposit } from "@/lib/tronDeposits";
-import { getPayment } from "@/lib/nowpayments";
-import { applyNowPayment } from "@/lib/nowpaymentsApply";
+import { getSolanaConfig } from "@/lib/solana";
+const solanaCfg = () => getSolanaConfig();
+
+async function solanaRpc<T>(method: string, params: unknown[]): Promise<T | null> {
+  try {
+    const res = await fetch(solanaCfg().rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { result?: T; error?: unknown };
+    if (json.error) return null;
+    return json.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getBalances(address: string): Promise<{ usdc: number; sol: number }> {
+  const addr = (address || "").trim();
+  if (!addr) return { usdc: 0, sol: 0 };
+
+  const [solResp, tokResp] = await Promise.all([
+    solanaRpc<{ value?: number }>("getBalance", [addr, { commitment: "confirmed" }]),
+    solanaRpc<{
+      value?: Array<{
+        account?: {
+          data?: {
+            parsed?: {
+              info?: { tokenAmount?: { amount?: string } };
+            };
+          };
+        };
+      }>;
+    }>("getTokenAccountsByOwner", [
+      addr,
+      { mint: solanaCfg().usdcMint },
+      { encoding: "jsonParsed", commitment: "confirmed" },
+    ]),
+  ]);
+
+  const lamports = solResp && typeof solResp.value === "number" ? solResp.value : 0;
+  let totalRaw = BigInt(0);
+  for (const item of (tokResp && tokResp.value) || []) {
+    const amtStr =
+      item &&
+      item.account &&
+      item.account.data &&
+      item.account.data.parsed &&
+      item.account.data.parsed.info &&
+      item.account.data.parsed.info.tokenAmount &&
+      item.account.data.parsed.info.tokenAmount.amount
+        ? item.account.data.parsed.info.tokenAmount.amount
+        : "0";
+    totalRaw += BigInt(amtStr);
+  }
+
+  return {
+    usdc: Number(totalRaw) / 10 ** solanaCfg().decimals,
+    sol: lamports / 1e9,
+  };
+}
+
+async function listIncomingUsdc(
+  address: string,
+  minBlockTimeSec = 0
+): Promise<Array<{ txid: string; from: string; units: bigint; blockTime: number }>> {
+  const addr = (address || "").trim();
+  if (!addr) return [];
+
+  const sigs = await solanaRpc<
+    Array<{
+      signature?: string;
+      blockTime?: number | null;
+      err?: unknown;
+    }>
+  >("getSignaturesForAddress", [addr, { limit: 25, commitment: "confirmed" }]);
+
+  if (!Array.isArray(sigs) || sigs.length === 0) return [];
+
+  const out: Array<{ txid: string; from: string; units: bigint; blockTime: number }> = [];
+
+  for (const s of sigs) {
+    if (!s || !s.signature || s.err) continue;
+    const bt = typeof s.blockTime === "number" ? s.blockTime : Math.floor(Date.now() / 1000);
+    if (minBlockTimeSec > 0 && bt < minBlockTimeSec) continue;
+
+    const tx = await solanaRpc<{
+      meta?: {
+        err?: unknown;
+        preTokenBalances?: Array<{
+          accountIndex: number;
+          mint?: string;
+          owner?: string;
+          uiTokenAmount?: { amount?: string };
+        }>;
+        postTokenBalances?: Array<{
+          accountIndex: number;
+          mint?: string;
+          owner?: string;
+          uiTokenAmount?: { amount?: string };
+        }>;
+      };
+      transaction?: {
+        message?: {
+          accountKeys?: Array<string | { pubkey?: string }>;
+        };
+      };
+    }>("getTransaction", [
+      s.signature,
+      { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" },
+    ]);
+
+    if (!tx || (tx.meta && tx.meta.err)) continue;
+
+    const rawKeys =
+      (tx.transaction &&
+        tx.transaction.message &&
+        tx.transaction.message.accountKeys) ||
+      [];
+    const keys = rawKeys.map((k) =>
+      typeof k === "string" ? k : k && k.pubkey ? String(k.pubkey) : ""
+    );
+
+    const map = new Map<string, { owner: string; pre: bigint; post: bigint }>();
+    for (const b of (tx.meta && tx.meta.preTokenBalances) || []) {
+      if (b.mint !== solanaCfg().usdcMint) continue;
+      const owner = b.owner || keys[b.accountIndex] || "";
+      const key = `${b.accountIndex}:${owner}`;
+      const amt = b.uiTokenAmount && b.uiTokenAmount.amount ? b.uiTokenAmount.amount : "0";
+      map.set(key, { owner, pre: BigInt(amt), post: BigInt(0) });
+    }
+    for (const b of (tx.meta && tx.meta.postTokenBalances) || []) {
+      if (b.mint !== solanaCfg().usdcMint) continue;
+      const owner = b.owner || keys[b.accountIndex] || "";
+      const key = `${b.accountIndex}:${owner}`;
+      const cur = map.get(key) || { owner, pre: BigInt(0), post: BigInt(0) };
+      const amt = b.uiTokenAmount && b.uiTokenAmount.amount ? b.uiTokenAmount.amount : "0";
+      cur.post = BigInt(amt);
+      map.set(key, cur);
+    }
+
+    let sender = keys[0] || "";
+    let received = BigInt(0);
+    for (const entry of Array.from(map.values())) {
+      const delta = entry.post - entry.pre;
+      if (delta < BigInt(0) && entry.owner !== addr && entry.owner) sender = entry.owner;
+      if (delta > BigInt(0) && entry.owner === addr) received += delta;
+    }
+
+    if (received > BigInt(0)) {
+      out.push({ txid: s.signature, from: sender, units: received, blockTime: bt });
+    }
+  }
+
+  return out;
+}import { creditOnchain, settleSolanaDeposit } from "@/lib/solanaDeposits";
+
+
 import { payoutConfig, processAutoPayouts } from "@/lib/payout";
 import { feeConfig, feeQueue } from "@/lib/fees";
 import { sendMessage } from "@/lib/telegram";
@@ -80,7 +236,7 @@ export async function alert(key: string, text: string) {
   const chat = process.env.TELEGRAM_ADMIN_CHAT_ID;
   if (chat) {
     try {
-      await sendMessage(chat, `🤖 <b>BETX autopilot</b>\n${text}`);
+      await sendMessage(chat, `ًں¤– <b>BETX autopilot</b>\n${text}`);
     } catch {
       /* best effort */
     }
@@ -90,69 +246,37 @@ export async function alert(key: string, text: string) {
 /* ------------------------------------------------------------- steps */
 
 async function reconcileDeposits() {
-  let credited = 0, expired = 0, nowpayments = 0;
+  let credited = 0, expired = 0;
 
   const stale = await db
     .update(deposits)
     .set({ status: "expired", updatedAt: new Date() })
-    .where(and(eq(deposits.provider, "tron"), eq(deposits.status, "waiting"), lt(deposits.createdAt, ago(5 * 60))))
+    .where(and(eq(deposits.provider, "solana"), eq(deposits.status, "waiting"), lt(deposits.createdAt, ago(5 * 60))))
     .returning({ id: deposits.id });
   expired += stale.length;
 
-  if (tron.enabled) {
+  if (solanaCfg().treasuryAddress) {
     const confirming = await db
       .select({ id: deposits.id })
       .from(deposits)
-      .where(and(eq(deposits.provider, "tron"), eq(deposits.status, "confirming")))
+      .where(and(eq(deposits.provider, "solana"), eq(deposits.status, "confirming")))
       .limit(25);
     for (const d of confirming) {
-      const r = await settleTronDeposit(d.id);
+      const r = await settleSolanaDeposit(d.id);
       if (r?.credited) credited++;
       if (r?.status === "expired") expired++;
     }
   }
 
-  if (config.nowpayments.enabled) {
-    const open = await db
-      .select()
-      .from(deposits)
-      .where(
-        and(
-          eq(deposits.provider, "nowpayments"),
-          eq(deposits.credited, false),
-          isNotNull(deposits.paymentId),
-          inArray(deposits.status, ["waiting", "confirming", "confirmed", "sending", "partially_paid"]),
-          lt(deposits.updatedAt, ago(180)),
-        ),
-      )
-      .limit(20);
-    for (const d of open) {
-      const res = await applyNowPayment(d, await getPayment(d.paymentId!));
-      if (res === "credited") nowpayments++;
-    }
-    const abandoned = await db
-      .update(deposits)
-      .set({ status: "expired", updatedAt: new Date() })
-      .where(
-        and(
-          eq(deposits.provider, "nowpayments"),
-          eq(deposits.status, "waiting"),
-          isNull(deposits.paymentId),
-          lt(deposits.createdAt, ago(24 * 3600)),
-        ),
-      )
-      .returning({ id: deposits.id });
-    expired += abandoned.length;
-  }
-  return { credited, nowpayments, expired };
+  return { credited, expired };
 }
 
 /** Finds USDT that reached the deposit address and credits it automatically. */
 async function scanIncoming() {
-  if (!tron.enabled) return { skipped: "direct deposits disabled" };
+  if (!solanaCfg().treasuryAddress) return { skipped: "direct deposits disabled" };
   const st = await stateRow();
   const since = Math.max((st.scanCursor ?? Date.now() - 24 * 3600_000) - 10 * 60_000, Date.now() - 7 * 24 * 3600_000);
-  const incoming = await listIncomingUsdt(tron.depositAddress, since);
+  const incoming = await listIncomingUsdc(solanaCfg().treasuryAddress, since);
   let credited = 0, unmatched = 0, cursor = st.scanCursor ?? 0;
 
   for (const t of incoming) {
@@ -165,14 +289,14 @@ async function scanIncoming() {
     } else {
       const ins = await db
         .insert(unmatchedTransfers)
-        .values({ txHash: t.txid, fromAddress: t.from, amount: String(Number(t.units) / 10 ** tron.decimals), blockTime: new Date(t.blockTime) })
+        .values({ txHash: t.txid, fromAddress: t.from, amount: String(Number(t.units) / 10 ** solanaCfg().decimals), blockTime: new Date(t.blockTime) })
         .onConflictDoNothing()
         .returning();
       unmatched += ins.length;
     }
   }
 
-  // a sender may link their wallet later — retry the parked transfers
+  // a sender may link their wallet later â€” retry the parked transfers
   const parked = await db.select().from(unmatchedTransfers).limit(50);
   for (const p of parked) {
     const owner = (await db.select({ id: users.id }).from(users).where(eq(users.walletAddress, p.fromAddress)).limit(1))[0];
@@ -182,7 +306,7 @@ async function scanIncoming() {
   }
 
   await db.update(automationState).set({ scanCursor: cursor || Date.now() }).where(eq(automationState.id, ID));
-  if (unmatched > 0) await alert("unmatched", `📥 ${unmatched} USDT transfer(s) arrived from wallets not linked to any account. See /admin.`);
+  if (unmatched > 0) await alert("unmatched", `ًں“¥ ${unmatched} USDT transfer(s) arrived from wallets not linked to any account. See /admin.`);
   return { seen: incoming.length, credited, unmatched };
 }
 
@@ -196,7 +320,7 @@ async function drawFullRounds() {
   for (const o of outcomes) {
     await alert(
       `draw-${o.roundId}`,
-      `🎰 Round ${o.roundId} draw is awaiting administrator approval. Proposed winner: <b>${o.winnerName}</b> (${o.winningSerial}). No prize has been settled.`,
+      `ًںژ° Round ${o.roundId} draw is awaiting administrator approval. Proposed winner: <b>${o.winnerName}</b> (${o.winningSerial}). No prize has been settled.`,
     );
   }
   return { drawn: outcomes.length, rounds: outcomes.map((o) => o.roundId) };
@@ -270,10 +394,10 @@ export async function healthChecks(sendAlerts = true) {
 
   let holdings: number | null = null;
   const cfg = payoutConfig();
-  if (tron.enabled) {
-    const dep = await getBalances(tron.depositAddress);
-    const hot = cfg.hotWallet ? await getBalances(cfg.hotWallet) : { usdt: 0, trx: 0 };
-    if (dep && hot) holdings = Math.round((dep.usdt + hot.usdt) * 100) / 100;
+  if (solanaCfg().treasuryAddress) {
+    const dep = await getBalances(solanaCfg().treasuryAddress);
+    const hot = cfg.hotWallet ? await getBalances(cfg.hotWallet) : { usdc: 0, sol: 0 };
+    if (dep && hot) holdings = Math.round((dep.usdc + hot.usdc) * 100) / 100;
   }
   const [reviewQ] = await db
     .select({ c: sql<number>`count(*)::int` })
@@ -281,10 +405,10 @@ export async function healthChecks(sendAlerts = true) {
     .where(and(eq(withdrawals.status, "pending"), isNotNull(withdrawals.reviewReason)));
 
   if (sendAlerts) {
-    if (mism.rows.length) await alert("ledger-mismatch", `🚨 ${mism.rows.length} account(s) whose balance differs from the ledger. Payouts for them are held.`);
-    if (Math.abs(vaultDrift) > 0.01) await alert("vault-drift", `⚠️ Vault drift of $${vaultDrift.toFixed(2)} vs. ledger.`);
+    if (mism.rows.length) await alert("ledger-mismatch", `ًںڑ¨ ${mism.rows.length} account(s) whose balance differs from the ledger. Payouts for them are held.`);
+    if (Math.abs(vaultDrift) > 0.01) await alert("vault-drift", `âڑ ï¸ڈ Vault drift of $${vaultDrift.toFixed(2)} vs. ledger.`);
     if (holdings !== null && holdings + 0.01 < liabilities) {
-      await alert("solvency", `🚨 On-chain holdings $${holdings.toFixed(2)} are below player liabilities $${liabilities.toFixed(2)}.`);
+      await alert("solvency", `ًںڑ¨ On-chain holdings $${holdings.toFixed(2)} are below player liabilities $${liabilities.toFixed(2)}.`);
     }
   }
   return {
@@ -337,14 +461,14 @@ async function dailyReport() {
   await sendMessage(
     chat,
     [
-      "📊 <b>BETX — last 24h</b>",
+      "ًں“ٹ <b>BETX â€” last 24h</b>",
       `New players: <b>${u.c}</b>`,
       `Deposits: <b>$${Number(dp.s).toFixed(2)}</b> (${dp.c})`,
       `Withdrawals paid: <b>$${Number(wd.s).toFixed(2)}</b> (${wd.c})`,
-      `Tickets: <b>${tk.c}</b> · Rounds drawn: <b>${rd.c}</b> · Treasury contributions: <b>$${Number(treasury.amount).toFixed(2)}</b>`,
+      `Tickets: <b>${tk.c}</b> آ· Rounds drawn: <b>${rd.c}</b> آ· Treasury contributions: <b>$${Number(treasury.amount).toFixed(2)}</b>`,
       `Vault (verified ledger): <b>$${Number(vaultLedger.balance).toFixed(2)}</b>`,
-      `Liabilities: $${h.liabilities.toFixed(2)}${h.holdings !== null ? ` · On-chain: $${h.holdings.toFixed(2)} ${h.solvent ? "✅" : "🚨"}` : ""}`,
-      `Review queue: ${h.reviewQueue} · Ledger check: ${h.ledgerMismatches === 0 ? "✅" : "🚨 " + h.ledgerMismatches}`,
+      `Liabilities: $${h.liabilities.toFixed(2)}${h.holdings !== null ? ` آ· On-chain: $${h.holdings.toFixed(2)} ${h.solvent ? "âœ…" : "ًںڑ¨"}` : ""}`,
+      `Review queue: ${h.reviewQueue} آ· Ledger check: ${h.ledgerMismatches === 0 ? "âœ…" : "ًںڑ¨ " + h.ledgerMismatches}`,
     ].join("\n"),
   );
   await db.update(automationState).set({ lastDailyReportAt: new Date() }).where(eq(automationState.id, ID));
@@ -385,7 +509,7 @@ export async function runAutomation(trigger: Trigger) {
     .set({ lockedUntil: null, lastRunAt: new Date(), lastReport: report, lastError: error })
     .where(eq(automationState.id, ID));
   await db.insert(jobRuns).values({ trigger, ok, durationMs, report, error });
-  if (!ok) await alert("job-error", `⚠️ Some automation steps failed:\n${errors.join("\n")}`);
+  if (!ok) await alert("job-error", `âڑ ï¸ڈ Some automation steps failed:\n${errors.join("\n")}`);
   return { skipped: false as const, ok, durationMs, report, errors };
 }
 
@@ -424,7 +548,7 @@ export async function automationStatus() {
       dailyMax: cfg.dailyMax,
     },
     roundTimeoutHours: Number(process.env.ROUND_TIMEOUT_HOURS ?? 24),
-    tron: { enabled: tron.enabled, network: tron.network, depositAddress: tron.depositAddress || null },
+    solana: { enabled: solanaCfg().treasuryAddress, network: solanaCfg().cluster, depositAddress: solanaCfg().treasuryAddress || null },
     fees: {
       autoSweep: fc.enabled,
       adminWallet: fc.adminWallet,
@@ -441,3 +565,4 @@ export async function automationStatus() {
     },
   };
 }
+
