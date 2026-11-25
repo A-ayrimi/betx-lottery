@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/phase1-safety.test.mjs tests/regression-safety.test.mjs tests/legacy-payment-safety.test.mjs tests/postgres-regressions.test.mjs tests/postgres-tls-regressions.test.mjs"
+    "test": "node --experimental-strip-types --test tests/phase1-safety.test.mjs tests/regression-safety.test.mjs tests/legacy-payment-safety.test.mjs tests/multi-tier-schema.test.mjs tests/tier-accounting.test.mjs tests/tier-engine.test.mjs tests/phase6-admin.test.mjs tests/phase7-ui.test.mjs tests/postgres-regressions.test.mjs tests/postgres-tls-regressions.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",

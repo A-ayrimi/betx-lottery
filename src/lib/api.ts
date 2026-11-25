@@ -4,6 +4,7 @@ import { UserError, type ErrorCode } from "@/lib/store";
 import { getDictionary, getRequestLocale } from "@/i18n";
 import { interpolate } from "@/i18n/config";
 import { regionStatus } from "@/lib/geo";
+import { ValidationError } from "@/lib/errors";
 
 async function message(code: ErrorCode, vars?: Record<string, string | number>) {
   const d = getDictionary(await getRequestLocale());
@@ -17,6 +18,9 @@ export async function handleError(e: unknown) {
       { ok: false, code: e.code, error: await message(e.code, e.vars) },
       { status: e.status },
     );
+  }
+  if (e instanceof ValidationError) {
+    return NextResponse.json({ ok: false, code: e.code, error: e.message }, { status: e.status });
   }
   console.error(e);
   return NextResponse.json({ ok: false, code: "server", error: await message("server") }, { status: 500 });

@@ -13,6 +13,25 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+export const ticketTiers = pgTable("ticket_tiers", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  priceUsd: numeric("price_usd", { precision: 12, scale: 2 }).notNull(),
+  ticketCapacity: integer("ticket_capacity").notNull(),
+  drawDurationMinutes: integer("draw_duration_minutes").notNull(),
+  prizePercentage: numeric("prize_percentage", { precision: 5, scale: 2 }).notNull(),
+  treasuryPercentage: numeric("treasury_percentage", { precision: 5, scale: 2 }).notNull(),
+  adminPercentage: numeric("admin_percentage", { precision: 5, scale: 2 }).notNull(),
+  minimumParticipants: integer("minimum_participants").notNull().default(1),
+  maximumParticipants: integer("maximum_participants"),
+  rules: jsonb("rules").notNull().default({}),
+  status: text("status").notNull().default("INACTIVE"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("ticket_tiers_code_unique").on(t.code)]);
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -49,6 +68,11 @@ export const rounds = pgTable("rounds", {
   fee: numeric("fee", { precision: 12, scale: 2 }).notNull().default("5"),
   treasuryContribution: numeric("treasury_contribution", { precision: 12, scale: 2 }),
   adminGrossRevenue: numeric("admin_gross_revenue", { precision: 12, scale: 2 }),
+  tierId: integer("tier_id").notNull().default(1).references(() => ticketTiers.id, { onDelete: "restrict" }),
+  tierSnapshot: jsonb("tier_snapshot").notNull().default({}),
+  closesAt: timestamp("closes_at", { withTimezone: true }),
+  minimumParticipants: integer("minimum_participants").notNull().default(1),
+  maximumParticipants: integer("maximum_participants"),
   winnerId: integer("winner_id").references(() => users.id, { onDelete: "restrict" }),
   winnerName: text("winner_name"),
   winningSerial: text("winning_serial"),
@@ -70,10 +94,28 @@ export const tickets = pgTable("tickets", {
   roundId: integer("round_id").notNull().references(() => rounds.id, { onDelete: "restrict" }),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   kind: text("kind").notNull().default("gold"), // gold | bronze
+  tierId: integer("tier_id").notNull().default(1).references(() => ticketTiers.id, { onDelete: "restrict" }),
+  amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull().default("1"),
   serial: text("serial").notNull().unique(),
   username: text("username").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const drawCommitments = pgTable("draw_commitments", {
+  id: serial("id").primaryKey(),
+  roundId: integer("round_id").notNull().references(() => rounds.id, { onDelete: "restrict" }),
+  tierId: integer("tier_id").notNull().references(() => ticketTiers.id, { onDelete: "restrict" }),
+  serverSeedHash: text("server_seed_hash").notNull(),
+  clientSeed: text("client_seed"),
+  drawNonce: integer("draw_nonce").notNull().default(0),
+  status: text("status").notNull().default("COMMITTED"),
+  winnerTicketId: integer("winner_ticket_id").references(() => tickets.id, { onDelete: "restrict" }),
+  winningSerial: text("winning_serial"),
+  revealedServerSeed: text("revealed_server_seed"),
+  committedAt: timestamp("committed_at", { withTimezone: true }).notNull().defaultNow(),
+  revealedAt: timestamp("revealed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("draw_commitments_round_id_unique").on(t.roundId)]);
 
 export const vault = pgTable("vault", {
   id: serial("id").primaryKey(),
@@ -101,12 +143,48 @@ export const ledger = pgTable("ledger", {
   note: text("note").notNull().default(""),
   account: text("account"),
   roundId: integer("round_id").references(() => rounds.id, { onDelete: "restrict" }),
+  tierId: integer("tier_id").notNull().default(1).references(() => ticketTiers.id, { onDelete: "restrict" }),
   reference: uuid("reference"),
   transactionKey: text("transaction_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("ledger_reference_unique").on(t.reference),
   uniqueIndex("ledger_transaction_key_unique").on(t.transactionKey),
+]);
+
+export const roundSettlements = pgTable("round_settlements", {
+  id: serial("id").primaryKey(),
+  roundId: integer("round_id").notNull().references(() => rounds.id, { onDelete: "restrict" }),
+  tierId: integer("tier_id").notNull().references(() => ticketTiers.id, { onDelete: "restrict" }),
+  totalPool: numeric("total_pool", { precision: 12, scale: 2 }).notNull(),
+  winnerAmount: numeric("winner_amount", { precision: 12, scale: 2 }).notNull(),
+  treasuryAmount: numeric("treasury_amount", { precision: 12, scale: 2 }).notNull(),
+  adminAmount: numeric("admin_amount", { precision: 12, scale: 2 }).notNull(),
+  ledgerReference: uuid("ledger_reference"),
+  status: text("status").notNull().default("PENDING"),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("round_settlements_round_id_unique").on(t.roundId),
+  uniqueIndex("round_settlements_ledger_reference_unique").on(t.ledgerReference),
+]);
+
+export const treasuryTransactions = pgTable("treasury_transactions", {
+  id: serial("id").primaryKey(),
+  tierId: integer("tier_id").notNull().references(() => ticketTiers.id, { onDelete: "restrict" }),
+  roundId: integer("round_id").references(() => rounds.id, { onDelete: "restrict" }),
+  ledgerId: integer("ledger_id").references(() => ledger.id, { onDelete: "restrict" }),
+  direction: text("direction").notNull(),
+  category: text("category").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  walletAddress: text("wallet_address"),
+  txHash: text("tx_hash"),
+  status: text("status").notNull().default("PENDING"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  postedAt: timestamp("posted_at", { withTimezone: true }),
+}, (t) => [
+  uniqueIndex("treasury_transactions_tier_round_idx").on(t.tierId, t.roundId),
+  uniqueIndex("treasury_transactions_tx_hash_category_unique").on(t.txHash, t.category),
 ]);
 
 export const adminAuditLog = pgTable("admin_audit_log", {
@@ -229,6 +307,7 @@ export const rateLimits = pgTable(
 export const feeTransfers = pgTable("fee_transfers", {
   id: serial("id").primaryKey(),
   roundId: integer("round_id").notNull().unique().references(() => rounds.id, { onDelete: "restrict" }),
+  tierId: integer("tier_id").notNull().default(1).references(() => ticketTiers.id, { onDelete: "restrict" }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   adminWallet: text("admin_wallet").notNull(),
   status: text("status").notNull().default("accrued"), // accrued | queued | processing | paid | failed
@@ -252,10 +331,15 @@ export const vaultSnapshots = pgTable("vault_snapshots", {
   delta: numeric("delta", { precision: 12, scale: 2 }).notNull().default("0"),
   reason: text("reason").notNull(),
   roundId: integer("round_id").references(() => rounds.id, { onDelete: "restrict" }),
+  tierId: integer("tier_id").notNull().default(1).references(() => ticketTiers.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type User = typeof users.$inferSelect;
+export type TicketTier = typeof ticketTiers.$inferSelect;
 export type Round = typeof rounds.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
+export type DrawCommitment = typeof drawCommitments.$inferSelect;
+export type RoundSettlement = typeof roundSettlements.$inferSelect;
+export type TreasuryTransaction = typeof treasuryTransactions.$inferSelect;
 export type VaultRow = typeof vault.$inferSelect;

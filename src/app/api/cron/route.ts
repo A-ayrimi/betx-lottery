@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runAutomation } from "@/lib/automation";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,6 +19,9 @@ function authorized(req: NextRequest) {
 /** Called every minute by Vercel Cron / GitHub Actions / cron-job.org. */
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (config.maintenanceMode) {
+    return NextResponse.json({ ok: true, skipped: "maintenance" });
+  }
   try {
     const result = await runAutomation("cron");
     return NextResponse.json({ ok: true, ...result });

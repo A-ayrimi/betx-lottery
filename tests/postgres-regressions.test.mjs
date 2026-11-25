@@ -28,6 +28,10 @@ test(
       new URL("../supabase/migrations/20261117_integrity_deposit_safety.sql", import.meta.url),
       "utf8",
     );
+    const multiTierMigrationSql = await readFile(
+      new URL("../supabase/migrations/20261125_multi_tier_pool_foundation.sql", import.meta.url),
+      "utf8",
+    );
 
     const adminPool = new Pool({ connectionString: databaseUrl, max: 1 });
     const schemaName = `betx_test_${randomUUID().replaceAll("-", "")}`;
@@ -71,11 +75,23 @@ test(
       ).rows[0];
       await pool.query(migrationSql);
       await pool.query(migrationSql);
+      await pool.query(multiTierMigrationSql);
+      await pool.query(multiTierMigrationSql);
 
       const constraints = await pool.query(
         "SELECT count(*)::int AS count FROM pg_constraint WHERE contype = 'f' AND connamespace = current_schema()::regnamespace",
       );
-      assert.equal(constraints.rows[0].count, 11);
+      assert.equal(constraints.rows[0].count, 24);
+
+      const defaultTier = (
+        await pool.query("SELECT id FROM ticket_tiers WHERE code = 'usd_1'")
+      ).rows[0];
+      assert.ok(defaultTier, "The legacy $1 economy must be preserved as the default tier.");
+      assert.equal(
+        (await pool.query("SELECT tier_id FROM rounds WHERE id = $1", [preexistingRound.id])).rows[0].tier_id,
+        defaultTier.id,
+        "Legacy rounds must be backfilled to the default tier without changing their economics.",
+      );
       assert.deepEqual(
         (await pool.query(
           "SELECT user_id, round_id, type, amount::text, note, account, reference, transaction_key FROM ledger WHERE id = $1",

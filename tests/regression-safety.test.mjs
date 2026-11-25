@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import bs58 from "bs58";
 import { buildPostgresConfig } from "../src/lib/postgresConfig.ts";
 import { DepositReservationError, isValidDepositIdempotencyKey } from "../src/lib/depositReservations.ts";
-import { broadcast, broadcastSolanaSignedTransaction, isSolanaBroadcastAuthorized } from "../src/lib/solana.ts";
+import {
+  broadcast,
+  broadcastSolanaSignedTransaction,
+  isSolanaBroadcastAuthorized,
+  isValidSolanaTxSignature,
+} from "../src/lib/solana.ts";
 
 test("remote PostgreSQL connections always use certificate verification", () => {
   const config = buildPostgresConfig(
@@ -94,4 +100,36 @@ test("deposit reservation keys are UUIDs and duplicate reservations have an expl
   assert.equal(isValidDepositIdempotencyKey("550e8400-e29b-41d4-a716-446655440000"), true);
   assert.equal(isValidDepositIdempotencyKey("not-a-key"), false);
   assert.ok(new DepositReservationError("idempotency_conflict") instanceof Error);
+});
+
+test("Solana transaction signatures are base58, not hexadecimal", () => {
+  const signature = bs58.encode(new Uint8Array(64).fill(7));
+  assert.equal(isValidSolanaTxSignature(signature), true);
+  assert.equal(isValidSolanaTxSignature("a".repeat(64)), false);
+  assert.equal(isValidSolanaTxSignature("short"), false);
+});
+
+test("every financial broadcast path uses the emergency kill-switch wrapper", () => {
+  const paths = [
+    "../src/app/api/wallet/deposit/route.ts",
+    "../src/app/api/admin/withdrawals/pay/route.ts",
+  ];
+  for (const path of paths) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /await broadcast\(/, `${path} must call broadcast().`);
+    assert.doesNotMatch(source, /broadcastSolanaSignedTransaction\(/, `${path} must not bypass broadcast().`);
+  }
+});
+
+test("maintenance mode blocks payout, fee, deposit-status, and cron side effects", () => {
+  const paths = [
+    "../src/app/api/admin/withdrawals/pay/route.ts",
+    "../src/app/api/admin/fees/route.ts",
+    "../src/app/api/wallet/deposit/route.ts",
+    "../src/app/api/cron/route.ts",
+  ];
+  for (const path of paths) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(source, /config\.maintenanceMode/, `${path} must honour maintenance mode.`);
+  }
 });

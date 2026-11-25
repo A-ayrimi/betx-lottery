@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Transaction } from "@solana/web3.js";
 import { Logo } from "@/components/Logo";
 import { WalletProvider, useWallet, walletErrorMessage } from "@/components/WalletProvider";
@@ -164,7 +164,14 @@ function AdminInner() {
 
           <FeesPanel token={token} />
 
+          <TierManagementPanel token={token} />
+
+          <TierReportsPanel token={token} />
+
+          <AuditLogPanel token={token} />
+
           <div className="panel mt-6 flex flex-wrap items-center gap-3 rounded-2xl p-5">
+
             <p className="micro text-mint">PAYOUT WALLET (USDC-SPL)</p>
             {wallet.address ? (
               <>
@@ -587,4 +594,355 @@ function AutomationPanel({ token }: { token: string }) {
     </div>
   );
 }
+
+async function adminJson<T>(url: string, token: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", "x-admin-token": token, ...(init?.headers ?? {}) },
+    cache: "no-store",
+  });
+  const json = await res.json();
+  if (!res.ok || !json.ok) throw new Error(json.error || "Data temporarily unavailable.");
+  return json as T;
+}
+
+interface TierRow {
+  id: number;
+  code: string;
+  name: string;
+  priceUsd: string;
+  ticketCapacity: number;
+  drawDurationMinutes: number;
+  prizePercentage: string;
+  treasuryPercentage: string;
+  adminPercentage: string;
+  minimumParticipants: number;
+  maximumParticipants: number | null;
+  status: string;
+  displayOrder: number;
+  rules: Record<string, unknown>;
+}
+
+type TierForm = {
+  code: string;
+  name: string;
+  priceUsd: string;
+  ticketCapacity: string;
+  drawDurationMinutes: string;
+  prizePercentage: string;
+  treasuryPercentage: string;
+  adminPercentage: string;
+  minimumParticipants: string;
+  maximumParticipants: string;
+  status: string;
+  displayOrder: string;
+};
+
+const TIER_FIELDS: Array<[keyof TierForm, string]> = [
+  ["code", "CODE"],
+  ["name", "NAME"],
+  ["priceUsd", "PRICE USD"],
+  ["ticketCapacity", "CAPACITY"],
+  ["drawDurationMinutes", "DRAW MINUTES"],
+  ["prizePercentage", "PRIZE %"],
+  ["treasuryPercentage", "TREASURY %"],
+  ["adminPercentage", "ADMIN %"],
+  ["minimumParticipants", "MIN PLAYERS"],
+  ["maximumParticipants", "MAX PLAYERS"],
+  ["status", "STATUS"],
+  ["displayOrder", "ORDER"],
+];
+
+function tierToForm(tier?: TierRow): TierForm {
+  return {
+    code: tier?.code ?? "",
+    name: tier?.name ?? "",
+    priceUsd: tier?.priceUsd ?? "1",
+    ticketCapacity: String(tier?.ticketCapacity ?? 20),
+    drawDurationMinutes: String(tier?.drawDurationMinutes ?? 1440),
+    prizePercentage: tier?.prizePercentage ?? "75",
+    treasuryPercentage: tier?.treasuryPercentage ?? "15",
+    adminPercentage: tier?.adminPercentage ?? "10",
+    minimumParticipants: String(tier?.minimumParticipants ?? 1),
+    maximumParticipants: tier?.maximumParticipants === null || tier?.maximumParticipants === undefined ? "" : String(tier.maximumParticipants),
+    status: tier?.status ?? "INACTIVE",
+    displayOrder: String(tier?.displayOrder ?? 0),
+  };
+}
+
+function TierEditor({ token, tier, onDone, onCancel }: {
+  token: string;
+  tier?: TierRow;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<TierForm>(() => tierToForm(tier));
+  const [err, setErr] = useState("");
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setErr("");
+    try {
+      const payload = {
+        code: form.code,
+        name: form.name,
+        priceUsd: Number(form.priceUsd),
+        ticketCapacity: Number(form.ticketCapacity),
+        drawDurationMinutes: Number(form.drawDurationMinutes),
+        prizePercentage: Number(form.prizePercentage),
+        treasuryPercentage: Number(form.treasuryPercentage),
+        adminPercentage: Number(form.adminPercentage),
+        minimumParticipants: Number(form.minimumParticipants),
+        maximumParticipants: form.maximumParticipants ? Number(form.maximumParticipants) : null,
+        status: form.status,
+        displayOrder: Number(form.displayOrder),
+      };
+      await adminJson(tier ? `/api/admin/tiers/${tier.id}` : "/api/admin/tiers", token, {
+        method: tier ? "PATCH" : "POST",
+        body: JSON.stringify(payload),
+      });
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="mt-4 rounded-xl border border-rule p-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {TIER_FIELDS.map(([key, label]) => (
+          <label key={key} className="flex flex-col gap-1">
+            <span className="micro text-mint">{label}</span>
+            {key === "status" ? (
+              <select
+                value={form[key]}
+                onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                className="rounded-lg border border-rule bg-black/30 px-3 py-2 text-sm text-white"
+              >
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+                <option value="ARCHIVED">ARCHIVED</option>
+              </select>
+            ) : (
+              <input
+                value={form[key]}
+                onChange={(e) => setForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                className="rounded-lg border border-rule bg-black/30 px-3 py-2 text-sm text-white"
+              />
+            )}
+          </label>
+        ))}
+      </div>
+      {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
+      <div className="mt-4 flex gap-2">
+        <button className="btn-neon rounded-lg px-4 py-2 text-sm font-bold">{tier ? "Save tier" : "Create tier"}</button>
+        <button type="button" onClick={onCancel} className="rounded-lg border border-rule px-4 py-2 text-sm text-mint">Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+function TierManagementPanel({ token }: { token: string }) {
+  const [tiers, setTiers] = useState<TierRow[]>([]);
+  const [editing, setEditing] = useState<{ tier?: TierRow } | null>(null);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const json = await adminJson<{ tiers: TierRow[] }>("/api/admin/tiers", token);
+      setTiers(json.tiers);
+      setErr("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [load]);
+
+  const setStatus = async (tier: TierRow, status: string) => {
+    try {
+      await adminJson(`/api/admin/tiers/${tier.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  return (
+    <div className="panel mt-6 rounded-2xl p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-black text-white">Tier management</h2>
+        <button onClick={() => setEditing({})} className="btn-foil rounded-lg px-4 py-2 text-sm font-bold">New tier</button>
+      </div>
+      {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
+      {editing ? (
+        <TierEditor
+          token={token}
+          tier={editing.tier}
+          onCancel={() => setEditing(null)}
+          onDone={() => { setEditing(null); void load(); }}
+        />
+      ) : null}
+      <div className="mt-4 overflow-x-auto rounded-xl border border-rule">
+        <table className="w-full min-w-[720px] text-left text-xs text-mint">
+          <thead className="border-b border-rule text-[10px] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-2">Tier</th>
+              <th className="px-4 py-2">Price</th>
+              <th className="px-4 py-2">Capacity</th>
+              <th className="px-4 py-2">Allocations</th>
+              <th className="px-4 py-2">Status</th>
+              <th className="px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tiers.map((tier) => (
+              <tr key={tier.id} className="border-b border-rule/50 last:border-b-0">
+                <td className="px-4 py-3 text-white">{tier.code} · {tier.name}</td>
+                <td className="px-4 py-3">${Number(tier.priceUsd).toFixed(2)}</td>
+                <td className="px-4 py-3">{tier.ticketCapacity}</td>
+                <td className="px-4 py-3">{tier.prizePercentage}/{tier.treasuryPercentage}/{tier.adminPercentage}</td>
+                <td className="px-4 py-3">{tier.status}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setEditing({ tier })} className="rounded border border-rule px-2 py-1 text-white">Edit</button>
+                    <button onClick={() => setStatus(tier, "ACTIVE")} disabled={tier.status === "ACTIVE"} className="rounded border border-rule px-2 py-1 text-neon-2 disabled:opacity-40">Activate</button>
+                    <button onClick={() => setStatus(tier, "INACTIVE")} disabled={tier.status === "INACTIVE"} className="rounded border border-rule px-2 py-1 text-foil disabled:opacity-40">Pause</button>
+                    <button onClick={() => setStatus(tier, "ARCHIVED")} disabled={tier.status === "ARCHIVED"} className="rounded border border-rule px-2 py-1 text-red-300 disabled:opacity-40">Archive</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface TierReportRow {
+  tierId: number;
+  code: string;
+  name: string;
+  status: string;
+  priceUsd: number;
+  capacity: number;
+  openRounds: number;
+  settledRounds: number;
+  ticketsSold: number;
+  ticketRevenue: number;
+  prizeObligation: number;
+  treasuryObligation: number;
+  adminObligation: number;
+}
+
+function TierReportsPanel({ token }: { token: string }) {
+  const [rows, setRows] = useState<TierReportRow[]>([]);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const json = await adminJson<{ report: TierReportRow[] }>("/api/admin/reports/tiers", token);
+      setRows(json.report);
+      setErr("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [load]);
+
+  return (
+    <div className="panel mt-6 rounded-2xl p-5">
+      <h2 className="text-xl font-black text-white">Tier reports</h2>
+      {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
+      <div className="mt-4 overflow-x-auto rounded-xl border border-rule">
+        <table className="w-full min-w-[720px] text-left text-xs text-mint">
+          <thead className="border-b border-rule text-[10px] uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-2">Tier</th>
+              <th className="px-4 py-2">Open</th>
+              <th className="px-4 py-2">Settled</th>
+              <th className="px-4 py-2">Tickets</th>
+              <th className="px-4 py-2">Revenue</th>
+              <th className="px-4 py-2">Prize</th>
+              <th className="px-4 py-2">Treasury</th>
+              <th className="px-4 py-2">Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.tierId} className="border-b border-rule/50 last:border-b-0">
+                <td className="px-4 py-3 text-white">{row.code} · {row.name}</td>
+                <td className="px-4 py-3">{row.openRounds}</td>
+                <td className="px-4 py-3">{row.settledRounds}</td>
+                <td className="px-4 py-3">{row.ticketsSold}</td>
+                <td className="px-4 py-3">${row.ticketRevenue.toFixed(2)}</td>
+                <td className="px-4 py-3">${row.prizeObligation.toFixed(2)}</td>
+                <td className="px-4 py-3">${row.treasuryObligation.toFixed(2)}</td>
+                <td className="px-4 py-3">${row.adminObligation.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface AuditEntry {
+  id: number;
+  actor: string;
+  action: string;
+  entity: string;
+  entityId: number;
+  details: unknown;
+  createdAt: string;
+}
+
+function AuditLogPanel({ token }: { token: string }) {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const json = await adminJson<{ entries: AuditEntry[] }>("/api/admin/audit?limit=100", token);
+      setEntries(json.entries);
+      setErr("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [load]);
+
+  return (
+    <div className="panel mt-6 rounded-2xl p-5">
+      <h2 className="text-xl font-black text-white">Audit log</h2>
+      {err ? <p className="mt-3 text-sm text-red-400">{err}</p> : null}
+      <div className="mt-4 rounded-xl border border-rule">
+        {entries.length === 0 ? <p className="p-4 text-sm text-mint">No entries.</p> : null}
+        {entries.map((entry) => (
+          <div key={entry.id} className="border-b border-rule/50 px-4 py-3 text-xs last:border-b-0">
+            <span className="text-mint">{new Date(entry.createdAt).toLocaleString()} · </span>
+            <span className="text-white">{entry.actor}</span> · {entry.action} · {entry.entity}#{entry.entityId}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 

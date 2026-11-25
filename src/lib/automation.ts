@@ -16,7 +16,7 @@ import {
   withdrawals,
 } from "@/db/schema";
 import { config } from "@/lib/config";
-import { autoDrawFullRounds, refundRound, TICKET_PRICE } from "@/lib/store";
+import { autoDrawExpiredRounds, autoDrawFullRounds, refundRound } from "@/lib/store";
 import { getSolanaConfig } from "@/lib/solana";
 const solanaCfg = () => getSolanaConfig();
 
@@ -316,7 +316,7 @@ async function scanIncoming() {
  * anything missed (crash between sale and draw, manual DB edits, races).
  */
 async function drawFullRounds() {
-  const outcomes = await autoDrawFullRounds();
+  const outcomes = [...await autoDrawFullRounds(), ...await autoDrawExpiredRounds()];
   for (const o of outcomes) {
     await alert(
       `draw-${o.roundId}`,
@@ -331,7 +331,7 @@ async function settleFees() {
   return { enabled: false, skipped: "financial reconciliation required" as const };
 }
 
-/** Rounds that don't fill within ROUND_TIMEOUT_HOURS are closed and refunded. */
+/** Rounds that don't fill before their configured deadline are closed and refunded. */
 async function refundStaleRounds() {
   const hours = Number(process.env.ROUND_TIMEOUT_HOURS ?? 24);
   if (!(hours > 0)) return { skipped: "disabled" };
@@ -339,8 +339,10 @@ async function refundStaleRounds() {
   let refunded = 0, refundedTickets = 0;
   for (const r of open) {
     if (r.sold === 0) continue;
+    const tierClosed = Boolean(r.closesAt && Date.now() >= new Date(r.closesAt).getTime());
     const [first] = await db.select({ t: sql<string>`min(${tickets.createdAt})` }).from(tickets).where(eq(tickets.roundId, r.id));
-    if (!first?.t || new Date(first.t).getTime() > Date.now() - hours * 3600_000) continue;
+    const legacyClosed = Boolean(first?.t && new Date(first.t).getTime() <= Date.now() - hours * 3600_000);
+    if (!tierClosed && !legacyClosed) continue;
     const res = await refundRound(r.id);
     if (!res) continue;
     refunded++;
@@ -351,7 +353,7 @@ async function refundStaleRounds() {
       try {
         await sendMessage(
           row.telegramId,
-          interpolate(botStrings(row.locale).roundRefund, { round: r.id, hours, n: u.count, amount: `$${(u.count * TICKET_PRICE).toFixed(2)}` }),
+          interpolate(botStrings(row.locale).roundRefund, { round: r.id, hours, n: u.count, amount: `$${(u.count * res.priceUsd).toFixed(2)}` }),
         );
       } catch {
         /* best effort */

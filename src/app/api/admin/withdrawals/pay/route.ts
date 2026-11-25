@@ -5,11 +5,13 @@ import { withdrawals } from "@/db/schema";
 import { isAdmin } from "@/lib/admin";
 import { processWithdrawal, UserError } from "@/lib/store";
 import {
-  broadcastSolanaSignedTransaction,
+  broadcast,
   buildSolanaUsdcPaymentTx,
   isValidSolanaAddress,
+  isValidSolanaTxSignature,
   solanaExplorerTxUrl,
 } from "@/lib/solana";
+import { config } from "@/lib/config";
 import { handleError } from "@/lib/api";
 import { sendMessage } from "@/lib/telegram";
 import { botStrings } from "@/i18n/bot";
@@ -25,6 +27,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (config.maintenanceMode) {
+    return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const w = (await db.select().from(withdrawals).where(eq(withdrawals.id, Number(body.id))).limit(1))[0];
@@ -45,9 +50,11 @@ export async function POST(req: NextRequest) {
     if (body.step === "submit") {
       const signed = body.signedTransaction;
       if (!signed) throw new UserError("txMismatch");
-      const r = await broadcastSolanaSignedTransaction(signed);
-      if (!r.ok) throw new UserError("broadcastFailed", 400, { reason: r.error ?? "" });
-      const txid = r.txid ?? w.expectedTxId!;
+      const r = await broadcast(signed);
+      if (!r.ok || !r.txid || !isValidSolanaTxSignature(r.txid)) {
+        throw new UserError("broadcastFailed", 400, { reason: r.error ?? "Invalid transaction signature" });
+      }
+      const txid = r.txid;
       const { telegramId, locale } = await processWithdrawal(w.id, "paid", txid, undefined, "admin");
       if (telegramId) {
         await sendMessage(

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { feeTransfers } from "@/db/schema";
 import { isAdmin } from "@/lib/admin";
 import { feeConfig, feeQueue } from "@/lib/fees";
+import { config } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (config.maintenanceMode) {
+    return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+  }
   return NextResponse.json(
     { ok: false, error: "Treasury transfers are paused until historical accounting is reconciled." },
     { status: 409 },

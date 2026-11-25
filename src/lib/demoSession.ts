@@ -6,6 +6,26 @@ export const DEMO_TREASURY_ADDRESS = "SOL_DEMO_TREASURY_9999";
 export const DEMO_SESSION_KEY = "betx_demo_session_v1";
 export const DEMO_STARTING_BALANCE = 100;
 
+const DEMO_TIERS = [{
+  id: 1,
+  code: "usd_1",
+  name: "$1 Tier",
+  status: "ACTIVE" as const,
+  displayOrder: 0,
+  priceUsd: 1,
+  capacity: 20,
+  drawDurationMinutes: 1440,
+  prizePercentage: 75,
+  treasuryPercentage: 15,
+  adminPercentage: 10,
+  prize: 15,
+  treasury: 3,
+  admin: 2,
+  minimumParticipants: 1,
+  maximumParticipants: 20,
+  rules: {},
+}];
+
 interface StoredDemoSession {
   version: 1;
   address: string;
@@ -143,6 +163,7 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       },
     },
     region: { country: null, blocked: false },
+    tiers: DEMO_TIERS,
     vault: {
       balance: 20,
       initialCapital: 20,
@@ -160,6 +181,9 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
     },
     round: {
       id: 1,
+      tierId: 1,
+      tierCode: "usd_1",
+      closesAt: null,
       status: "OPEN",
       capacity: 20,
       sold: 0,

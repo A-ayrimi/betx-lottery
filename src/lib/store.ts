@@ -1,15 +1,19 @@
 ﻿import { cookies } from "next/headers";
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   deposits,
   adminAuditLog,
+  drawCommitments,
   feeTransfers,
+  roundSettlements,
   vaultSnapshots,
   ledger,
   rounds,
+  ticketTiers,
   tickets,
+  treasuryTransactions,
   users,
   vault,
   wheelSpins,
@@ -24,9 +28,6 @@ import type { Dict } from "@/i18n/dictionaries/en";
 import { regionStatus } from "@/lib/geo";
 import { headers } from "next/headers";
 const STORE_SOLANA_USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const STORE_SOLANA_TREASURY =
-  process.env.NEXT_PUBLIC_SOLANA_TREASURY ||
-  "5TekXvxKMMhhHea399Kyf28Paun9pY3QhAtUte4N8xdy";
 const STORE_SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL ||
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
@@ -43,7 +44,7 @@ function toSolanaUsdcUnits(amount: number): bigint {
 
 async function lookupSolanaUsdcTransfers(
   signature: string
-): Promise<{ status: "confirmed" | "pending" | "not_found"; transfers: Array<{ to: string; units: bigint }> }> {
+): Promise<{ status: "confirmed" | "pending" | "not_found"; transfers: Array<{ from: string; to: string; units: bigint }> }> {
   const sig = (signature || "").trim();
   if (!sig) return { status: "not_found", transfers: [] };
 
@@ -114,11 +115,16 @@ async function lookupSolanaUsdcTransfers(
       map.set(key, cur);
     }
 
-    const transfers: Array<{ to: string; units: bigint }> = [];
+    const transfers: Array<{ from: string; to: string; units: bigint }> = [];
+    let sender = keys[0] || "";
+    for (const entry of Array.from(map.values())) {
+      const delta = entry.post - entry.pre;
+      if (delta < BigInt(0) && entry.owner) sender = entry.owner;
+    }
     for (const entry of Array.from(map.values())) {
       const delta = entry.post - entry.pre;
       if (delta > BigInt(0) && entry.owner) {
-        transfers.push({ to: entry.owner, units: delta });
+        transfers.push({ from: sender, to: entry.owner, units: delta });
       }
     }
 
@@ -128,7 +134,13 @@ async function lookupSolanaUsdcTransfers(
   }
 }import { getRoundAccountingEntries, getTicketPurchaseCount } from "@/lib/roundAccounting";
 import { effectiveLimit } from "@/lib/responsibleGaming";
-import { isValidSolanaAddress } from "@/lib/solana";
+import {
+  getSolanaConfig,
+  isValidSolanaAddress,
+  isValidSolanaTxSignature,
+} from "@/lib/solana";
+import { roundMoney } from "@/lib/tierAccounting";
+import { deriveTierAmounts, tierLockKey } from "@/lib/tierMath";
 
 export { money } from "@/lib/format";
 export { effectiveLimit } from "@/lib/responsibleGaming";
@@ -226,6 +238,166 @@ function newSeed() {
   return { serverSeed, seedHash };
 }
 
+type TierConfig = {
+  id: number;
+  code: string;
+  name: string;
+  priceUsd: number;
+  capacity: number;
+  drawDurationMinutes: number;
+  minimumParticipants: number;
+  maximumParticipants: number | null;
+  prizePercentage: number;
+  treasuryPercentage: number;
+  adminPercentage: number;
+  amounts: ReturnType<typeof deriveTierAmounts>;
+  snapshot: Record<string, unknown>;
+};
+
+function amountsForTicketCount(tier: TierConfig, ticketCount: number) {
+  if (!(ticketCount > 0)) throw new Error("Ticket count must be positive");
+  return deriveTierAmounts({
+    priceUsd: tier.priceUsd,
+    capacity: ticketCount,
+    prizePercentage: tier.prizePercentage,
+    treasuryPercentage: tier.treasuryPercentage,
+    adminPercentage: tier.adminPercentage,
+  });
+}
+
+function tierConfigFromRow(row: typeof ticketTiers.$inferSelect): TierConfig {
+  const priceUsd = Number(row.priceUsd);
+  const prizePercentage = Number(row.prizePercentage);
+  const treasuryPercentage = Number(row.treasuryPercentage);
+  const adminPercentage = Number(row.adminPercentage);
+  const amounts = deriveTierAmounts({
+    priceUsd,
+    capacity: row.ticketCapacity,
+    prizePercentage,
+    treasuryPercentage,
+    adminPercentage,
+  });
+  const rules =
+    row.rules && typeof row.rules === "object" && !Array.isArray(row.rules)
+      ? (row.rules as Record<string, unknown>)
+      : {};
+
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    priceUsd,
+    capacity: row.ticketCapacity,
+    drawDurationMinutes: row.drawDurationMinutes,
+    minimumParticipants: row.minimumParticipants,
+    maximumParticipants: row.maximumParticipants,
+    prizePercentage,
+    treasuryPercentage,
+    adminPercentage,
+    amounts,
+    snapshot: {
+      code: row.code,
+      name: row.name,
+      priceUsd,
+      capacity: row.ticketCapacity,
+      drawDurationMinutes: row.drawDurationMinutes,
+      prizePercentage,
+      treasuryPercentage,
+      adminPercentage,
+      prize: amounts.prize,
+      treasury: amounts.treasury,
+      admin: amounts.admin,
+      minimumParticipants: row.minimumParticipants,
+      maximumParticipants: row.maximumParticipants,
+      rules,
+    },
+  };
+}
+
+async function resolveTierConfig(q: Q, selector?: string | number): Promise<TierConfig> {
+  const condition =
+    selector === undefined
+      ? eq(ticketTiers.status, "ACTIVE")
+      : and(
+          eq(ticketTiers.status, "ACTIVE"),
+          typeof selector === "number" ? eq(ticketTiers.id, selector) : eq(ticketTiers.code, selector),
+        );
+  const row = (
+    await q
+      .select()
+      .from(ticketTiers)
+      .where(condition)
+      .orderBy(asc(ticketTiers.displayOrder), asc(ticketTiers.id))
+      .limit(1)
+  )[0];
+  if (!row) throw new Error("No active ticket tier is configured");
+  return tierConfigFromRow(row);
+}
+
+export async function listActiveTiers() {
+  const rows = await db
+    .select()
+    .from(ticketTiers)
+    .where(eq(ticketTiers.status, "ACTIVE"))
+    .orderBy(asc(ticketTiers.displayOrder), asc(ticketTiers.id));
+  return rows.map((row) => {
+    const tier = tierConfigFromRow(row);
+    return {
+      id: tier.id,
+      code: tier.code,
+      name: tier.name,
+      status: row.status,
+      displayOrder: row.displayOrder,
+      priceUsd: tier.priceUsd,
+      capacity: tier.capacity,
+      drawDurationMinutes: tier.drawDurationMinutes,
+      prizePercentage: tier.prizePercentage,
+      treasuryPercentage: tier.treasuryPercentage,
+      adminPercentage: tier.adminPercentage,
+      prize: tier.amounts.prize,
+      treasury: tier.amounts.treasury,
+      admin: tier.amounts.admin,
+      minimumParticipants: tier.minimumParticipants,
+      maximumParticipants: tier.maximumParticipants,
+      rules: (tier.snapshot.rules ?? {}) as Record<string, unknown>,
+    };
+  });
+}
+
+function tierConfigFromRound(row: Round): TierConfig {
+  const snapshot =
+    row.tierSnapshot && typeof row.tierSnapshot === "object" && !Array.isArray(row.tierSnapshot)
+      ? (row.tierSnapshot as Record<string, unknown>)
+      : {};
+  const priceUsd = Number(snapshot.priceUsd ?? TICKET_PRICE);
+  const capacity = Number(snapshot.capacity ?? row.capacity ?? POOL_CAPACITY);
+  const prizePercentage = Number(snapshot.prizePercentage ?? 75);
+  const treasuryPercentage = Number(snapshot.treasuryPercentage ?? 15);
+  const adminPercentage = Number(snapshot.adminPercentage ?? 10);
+
+  return {
+    id: row.tierId ?? 1,
+    code: String(snapshot.code ?? "usd_1"),
+    name: String(snapshot.name ?? "$1 Tier"),
+    priceUsd,
+    capacity,
+    drawDurationMinutes: Number(snapshot.drawDurationMinutes ?? 1440),
+    minimumParticipants: Number(snapshot.minimumParticipants ?? 1),
+    maximumParticipants: snapshot.maximumParticipants === null ? null : Number(snapshot.maximumParticipants ?? capacity),
+    prizePercentage,
+    treasuryPercentage,
+    adminPercentage,
+    amounts: deriveTierAmounts({
+      priceUsd,
+      capacity,
+      prizePercentage,
+      treasuryPercentage,
+      adminPercentage,
+    }),
+    snapshot,
+  };
+}
+
 export const ROUND_STATUSES = {
   LOCKED: "LOCKED",
   OPEN: "OPEN",
@@ -279,30 +451,45 @@ export function fairIndex(serverSeed: string, roundId: number, serials: string[]
 function verifyStoredDraw(
   row: Pick<Round, "id" | "serverSeed" | "seedHash" | "winnerId" | "winningSerial">,
   pool: Pick<Ticket, "serial" | "userId">[],
+  expectedTicketCount: number,
 ) {
-  if (!row.serverSeed || !row.seedHash || !row.winnerId || !row.winningSerial || pool.length !== POOL_CAPACITY) return false;
+  if (!row.serverSeed || !row.seedHash || !row.winnerId || !row.winningSerial || pool.length !== expectedTicketCount) return false;
   if (createHash("sha256").update(row.serverSeed).digest("hex") !== row.seedHash) return false;
   const winner = pool[fairIndex(row.serverSeed, row.id, pool.map((ticket) => ticket.serial))];
   return winner?.serial === row.winningSerial && winner.userId === row.winnerId;
 }
 
-async function openNewRound(q: Q) {
+async function openNewRound(q: Q, tier: TierConfig) {
   const { serverSeed, seedHash } = newSeed();
-  const created = await q
-    .insert(rounds)
-    .values({
-      status: ROUND_STATUSES.OPEN,
-      capacity: POOL_CAPACITY,
-      sold: 0,
-      prize: String(PRIZE),
-      fee: String(FEE),
-      treasuryContribution: String(TREASURY_CONTRIBUTION),
-      adminGrossRevenue: String(ADMIN_GROSS_REVENUE),
-      serverSeed,
-      seedHash,
-    })
-    .returning();
-  return created[0];
+  const created = (
+    await q
+      .insert(rounds)
+      .values({
+        status: ROUND_STATUSES.OPEN,
+        capacity: tier.capacity,
+        sold: 0,
+        prize: String(tier.amounts.prize),
+        fee: String(tier.amounts.fee),
+        treasuryContribution: String(tier.amounts.treasury),
+        adminGrossRevenue: String(tier.amounts.admin),
+        tierId: tier.id,
+        tierSnapshot: tier.snapshot,
+        closesAt: new Date(Date.now() + tier.drawDurationMinutes * 60_000),
+        minimumParticipants: tier.minimumParticipants,
+        maximumParticipants: tier.maximumParticipants,
+        serverSeed,
+        seedHash,
+      })
+      .returning()
+  )[0];
+  await q.insert(drawCommitments).values({
+    roundId: created.id,
+    tierId: tier.id,
+    serverSeedHash: seedHash,
+    drawNonce: 0,
+    status: "COMMITTED",
+  });
+  return created;
 }
 
 export async function initializeAdminVault(actor: string) {
@@ -357,38 +544,46 @@ export async function initializeAdminVault(actor: string) {
   });
 }
 
-export async function openAdminRound(actor: string) {
+export async function openAdminRound(actor: string, tierSelector?: string | number) {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(424243)`);
+    const tier = await resolveTierConfig(tx, tierSelector);
+    await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     const active = await tx
       .select({ id: rounds.id })
       .from(rounds)
-      .where(inArray(rounds.status, ["OPEN", "FULL", "AWAITING_ADMIN_APPROVAL", "APPROVED"]))
+      .where(and(
+        inArray(rounds.status, ["OPEN", "FULL", "AWAITING_ADMIN_APPROVAL", "APPROVED"]),
+        eq(rounds.tierId, tier.id),
+      ))
       .limit(1);
     if (active.length) throw new UserError("roundFull", 409);
     const v = (await tx.select({ id: vault.id }).from(vault).limit(1))[0];
     if (!v) throw new Error("Vault must be initialized explicitly before opening a round");
-    const round = await openNewRound(tx);
+    const round = await openNewRound(tx, tier);
     await tx.insert(adminAuditLog).values({
       actor,
       action: "round.open",
       entity: "round",
       entityId: round.id,
-      details: { status: ROUND_STATUSES.OPEN },
+      details: { status: ROUND_STATUSES.OPEN, tierCode: tier.code },
     });
     return round;
   });
 }
 
-export async function ensureOpenRound() {
+export async function ensureOpenRound(tierSelector?: string | number) {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(424243)`);
+    const tier = await resolveTierConfig(tx, tierSelector);
+    await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
 
     const open = (
       await tx
         .select()
         .from(rounds)
-        .where(inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]))
+        .where(and(
+          inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]),
+          eq(rounds.tierId, tier.id),
+        ))
         .orderBy(desc(rounds.id))
         .limit(1)
         .for("update")
@@ -399,7 +594,7 @@ export async function ensureOpenRound() {
     const v = (await tx.select({ id: vault.id }).from(vault).limit(1))[0];
     if (!v) return null;
 
-    return openNewRound(tx);
+    return openNewRound(tx, tier);
   });
 }
 
@@ -409,9 +604,10 @@ export async function ensureOpenRound() {
  */
 export async function refundRound(roundId: number) {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(424243)`);
     const r = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
     if (!r || normalizeRoundStatus(r.status) !== ROUND_STATUSES.OPEN || r.sold === 0) return null;
+    const tier = tierConfigFromRound(r);
+    await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     const list = await tx.select().from(tickets).where(eq(tickets.roundId, roundId));
     const perUser = new Map<number, { count: number; username: string }>();
     for (const t of list) {
@@ -420,7 +616,7 @@ export async function refundRound(roundId: number) {
       perUser.set(t.userId, cur);
     }
     for (const [userId, v] of perUser) {
-      const amount = v.count * TICKET_PRICE;
+      const amount = roundMoney(v.count * tier.priceUsd);
       await tx.update(users).set({ balance: sql`${users.balance} + ${amount}` }).where(eq(users.id, userId));
       await tx.insert(ledger).values({
         userId,
@@ -429,13 +625,19 @@ export async function refundRound(roundId: number) {
         amount: String(amount),
         note: `Refund: round ${roundId} expired (${v.count} tickets)`,
         account: "user",
+        roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:refund:${userId}`,
       });
     }
     await tx.update(rounds).set({ status: ROUND_STATUSES.REFUNDED, drawnAt: new Date() }).where(eq(rounds.id, roundId));
     await tx.update(vault).set({ ticketsSold: sql`greatest(${vault.ticketsSold} - ${r.sold}, 0)`, updatedAt: new Date() });
-    return { tickets: list.length, users: [...perUser.entries()].map(([id, v]) => ({ id, count: v.count })) };
+    return {
+      tickets: list.length,
+      priceUsd: tier.priceUsd,
+      users: [...perUser.entries()].map(([id, v]) => ({ id, count: v.count })),
+    };
   });
 }
 
@@ -655,6 +857,7 @@ async function drawRound(
 ): Promise<DrawOutcome | null> {
   const row = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
   if (!row || !["OPEN", "FULL"].includes(normalizeRoundStatus(row.status))) return null;
+  const tier = tierConfigFromRound(row);
   if (!row.serverSeed || !row.seedHash || createHash("sha256").update(row.serverSeed).digest("hex") !== row.seedHash) {
     throw new Error(`Round ${roundId} has no verifiable committed seed`);
   }
@@ -665,22 +868,28 @@ async function drawRound(
     .where(and(eq(tickets.roundId, roundId), eq(tickets.kind, "gold")))
     .orderBy(tickets.id);
 
-  if (pool.length < row.capacity) {
-    await tx.update(rounds).set({ sold: pool.length, status: ROUND_STATUSES.OPEN }).where(eq(rounds.id, roundId));
-    return null;
-  }
-  if (pool.length !== POOL_CAPACITY || row.capacity !== POOL_CAPACITY) {
+  const closed = Boolean(row.closesAt && Date.now() >= new Date(row.closesAt).getTime());
+  const participantCount = new Set(pool.map((ticket) => ticket.userId)).size;
+  const partialDraw = pool.length < row.capacity;
+  if (partialDraw) {
+    const eligible = closed && participantCount >= row.minimumParticipants && pool.length >= row.minimumParticipants;
+    if (!eligible) {
+      await tx.update(rounds).set({ sold: pool.length, status: ROUND_STATUSES.OPEN }).where(eq(rounds.id, roundId));
+      return null;
+    }
+  } else if (pool.length !== row.capacity || row.capacity !== tier.capacity) {
     throw new Error(`Round ${roundId} does not meet the configured ticket capacity`);
   }
 
   if (row.sold !== pool.length) {
-    await tx.update(rounds).set({ sold: pool.length, status: "FULL" }).where(eq(rounds.id, roundId));
+    await tx.update(rounds).set({ sold: pool.length, status: partialDraw ? ROUND_STATUSES.OPEN : "FULL" }).where(eq(rounds.id, roundId));
   }
 
-  const prize = Number(row.prize);
-  const revenue = TOTAL_TICKET_REVENUE;
-  const treasuryContribution = TREASURY_CONTRIBUTION;
-  const adminGrossRevenue = ADMIN_GROSS_REVENUE;
+  const amounts = amountsForTicketCount(tier, pool.length);
+  const prize = amounts.prize;
+  const revenue = amounts.totalPool;
+  const treasuryContribution = amounts.treasury;
+  const adminGrossRevenue = amounts.admin;
   const adminWallet = config.adminWallet;
   const winner = pool[fairIndex(row.serverSeed, roundId, pool.map((t) => t.serial))];
   const winnerRow = (await tx.select().from(users).where(eq(users.id, winner.userId)).limit(1))[0];
@@ -701,9 +910,39 @@ async function drawRound(
       winnerName,
       winningSerial: winner.serial,
       drawnAt,
+      prize: String(prize),
+      fee: String(amounts.fee),
+      treasuryContribution: String(treasuryContribution),
+      adminGrossRevenue: String(adminGrossRevenue),
       feeStatus: "accrued",
     })
     .where(eq(rounds.id, roundId));
+
+  await tx
+    .insert(drawCommitments)
+    .values({
+      roundId,
+      tierId: tier.id,
+      serverSeedHash: row.seedHash,
+      clientSeed: null,
+      drawNonce: 0,
+      status: "REVEALED",
+      winnerTicketId: winner.id,
+      winningSerial: winner.serial,
+      revealedServerSeed: row.serverSeed,
+      committedAt: row.openedAt ?? new Date(),
+      revealedAt: drawnAt,
+    })
+    .onConflictDoUpdate({
+      target: drawCommitments.roundId,
+      set: {
+        status: "REVEALED",
+        winnerTicketId: winner.id,
+        winningSerial: winner.serial,
+        revealedServerSeed: row.serverSeed,
+        revealedAt: drawnAt,
+      },
+    });
 
   return {
     winnerName,
@@ -711,7 +950,7 @@ async function drawRound(
     winnerLocale: winnerRow?.locale ?? "en",
     winningSerial: winner.serial,
     prize,
-    fee: Number(row.fee),
+    fee: amounts.fee,
     roundId,
     serverSeed: row.serverSeed,
     drawnAt: drawnAt.toISOString(),
@@ -745,7 +984,29 @@ export async function autoDrawFullRounds(triggerUserId = 0): Promise<DrawOutcome
   for (const r of open) {
     if ((!r.serverSeed || !r.seedHash) && r.sold < r.capacity) continue;
     const outcome = await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(424243)`);
+      await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(r.tierId ?? 1)})`);
+      return drawRound(tx, r.id, triggerUserId);
+    });
+    if (outcome) outcomes.push(outcome);
+  }
+  return outcomes;
+}
+
+export async function autoDrawExpiredRounds(triggerUserId = 0): Promise<DrawOutcome[]> {
+  const open = await db
+    .select()
+    .from(rounds)
+    .where(and(
+      inArray(rounds.status, [ROUND_STATUSES.OPEN, ROUND_STATUSES.FULL, "open", "full"]),
+      isNotNull(rounds.closesAt),
+      lt(rounds.closesAt, new Date()),
+    ))
+    .orderBy(asc(rounds.id));
+  const outcomes: DrawOutcome[] = [];
+  for (const r of open) {
+    if (!r.serverSeed || !r.seedHash) continue;
+    const outcome = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(r.tierId ?? 1)})`);
       return drawRound(tx, r.id, triggerUserId);
     });
     if (outcome) outcomes.push(outcome);
@@ -757,18 +1018,24 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
   return db.transaction(async (tx) => {
     const row = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
     if (!row) return null;
+    const tier = tierConfigFromRound(row);
+    await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     const current = normalizeRoundStatus(row.status);
     if (approved && current === ROUND_STATUSES.APPROVED) return { roundId, approved, status: current, alreadyApplied: true };
     if (!approved && current === ROUND_STATUSES.REFUNDED) return { roundId, approved, status: current, alreadyApplied: true };
     if (current !== ROUND_STATUSES.AWAITING_ADMIN_APPROVAL) return null;
     if (approved) {
-      if (!row.winnerId || !row.winningSerial || row.sold !== POOL_CAPACITY || row.capacity !== POOL_CAPACITY) return null;
       const pool = await tx
         .select({ serial: tickets.serial, userId: tickets.userId })
         .from(tickets)
         .where(and(eq(tickets.roundId, roundId), eq(tickets.kind, "gold")))
         .orderBy(tickets.id);
-      if (!verifyStoredDraw(row, pool)) return null;
+      if (!row.winnerId || !row.winningSerial || row.sold !== pool.length || row.capacity !== tier.capacity) return null;
+      if (pool.length < row.capacity) {
+        const closed = Boolean(row.closesAt && Date.now() >= new Date(row.closesAt).getTime());
+        if (!closed || new Set(pool.map((ticket) => ticket.userId)).size < row.minimumParticipants) return null;
+      }
+      if (!verifyStoredDraw(row, pool, pool.length)) return null;
     }
 
     const next = approved ? ROUND_STATUSES.APPROVED : ROUND_STATUSES.REFUNDED;
@@ -783,7 +1050,7 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
         perUser.set(ticket.userId, cur);
       }
       for (const [userId, value] of perUser) {
-        const amount = value.count * TICKET_PRICE;
+        const amount = roundMoney(value.count * tier.priceUsd);
         await tx.update(users).set({ balance: sql`${users.balance} + ${amount}` }).where(eq(users.id, userId));
         await tx.insert(ledger).values({
           userId,
@@ -792,6 +1059,8 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
           amount: String(amount),
           note: `Refund: round ${roundId} rejected by administrator`,
           account: "user",
+          roundId,
+          tierId: tier.id,
           reference: randomUUID(),
           transactionKey: `round:${roundId}:refund:${userId}`,
         });
@@ -825,6 +1094,8 @@ export async function settleApprovedRound(roundId: number, actor: string) {
   return db.transaction(async (tx) => {
     const row = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
     if (!row) return null;
+    const tier = tierConfigFromRound(row);
+    await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     if (normalizeRoundStatus(row.status) === ROUND_STATUSES.SETTLED) {
       return { roundId, status: ROUND_STATUSES.SETTLED, alreadySettled: true };
     }
@@ -832,30 +1103,39 @@ export async function settleApprovedRound(roundId: number, actor: string) {
     if (!row.winnerId || !row.winnerName || !row.winningSerial || !row.approvedAt) {
       throw new Error(`Round ${roundId} is missing approved winner data`);
     }
-    if (
-      row.capacity !== POOL_CAPACITY ||
-      row.sold !== POOL_CAPACITY ||
-      Number(row.prize) !== PRIZE ||
-      Number(row.treasuryContribution) !== TREASURY_CONTRIBUTION ||
-      Number(row.adminGrossRevenue) !== ADMIN_GROSS_REVENUE
-    ) {
-      throw new Error(`Round ${roundId} requires accounting reconciliation before settlement`);
-    }
     const roundTickets = await tx
       .select({ serial: tickets.serial, userId: tickets.userId })
       .from(tickets)
       .where(and(eq(tickets.roundId, roundId), eq(tickets.kind, "gold")))
       .orderBy(tickets.id);
-    if (roundTickets.length !== POOL_CAPACITY) {
-      throw new Error(`Round ${roundId} does not contain exactly ${POOL_CAPACITY} tickets`);
+    if (row.sold !== roundTickets.length) {
+      throw new Error(`Round ${roundId} ticket count does not match its recorded sales`);
     }
-    if (!verifyStoredDraw(row, roundTickets)) throw new Error(`Round ${roundId} winner result does not verify`);
+    if (new Set(roundTickets.map((ticket) => ticket.userId)).size < row.minimumParticipants) {
+      throw new Error(`Round ${roundId} does not meet its minimum participant requirement`);
+    }
+    if (row.capacity !== tier.capacity) {
+      throw new Error(`Round ${roundId} requires accounting reconciliation before settlement`);
+    }
+    const amounts = amountsForTicketCount(tier, roundTickets.length);
+    const prize = amounts.prize;
+    const treasuryContribution = amounts.treasury;
+    const adminGrossRevenue = amounts.admin;
+    if (
+      roundMoney(Number(row.prize)) !== prize ||
+      roundMoney(Number(row.fee)) !== amounts.fee ||
+      roundMoney(Number(row.treasuryContribution ?? 0)) !== treasuryContribution ||
+      roundMoney(Number(row.adminGrossRevenue ?? 0)) !== adminGrossRevenue
+    ) {
+      throw new Error(`Round ${roundId} requires accounting reconciliation before settlement`);
+    }
+    if (!verifyStoredDraw(row, roundTickets, roundTickets.length)) throw new Error(`Round ${roundId} winner result does not verify`);
     const [ticketSales] = await tx
       .select({ amount: sql<string>`coalesce(sum(${ledger.amount}), 0)` })
       .from(ledger)
       .where(and(eq(ledger.type, "ticket_buy"), eq(ledger.roundId, roundId)));
-    if (Number(ticketSales?.amount ?? 0) !== -TOTAL_TICKET_REVENUE) {
-      throw new Error(`Round ${roundId} ticket sales do not reconcile to $${TOTAL_TICKET_REVENUE}`);
+    if (roundMoney(Number(ticketSales?.amount ?? 0)) !== -amounts.totalPool) {
+      throw new Error(`Round ${roundId} ticket sales do not reconcile to $${amounts.totalPool.toFixed(2)}`);
     }
     const priorFee = (await tx.select().from(feeTransfers).where(eq(feeTransfers.roundId, roundId)).limit(1))[0];
     if (priorFee) {
@@ -864,9 +1144,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
 
     const winner = (await tx.select().from(users).where(eq(users.id, row.winnerId)).limit(1))[0];
     if (!winner) throw new Error(`Round ${roundId} winner account is missing`);
-    const prize = PRIZE;
-    const treasuryContribution = TREASURY_CONTRIBUTION;
-    const adminGrossRevenue = ADMIN_GROSS_REVENUE;
+    const settlementReference = randomUUID();
     if (!config.adminWallet) throw new Error("ADMIN_WALLET must be configured before settlement");
     const vaultRow = (await tx.select().from(vault).limit(1).for("update"))[0];
     if (!vaultRow) throw new Error("Vault must be initialized explicitly before settlement");
@@ -883,7 +1161,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
     });
     await recordVaultSnapshot(tx, "settlement", treasuryContribution, roundId);
     const accountingEntries = getRoundAccountingEntries({
-      ticketRevenue: TOTAL_TICKET_REVENUE,
+      ticketRevenue: amounts.totalPool,
       prize,
       treasury: treasuryContribution,
       adminRevenue: adminGrossRevenue,
@@ -897,6 +1175,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Treasury vault contribution for round ${roundId}`,
         account: "vault_balance",
         roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:vault-contribution`,
       },
@@ -908,6 +1187,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Admin gross revenue for round ${roundId}`,
         account: "admin_balance",
         roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:admin-balance`,
       },
@@ -919,6 +1199,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Settled winner payout for round ${roundId}`,
         account: "user",
         roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:winner-payout`,
       },
@@ -930,7 +1211,8 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Ticket revenue for round ${roundId}`,
         account: "accounting",
         roundId,
-        reference: randomUUID(),
+        tierId: tier.id,
+        reference: settlementReference,
         transactionKey: `round:${roundId}:ticket-revenue`,
       },
       {
@@ -941,6 +1223,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Prize allocation for round ${roundId}`,
         account: "accounting",
         roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:prize-allocation`,
       },
@@ -952,6 +1235,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Treasury contribution for round ${roundId}`,
         account: "accounting",
         roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:treasury`,
       },
@@ -963,12 +1247,50 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         note: `Admin gross revenue for round ${roundId}`,
         account: "accounting",
         roundId,
+        tierId: tier.id,
         reference: randomUUID(),
         transactionKey: `round:${roundId}:admin-revenue`,
       },
     ]);
+    await tx.insert(roundSettlements).values({
+      roundId,
+      tierId: tier.id,
+      totalPool: String(amounts.totalPool),
+      winnerAmount: String(prize),
+      treasuryAmount: String(treasuryContribution),
+      adminAmount: String(adminGrossRevenue),
+      ledgerReference: settlementReference,
+      status: "PENDING",
+    });
+    await tx.insert(treasuryTransactions).values([
+      {
+        tierId: tier.id,
+        roundId,
+        direction: "OUT",
+        category: "prize_reserve",
+        amount: String(prize),
+        status: "PENDING",
+      },
+      {
+        tierId: tier.id,
+        roundId,
+        direction: "OUT",
+        category: "treasury_transfer",
+        amount: String(treasuryContribution),
+        status: "PENDING",
+      },
+      {
+        tierId: tier.id,
+        roundId,
+        direction: "OUT",
+        category: "admin_transfer",
+        amount: String(adminGrossRevenue),
+        status: "PENDING",
+      },
+    ]);
     await tx.insert(feeTransfers).values({
       roundId,
+      tierId: tier.id,
       amount: String(treasuryContribution),
       adminWallet: config.adminWallet,
       status: "accrued",
@@ -979,7 +1301,13 @@ export async function settleApprovedRound(roundId: number, actor: string) {
       action: "round.settle",
       entity: "round",
       entityId: roundId,
-      details: { ticketRevenue: TOTAL_TICKET_REVENUE, prize, treasuryContribution, adminGrossRevenue },
+      details: {
+        tierCode: tier.code,
+        ticketRevenue: amounts.totalPool,
+        prize,
+        treasuryContribution,
+        adminGrossRevenue,
+      },
     });
     return { roundId, status: "SETTLED" };
   });
@@ -1039,28 +1367,32 @@ export async function getDrawHistory(limit = 20, offset = 0) {
   };
 }
 
-export async function buyTickets(userId: number, requested: number) {
+export async function buyTickets(userId: number, requested: number, tierSelector?: string | number) {
   const count = Math.min(10, Math.max(1, Math.floor(requested) || 1));
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(424243)`);
+    const tier = await resolveTierConfig(tx, tierSelector);
+    await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     const me = (await tx.select().from(users).where(eq(users.id, userId)).for("update"))[0];
     if (!me) throw new UserError("userNotFound", 404);
     assertCanPlay(me);
 
-   let round = (
-  await tx
-    .select()
-    .from(rounds)
-    .where(inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]))
-    .orderBy(desc(rounds.id))
-    .limit(1)
-    .for("update")
-)[0];
+    let round = (
+      await tx
+        .select()
+        .from(rounds)
+        .where(and(
+          inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]),
+          eq(rounds.tierId, tier.id),
+        ))
+        .orderBy(desc(rounds.id))
+        .limit(1)
+        .for("update")
+    )[0];
 
-if (!round) {
-  round = await openNewRound(tx);
-}
+    if (!round) {
+      round = await openNewRound(tx, tier);
+    }
 
     const [sold] = await tx
       .select({ count: sql<number>`count(*)::int` })
@@ -1070,7 +1402,7 @@ if (!round) {
     const take = getTicketPurchaseCount(round.capacity, currentSold, count);
     if (take <= 0) throw new UserError("roundFull");
 
-    const cost = take * TICKET_PRICE;
+    const cost = roundMoney(take * tier.priceUsd);
     if (Number(me.balance) < cost) {
       throw new UserError("insufficient", 402, { n: take, cost: usd(cost) });
     }
@@ -1092,6 +1424,8 @@ if (!round) {
           userId: me.id,
           username: me.username,
           kind: "gold",
+          tierId: tier.id,
+          amountUsd: String(tier.priceUsd),
           serial: makeSerial(),
         })),
       )
@@ -1099,17 +1433,16 @@ if (!round) {
 
     await tx.update(users).set({ balance: sql`${users.balance} - ${cost}` }).where(eq(users.id, me.id));
     const newSold = currentSold + take;
-const nextStatus =
-  newSold >= round.capacity ? ROUND_STATUSES.FULL : ROUND_STATUSES.OPEN;
+    const nextStatus = newSold >= round.capacity ? ROUND_STATUSES.FULL : ROUND_STATUSES.OPEN;
 
-await tx.update(rounds).set({
-  sold: newSold,
-  status: nextStatus,
-}).where(eq(rounds.id, round.id));
+    await tx.update(rounds).set({
+      sold: newSold,
+      status: nextStatus,
+    }).where(eq(rounds.id, round.id));
 
-if (newSold >= round.capacity) {
-  await openNewRound(tx);
-}
+    if (newSold >= round.capacity) {
+      await openNewRound(tx, tier);
+    }
     await tx.update(vault).set({ ticketsSold: sql`${vault.ticketsSold} + ${take}`, updatedAt: new Date() });
     await tx.insert(ledger).values({
       userId: me.id,
@@ -1119,6 +1452,7 @@ if (newSold >= round.capacity) {
       note: `${take} golden tickets آ· round ${round.id}`,
       account: "user",
       roundId: round.id,
+      tierId: tier.id,
       reference: randomUUID(),
       transactionKey: `ticket-purchase:${randomUUID()}`,
     });
@@ -1139,12 +1473,13 @@ if (newSold >= round.capacity) {
           amount: "0",
           note: `Golden ticket referral spin (${me.username})`,
           account: "user",
+          tierId: tier.id,
           reference: randomUUID(),
         });
       }
     }
 
-    return { serials: created.map((t) => t.serial), roundId: round.id, draw: null };
+    return { serials: created.map((t) => t.serial), roundId: round.id, tierCode: tier.code, draw: null };
   });
 }
 
@@ -1297,17 +1632,21 @@ export async function processWithdrawal(
 ) {
   let verifiedTxHash: string | null = null;
   if (action === "paid") {
-    const clean = txHash?.trim().toLowerCase() ?? "";
-    if (!/^[0-9a-f]{64}$/.test(clean)) throw new UserError("txMismatch");
+    const clean = txHash?.trim() ?? "";
+    if (!isValidSolanaTxSignature(clean)) throw new UserError("txMismatch");
     const pending = (await db.select().from(withdrawals).where(eq(withdrawals.id, id)).limit(1))[0];
     if (!pending) throw new UserError("wdNotFound", 404);
-    if (pending.expectedTxId !== clean) throw new UserError("txMismatch");
+    const treasuryAddress = getSolanaConfig().treasuryAddress;
+    if (!treasuryAddress) throw new UserError("gatewayOff", 503);
     const chain = await lookupSolanaUsdcTransfers(clean);
     const matchingUnits = chain.status === "confirmed"
-      ? chain.transfers.filter((transfer: { to: string; units: bigint }) => transfer.to === pending.address).reduce((sum: bigint, transfer: { to: string; units: bigint }) => sum + transfer.units, BigInt(0))
+      ? chain.transfers
+          .filter((transfer) => transfer.from === treasuryAddress && transfer.to === pending.address)
+          .reduce((sum: bigint, transfer: { units: bigint }) => sum + transfer.units, BigInt(0))
       : BigInt(0);
     if (matchingUnits !== toSolanaUsdcUnits(Number(pending.amount))) throw new UserError("txMismatch");
     verifiedTxHash = clean;
+
   }
   return db.transaction(async (tx) => {
     const w = (await tx.select().from(withdrawals).where(eq(withdrawals.id, id)).for("update"))[0];
@@ -1355,11 +1694,12 @@ export async function processWithdrawal(
 
 /* ------------------------------------------------------------------ state */
 
-export async function getState() {
+export async function getState(tierSelector?: string | number) {
   const me = await getSessionUser();
   const region = regionStatus(await headers());
 
-  const round = await ensureOpenRound();
+  const round = await ensureOpenRound(tierSelector);
+  const tiers = await listActiveTiers();
   const v = (await db.select().from(vault).limit(1))[0];
   const settledRoundEntry = sql`exists (
     select 1 from ${rounds}
@@ -1582,6 +1922,7 @@ export async function getState() {
       },
     },
     region,
+    tiers,
     vault: {
       balance: Number(financial?.balance ?? 0),
       initialCapital: Number(financial?.initialCapital ?? 0),
@@ -1602,6 +1943,11 @@ export async function getState() {
     },
     round: round ? {
       id: round.id,
+      tierId: round.tierId,
+      tierCode: round.tierSnapshot && typeof round.tierSnapshot === "object" && !Array.isArray(round.tierSnapshot)
+        ? String((round.tierSnapshot as Record<string, unknown>).code ?? "usd_1")
+        : "usd_1",
+      closesAt: round.closesAt ? new Date(round.closesAt).toISOString() : null,
       status: normalizeRoundStatus(round.status),
       capacity: round.capacity,
       sold: round.sold,

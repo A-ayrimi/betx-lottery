@@ -5,7 +5,12 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/db";
 import { deposits } from "@/db/schema";
 import { creditDeposit, getSessionUser, UserError } from "@/lib/store";
-import { getSolanaConfig, solanaExplorerTxUrl, verifySolanaUsdcDepositOnChain } from "@/lib/solana";
+import {
+  getSolanaConfig,
+  isValidSolanaTxSignature,
+  solanaExplorerTxUrl,
+  verifySolanaUsdcDepositOnChain,
+} from "@/lib/solana";
 import { handleError, unauthorized } from "@/lib/api";
 import { config } from "@/lib/config";
 
@@ -31,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const { txid: raw } = await req.json().catch(() => ({ txid: "" }));
     const txid = String(raw ?? "").trim();
-    if (!txid) throw new UserError("badTxid");
+    if (!isValidSolanaTxSignature(txid)) throw new UserError("badTxid");
 
     const used = (await db.select().from(deposits).where(eq(deposits.txHash, txid)).limit(1))[0];
     if (used) throw new UserError("txUsed", 409);

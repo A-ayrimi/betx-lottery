@@ -88,6 +88,16 @@ export function isValidSolanaAddress(address: string): boolean {
   }
 }
 
+export function isValidSolanaTxSignature(value: string): boolean {
+  const clean = (value || "").trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{64,88}$/.test(clean)) return false;
+  try {
+    return bs58.decode(clean).length === 64;
+  } catch {
+    return false;
+  }
+}
+
 export function shortSolanaAddr(addr: string, chars = 4): string {
   const clean = (addr || "").trim();
   if (clean.length <= chars * 2 + 3) return clean;

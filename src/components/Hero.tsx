@@ -22,6 +22,7 @@ export function Hero() {
   const { state, loading, dataUnavailable, demoEnabled, setToast } = useApp();
   const { d, t, n } = useI18n();
   const v = state?.vault;
+  const tier = state?.tiers[0];
   const profit = v ? v.balance - v.initialCapital : null;
   const unavailableText = dataUnavailable
     ? d.errors.unavailable
@@ -161,12 +162,12 @@ export function Hero() {
             <div className="mt-7 grid grid-cols-2 gap-3">
               <Cell
                 label={d.hero.cellFee}
-                value={state ? `$${money(state.config.treasuryContributionPerRound)} + $${money(state.config.adminGrossRevenuePerRound)}` : "—"}
+                value={tier ? `$${money(tier.treasury)} + $${money(tier.admin)}` : state ? `$${money(state.config.treasuryContributionPerRound)} + $${money(state.config.adminGrossRevenuePerRound)}` : "—"}
                 note={d.hero.cellFeeNote}
               />
-              <Cell label={d.hero.cellPrize} value={state ? `$${money(state.config.prizePerRound)}` : "—"} note={d.hero.cellPrizeNote} />
-              <Cell label={d.hero.cellOdds} value={state ? `1/${state.config.roundCapacity}` : "—"} note={d.hero.cellOddsNote} />
-              <Cell label={d.hero.cellCap} value={state ? n(state.config.roundCapacity) : "—"} note={d.hero.cellCapNote} />
+              <Cell label={d.hero.cellPrize} value={tier ? `$${money(tier.prize)}` : state ? `$${money(state.config.prizePerRound)}` : "—"} note={d.hero.cellPrizeNote} />
+              <Cell label={d.hero.cellOdds} value={tier ? `1/${tier.capacity}` : state ? `1/${state.config.roundCapacity}` : "—"} note={d.hero.cellOddsNote} />
+              <Cell label={d.hero.cellCap} value={tier ? n(tier.capacity) : state ? n(state.config.roundCapacity) : "—"} note={d.hero.cellCapNote} />
             </div>
 
             {v ? (

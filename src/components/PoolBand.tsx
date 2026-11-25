@@ -7,6 +7,7 @@ import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import { GoldDollars3D } from "./GoldDollars3D";
 import { burstDollars, burstFrom } from "@/lib/dollarFx";
+import type { AppState } from "@/lib/types";
 
 export function PoolBand() {
   const { state, loading, dataUnavailable, demoEnabled, buy, setToast, openWalletConnect } = useApp();
@@ -14,11 +15,19 @@ export function PoolBand() {
   const barRef = useRef<HTMLDivElement>(null);
   const lastSold = useRef<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tierCode, setTierCode] = useState("");
+  const [tierRound, setTierRound] = useState<NonNullable<AppState["round"]> | null>(null);
 
-  const round = state?.round;
+  const tiers = state?.tiers ?? [];
+  const defaultRound = state?.round;
+  const activeTierCode = tierCode || defaultRound?.tierCode || tiers[0]?.code || "usd_1";
+  const selectedTier = tiers.find((tier) => tier.code === activeTierCode);
+  const round = activeTierCode === defaultRound?.tierCode ? defaultRound : tierRound;
   const sold = round?.sold ?? 0;
-  const capacity = round?.capacity ?? 1;
+  const capacity = round?.capacity ?? selectedTier?.capacity ?? 1;
   const remaining = Math.max(0, capacity - sold);
+  const ticketPrice = selectedTier?.priceUsd ?? state?.config.ticketPrice ?? 1;
+  const displayPrize = round?.prize ?? selectedTier?.prize ?? state?.config.prizePerRound ?? 0;
   const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
 
   // stubs sold after first render get the flash animation (keyed remount)
@@ -36,6 +45,25 @@ export function PoolBand() {
     burstDollars({ x, y: r.top + r.height / 2, count: Math.min(10, 3 + (sold - prev) * 2), power: 0.6 });
   }, [sold, capacity, dir]);
 
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      if (!activeTierCode || activeTierCode === defaultRound?.tierCode) {
+        setTierRound(defaultRound ?? null);
+        return;
+      }
+      void (async () => {
+        try {
+          const res = await fetch(`/api/rounds/state?tierCode=${encodeURIComponent(activeTierCode)}`, { cache: "no-store" });
+          const json = await res.json();
+          if (res.ok && json.ok) setTierRound(json.round ?? null);
+        } catch {
+          setTierRound(null);
+        }
+      })();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [activeTierCode, defaultRound]);
+
   const purchase = async (count: number, btn?: HTMLElement) => {
     if (maintenance) {
       setToast(d.errors.unavailable);
@@ -51,7 +79,7 @@ export function PoolBand() {
     }
     const tickets = Math.min(count, remaining);
     if (tickets <= 0) return;
-    const cost = tickets * state.config.ticketPrice;
+    const cost = tickets * ticketPrice;
     const goToWallet = () => {
       const wallet = document.getElementById("wallet");
       if (!wallet) return;
@@ -73,7 +101,7 @@ export function PoolBand() {
     setBusy(true);
     let res;
     try {
-      res = await buy(count);
+      res = await buy(count, activeTierCode);
     } finally {
       setBusy(false);
     }
@@ -119,6 +147,31 @@ export function PoolBand() {
         <GoldDollars3D count={18} seed={21} side="both" className="opacity-90" />
 
         <div className="relative mx-auto max-w-[1240px] px-4 py-14 sm:px-6 lg:py-20">
+          {tiers.length > 1 ? (
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="micro text-foil">{d.tiers.title}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {tiers.map((tier) => (
+                    <button
+                      key={tier.code}
+                      onClick={() => setTierCode(tier.code)}
+                      className={`focus-ring rounded-full border px-4 py-2 text-xs font-bold transition ${
+                        tier.code === activeTierCode
+                          ? "border-neon bg-neon/10 text-neon-2"
+                          : "border-rule text-mint hover:border-mint/50"
+                      }`}
+                    >
+                      {tier.name} · ${money(tier.priceUsd)}
+                      {tier.code === round?.tierCode ? ` · ${d.tiers.current}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-mint">{d.tiers.select}</p>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-end justify-between gap-8">
             <div>
               <p className="micro flex flex-wrap items-center gap-2 text-foil">
@@ -136,7 +189,7 @@ export function PoolBand() {
                 {d.pool.titleAfter}
               </h2>
               <p className="mt-4 max-w-[58ch] text-[15px] leading-8 text-mint">
-                {t(d.pool.body, { prize: `$${money(round.prize)}` })}
+                {t(d.pool.body, { prize: `$${money(displayPrize)}` })}
               </p>
             </div>
 
@@ -147,7 +200,7 @@ export function PoolBand() {
                   dir="ltr"
                   className="font-display tnum text-[clamp(2.4rem,6vw,3.6rem)] font-bold leading-none text-white"
                 >
-                  ${money(round.prize)}
+                  ${money(displayPrize)}
                 </p>
               </div>
               <div className="hidden h-14 w-px bg-rule sm:block" />
@@ -157,11 +210,34 @@ export function PoolBand() {
                   dir="ltr"
                   className="font-display tnum text-[clamp(2.4rem,6vw,3.6rem)] font-bold leading-none text-foil"
                 >
-                  ${money(state.config.ticketPrice)}
+                  ${money(ticketPrice)}
                 </p>
               </div>
             </div>
           </div>
+
+          {selectedTier ? (
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {[
+                [d.tiers.price, `$${money(selectedTier.priceUsd)}`],
+                [d.tiers.capacity, n(selectedTier.capacity)],
+                [d.tiers.prize, `$${money(selectedTier.prize)}`],
+                [d.tiers.treasury, `$${money(selectedTier.treasury)}`],
+                [d.tiers.admin, `$${money(selectedTier.admin)}`],
+                [
+                  d.tiers.duration,
+                  selectedTier.maximumParticipants === null
+                    ? t(d.tiers.anyPlayers, { n: n(selectedTier.minimumParticipants) })
+                    : t(d.tiers.players, { min: n(selectedTier.minimumParticipants), max: n(selectedTier.maximumParticipants) }),
+                ],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-rule bg-black/20 px-4 py-3">
+                  <p className="micro text-mint">{label}</p>
+                  <p dir="ltr" className="mt-1 font-display tnum text-sm text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {/* ————— the signature: 20 perforated stubs ————— */}
           <div className="mt-12 grid grid-cols-4 gap-2.5 sm:grid-cols-5 lg:grid-cols-10">

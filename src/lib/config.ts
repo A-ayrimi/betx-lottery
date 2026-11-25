@@ -64,6 +64,9 @@ export const config = {
   get adminToken() {
     return process.env.ADMIN_TOKEN || "";
   },
+  get adminViewerToken() {
+    return process.env.ADMIN_VIEWER_TOKEN || "";
+  },
   /** Compatibility getter for Solana-only mode. */
   get tronOnly() {
     return process.env.SOLANA_ONLY !== "off" && process.env.TRON_ONLY !== "off";

@@ -51,7 +51,7 @@ interface Ctx {
   connect: (username: string, telegram: string, referral: string, acceptTerms: boolean) => Promise<boolean>;
   account: (body: Record<string, unknown>) => Promise<boolean>;
   logout: () => Promise<void>;
-  buy: (count: number) => Promise<DrawResult | true | "insufficient" | null>;
+  buy: (count: number, tierCode?: string) => Promise<DrawResult | true | "insufficient" | null>;
   spin: () => Promise<{ ok: boolean; index?: number; prize?: number; error?: string }>;
   deposit: (amount: number) => Promise<boolean>;
   withdraw: (amount: number, address: string) => Promise<boolean>;
@@ -296,7 +296,7 @@ export function AppProvider({
   }, [refresh, d, isDemoSession]);
 
   const buy = useCallback(
-    async (count: number) => {
+    async (count: number, tierCode?: string) => {
       if (dataUnavailable) {
         setToast(d.errors.unavailable);
         return null;
@@ -322,7 +322,7 @@ export function AppProvider({
       }
       let json;
       try {
-        json = await post("/api/tickets/buy", { count });
+        json = await post("/api/tickets/buy", { count, tierCode });
       } catch {
         setToast(d.toast.buyFail);
         return null;

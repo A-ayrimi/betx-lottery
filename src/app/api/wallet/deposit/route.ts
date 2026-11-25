@@ -12,9 +12,10 @@ import {
   reserveDeposit,
 } from "@/lib/depositReservations";
 import {
-  broadcastSolanaSignedTransaction,
+  broadcast,
   buildSolanaUsdcTransferTx,
   getSolanaConfig,
+  isValidSolanaTxSignature,
   solanaExplorerTxUrl,
   verifySolanaUsdcDepositOnChain,
 } from "@/lib/solana";
@@ -155,8 +156,8 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const r = await broadcastSolanaSignedTransaction(body.signedTransaction);
-      if (!r.ok || !r.txid) {
+      const r = await broadcast(body.signedTransaction);
+      if (!r.ok || !r.txid || !isValidSolanaTxSignature(r.txid)) {
         await db
           .update(deposits)
           .set({ status: "failed", updatedAt: new Date() })
@@ -203,6 +204,9 @@ export async function GET(req: NextRequest) {
   try {
     const me = await getSessionUser();
     if (!me) return unauthorized();
+    if (config.maintenanceMode) {
+      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+    }
     await rateLimit("wstatus", me.id, 40);
     const id = Number(req.nextUrl.searchParams.get("id"));
     let dep = (

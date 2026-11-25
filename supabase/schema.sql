@@ -34,6 +34,7 @@ CREATE TABLE "deposits" (
 CREATE TABLE "fee_transfers" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"round_id" integer NOT NULL,
+	"tier_id" integer DEFAULT 1 NOT NULL,
 	"amount" numeric(12, 2) NOT NULL,
 	"admin_wallet" text NOT NULL,
 	"status" text DEFAULT 'accrued' NOT NULL,
@@ -45,6 +46,8 @@ CREATE TABLE "fee_transfers" (
 	"paid_at" timestamp with time zone,
 	CONSTRAINT "fee_transfers_round_id_unique" UNIQUE("round_id")
 );
+
+CREATE INDEX "fee_transfers_tier_id_idx" ON "fee_transfers" ("tier_id");
 
 CREATE UNIQUE INDEX "fee_transfers_tx_hash_unique" ON "fee_transfers" ("tx_hash");
 CREATE UNIQUE INDEX "deposits_user_provider_idempotency_unique" ON "deposits" ("user_id", "provider", "idempotency_key");
@@ -78,10 +81,13 @@ CREATE TABLE "ledger" (
 	"note" text DEFAULT '' NOT NULL,
 	"account" text,
 	"round_id" integer,
+	"tier_id" integer DEFAULT 1 NOT NULL,
 	"reference" uuid,
 	"transaction_key" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+CREATE INDEX "ledger_tier_id_idx" ON "ledger" ("tier_id");
 
 CREATE UNIQUE INDEX "ledger_reference_unique" ON "ledger" ("reference");
 CREATE UNIQUE INDEX "ledger_transaction_key_unique" ON "ledger" ("transaction_key");
@@ -100,6 +106,41 @@ CREATE TABLE "rate_limits" (
 	CONSTRAINT "rate_limits_key_window_start_pk" PRIMARY KEY("key","window_start")
 );
 
+CREATE TABLE "ticket_tiers" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"code" text NOT NULL,
+	"name" text NOT NULL,
+	"price_usd" numeric(12, 2) NOT NULL,
+	"ticket_capacity" integer NOT NULL,
+	"draw_duration_minutes" integer NOT NULL,
+	"prize_percentage" numeric(5, 2) NOT NULL,
+	"treasury_percentage" numeric(5, 2) NOT NULL,
+	"admin_percentage" numeric(5, 2) NOT NULL,
+	"minimum_participants" integer DEFAULT 1 NOT NULL,
+	"maximum_participants" integer,
+	"rules" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"status" text DEFAULT 'INACTIVE' NOT NULL,
+	"display_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "ticket_tiers_code_unique" UNIQUE("code"),
+	CONSTRAINT "ticket_tiers_price_usd_positive" CHECK ("price_usd" > 0),
+	CONSTRAINT "ticket_tiers_ticket_capacity_positive" CHECK ("ticket_capacity" > 0),
+	CONSTRAINT "ticket_tiers_draw_duration_positive" CHECK ("draw_duration_minutes" > 0),
+	CONSTRAINT "ticket_tiers_percentages_sum" CHECK ("prize_percentage" + "treasury_percentage" + "admin_percentage" = 100),
+	CONSTRAINT "ticket_tiers_status_valid" CHECK ("status" IN ('ACTIVE', 'INACTIVE', 'ARCHIVED')),
+	CONSTRAINT "ticket_tiers_minimum_participants_positive" CHECK ("minimum_participants" > 0),
+	CONSTRAINT "ticket_tiers_capacity_bounds" CHECK ("minimum_participants" <= "ticket_capacity" AND ("maximum_participants" IS NULL OR "maximum_participants" <= "ticket_capacity"))
+);
+
+INSERT INTO "ticket_tiers" (
+	"code", "name", "price_usd", "ticket_capacity", "draw_duration_minutes",
+	"prize_percentage", "treasury_percentage", "admin_percentage",
+	"minimum_participants", "maximum_participants", "rules", "status", "display_order"
+) VALUES (
+	'usd_1', '$1 Tier', 1, 20, 1440, 75, 15, 10, 1, 20, '{}'::jsonb, 'ACTIVE', 0
+);
+
 CREATE TABLE "rounds" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"status" text DEFAULT 'LOCKED' NOT NULL,
@@ -109,6 +150,11 @@ CREATE TABLE "rounds" (
 	"fee" numeric(12, 2) DEFAULT '5' NOT NULL,
 	"treasury_contribution" numeric(12, 2),
 	"admin_gross_revenue" numeric(12, 2),
+	"tier_id" integer DEFAULT 1 NOT NULL,
+	"tier_snapshot" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"closes_at" timestamp with time zone,
+	"minimum_participants" integer DEFAULT 1 NOT NULL,
+	"maximum_participants" integer,
 	"winner_id" integer,
 	"winner_name" text,
 	"winning_serial" text,
@@ -124,16 +170,22 @@ CREATE TABLE "rounds" (
 	"drawn_at" timestamp with time zone
 );
 
+CREATE INDEX "rounds_tier_id_idx" ON "rounds" ("tier_id");
+
 CREATE TABLE "tickets" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"round_id" integer NOT NULL,
 	"user_id" integer NOT NULL,
+	"tier_id" integer DEFAULT 1 NOT NULL,
+	"amount_usd" numeric(12, 2) DEFAULT '1' NOT NULL,
 	"kind" text DEFAULT 'gold' NOT NULL,
 	"serial" text NOT NULL,
 	"username" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "tickets_serial_unique" UNIQUE("serial")
 );
+
+CREATE INDEX "tickets_tier_id_idx" ON "tickets" ("tier_id");
 
 CREATE TABLE "unmatched_transfers" (
 	"tx_hash" text PRIMARY KEY NOT NULL,
@@ -191,8 +243,11 @@ CREATE TABLE "vault_snapshots" (
 	"delta" numeric(12, 2) DEFAULT '0' NOT NULL,
 	"reason" text NOT NULL,
 	"round_id" integer,
+	"tier_id" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+CREATE INDEX "vault_snapshots_tier_id_idx" ON "vault_snapshots" ("tier_id");
 
 CREATE TABLE "wallet_nonces" (
 	"nonce" text PRIMARY KEY NOT NULL,
@@ -228,6 +283,72 @@ CREATE TABLE "withdrawals" (
 
 CREATE UNIQUE INDEX "withdrawals_tx_hash_unique" ON "withdrawals" ("tx_hash");
 
+CREATE TABLE "draw_commitments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"round_id" integer NOT NULL,
+	"tier_id" integer NOT NULL,
+	"server_seed_hash" text NOT NULL,
+	"client_seed" text,
+	"draw_nonce" integer DEFAULT 0 NOT NULL,
+	"status" text DEFAULT 'COMMITTED' NOT NULL,
+	"winner_ticket_id" integer,
+	"winning_serial" text,
+	"revealed_server_seed" text,
+	"committed_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"revealed_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "draw_commitments_round_id_unique" UNIQUE("round_id"),
+	CONSTRAINT "draw_commitments_status_valid" CHECK ("status" IN ('COMMITTED', 'REVEALED', 'CANCELLED'))
+);
+
+CREATE INDEX "draw_commitments_status_idx" ON "draw_commitments" ("status");
+
+CREATE TABLE "round_settlements" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"round_id" integer NOT NULL,
+	"tier_id" integer NOT NULL,
+	"total_pool" numeric(12, 2) NOT NULL,
+	"winner_amount" numeric(12, 2) NOT NULL,
+	"treasury_amount" numeric(12, 2) NOT NULL,
+	"admin_amount" numeric(12, 2) NOT NULL,
+	"ledger_reference" uuid,
+	"status" text DEFAULT 'PENDING' NOT NULL,
+	"settled_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "round_settlements_round_id_unique" UNIQUE("round_id"),
+	CONSTRAINT "round_settlements_ledger_reference_unique" UNIQUE("ledger_reference"),
+	CONSTRAINT "round_settlements_amounts_nonnegative" CHECK (
+		"total_pool" >= 0 AND "winner_amount" >= 0 AND "treasury_amount" >= 0 AND "admin_amount" >= 0
+	),
+	CONSTRAINT "round_settlements_amounts_balanced" CHECK (
+		"total_pool" = "winner_amount" + "treasury_amount" + "admin_amount"
+	),
+	CONSTRAINT "round_settlements_status_valid" CHECK ("status" IN ('PENDING', 'POSTED', 'FAILED'))
+);
+
+CREATE INDEX "round_settlements_tier_id_idx" ON "round_settlements" ("tier_id");
+
+CREATE TABLE "treasury_transactions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"tier_id" integer NOT NULL,
+	"round_id" integer,
+	"ledger_id" integer,
+	"direction" text NOT NULL,
+	"category" text NOT NULL,
+	"amount" numeric(12, 2) NOT NULL,
+	"wallet_address" text,
+	"tx_hash" text,
+	"status" text DEFAULT 'PENDING' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"posted_at" timestamp with time zone,
+	CONSTRAINT "treasury_transactions_direction_valid" CHECK ("direction" IN ('IN', 'OUT')),
+	CONSTRAINT "treasury_transactions_amount_positive" CHECK ("amount" > 0),
+	CONSTRAINT "treasury_transactions_status_valid" CHECK ("status" IN ('PENDING', 'POSTED', 'FAILED'))
+);
+
+CREATE INDEX "treasury_transactions_tier_round_idx" ON "treasury_transactions" ("tier_id", "round_id");
+CREATE UNIQUE INDEX "treasury_transactions_tx_hash_category_unique" ON "treasury_transactions" ("tx_hash", "category");
+
 ALTER TABLE "deposits"
   ADD CONSTRAINT "deposits_user_id_users_id_fk"
   FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
@@ -259,4 +380,38 @@ ALTER TABLE "wheel_spins"
 ALTER TABLE "withdrawals"
   ADD CONSTRAINT "withdrawals_user_id_users_id_fk"
   FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT;
+ALTER TABLE "rounds"
+  ADD CONSTRAINT "rounds_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT;
+ALTER TABLE "tickets"
+  ADD CONSTRAINT "tickets_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT;
+ALTER TABLE "ledger"
+  ADD CONSTRAINT "ledger_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT;
+ALTER TABLE "fee_transfers"
+  ADD CONSTRAINT "fee_transfers_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT;
+ALTER TABLE "vault_snapshots"
+  ADD CONSTRAINT "vault_snapshots_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT;
+ALTER TABLE "draw_commitments"
+  ADD CONSTRAINT "draw_commitments_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "draw_commitments_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "draw_commitments_winner_ticket_id_tickets_id_fk"
+  FOREIGN KEY ("winner_ticket_id") REFERENCES "tickets"("id") ON DELETE RESTRICT;
+ALTER TABLE "round_settlements"
+  ADD CONSTRAINT "round_settlements_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "round_settlements_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT;
+ALTER TABLE "treasury_transactions"
+  ADD CONSTRAINT "treasury_transactions_tier_id_ticket_tiers_id_fk"
+  FOREIGN KEY ("tier_id") REFERENCES "ticket_tiers"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "treasury_transactions_round_id_rounds_id_fk"
+  FOREIGN KEY ("round_id") REFERENCES "rounds"("id") ON DELETE RESTRICT,
+  ADD CONSTRAINT "treasury_transactions_ledger_id_ledger_id_fk"
+  FOREIGN KEY ("ledger_id") REFERENCES "ledger"("id") ON DELETE RESTRICT;
 

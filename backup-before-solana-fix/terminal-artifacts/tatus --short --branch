@@ -1,0 +1,158 @@
+src/app/admin/page.tsx:589: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/app/admin/page.tsx:590: trailing whitespace.
+[32m+[m[41m[m
+src/app/admin/page.tsx:590: new blank line at EOF.
+src/components/DepositCard.tsx:364: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/components/Header.tsx:310: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/automation.ts:614: trailing whitespace.
+[32m+[m[41m[m
+src/lib/automation.ts:614: new blank line at EOF.
+src/lib/demoSession.ts:1: trailing whitespace.
+[32m+[m[32m﻿import type { AppState, DrawResult, UserState } from "@/lib/types";[m[41m[m
+src/lib/demoSession.ts:2: trailing whitespace.
+[32m+[m[32mimport { WHEEL_SECTORS } from "@/lib/wheel";[m[41m[m
+src/lib/demoSession.ts:3: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:4: trailing whitespace.
+[32m+[m[32mexport const DEMO_WALLET_ADDRESS = "SOL_DEMO_WALLET_9999";[m[41m[m
+src/lib/demoSession.ts:5: trailing whitespace.
+[32m+[m[32mexport const DEMO_TREASURY_ADDRESS = "SOL_DEMO_TREASURY_9999";[m[41m[m
+src/lib/demoSession.ts:6: trailing whitespace.
+[32m+[m[32mexport const DEMO_SESSION_KEY = "betx_demo_session_v1";[m[41m[m
+src/lib/demoSession.ts:7: trailing whitespace.
+[32m+[m[32mexport const DEMO_STARTING_BALANCE = 100;[m[41m[m
+src/lib/demoSession.ts:8: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:9: trailing whitespace.
+[32m+[m[32minterface StoredDemoSession {[m[41m[m
+src/lib/demoSession.ts:10: trailing whitespace.
+[32m+[m[32m  version: 1;[m[41m[m
+src/lib/demoSession.ts:11: trailing whitespace.
+[32m+[m[32m  address: string;[m[41m[m
+src/lib/demoSession.ts:12: trailing whitespace.
+[32m+[m[32m  state: DemoAppState;[m[41m[m
+src/lib/demoSession.ts:13: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/demoSession.ts:14: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:15: trailing whitespace.
+[32m+[m[32mtype DemoAppState = Omit<AppState, "round"> & { round: NonNullable<AppState["round"]> };[m[41m[m
+src/lib/demoSession.ts:16: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:17: trailing whitespace.
+[32m+[m[32mfunction isRecord(value: unknown): value is Record<string, unknown> {[m[41m[m
+src/lib/demoSession.ts:18: trailing whitespace.
+[32m+[m[32m  return typeof value === "object" && value !== null;[m[41m[m
+src/lib/demoSession.ts:19: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/demoSession.ts:20: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:21: trailing whitespace.
+[32m+[m[32mfunction isDemoState(value: unknown): value is DemoAppState {[m[41m[m
+src/lib/demoSession.ts:22: trailing whitespace.
+[32m+[m[32m  if (!isRecord(value) || !isRecord(value.config) || !isRecord(value.round) || !isRecord(value.vault)) return false;[m[41m[m
+src/lib/demoSession.ts:23: trailing whitespace.
+[32m+[m[32m  const user = value.user;[m[41m[m
+src/lib/demoSession.ts:24: trailing whitespace.
+[32m+[m[32m  return ([m[41m[m
+src/lib/demoSession.ts:25: trailing whitespace.
+[32m+[m[32m    value.config.live === false &&[m[41m[m
+src/lib/demoSession.ts:26: trailing whitespace.
+[32m+[m[32m    isRecord(user) &&[m[41m[m
+src/lib/demoSession.ts:27: trailing whitespace.
+[32m+[m[32m    user.walletAddress === DEMO_WALLET_ADDRESS &&[m[41m[m
+src/lib/demoSession.ts:28: trailing whitespace.
+[32m+[m[32m    typeof user.balance === "number" &&[m[41m[m
+src/lib/demoSession.ts:29: trailing whitespace.
+[32m+[m[32m    Array.isArray(user.tickets) &&[m[41m[m
+src/lib/demoSession.ts:30: trailing whitespace.
+[32m+[m[32m    Array.isArray(value.round.tickets) &&[m[41m[m
+src/lib/demoSession.ts:31: trailing whitespace.
+[32m+[m[32m    Array.isArray(value.winners) &&[m[41m[m
+src/lib/demoSession.ts:32: trailing whitespace.
+[32m+[m[32m    Array.isArray(value.activity)[m[41m[m
+src/lib/demoSession.ts:33: trailing whitespace.
+[32m+[m[32m  );[m[41m[m
+src/lib/demoSession.ts:34: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/demoSession.ts:35: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:36: trailing whitespace.
+[32m+[m[32mexport function isDemoAppState(state: AppState): state is DemoAppState {[m[41m[m
+src/lib/demoSession.ts:37: trailing whitespace.
+[32m+[m[32m  return state.config.live === false && state.round !== null && state.user?.walletAddress === DEMO_WALLET_ADDRESS;[m[41m[m
+src/lib/demoSession.ts:38: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/demoSession.ts:39: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:40: trailing whitespace.
+[32m+[m[32mexport function loadDemoSession(): StoredDemoSession | null {[m[41m[m
+src/lib/demoSession.ts:41: trailing whitespace.
+[32m+[m[32m  const raw = window.localStorage.getItem(DEMO_SESSION_KEY);[m[41m[m
+src/lib/demoSession.ts:42: trailing whitespace.
+[32m+[m[32m  if (!raw) return null;[m[41m[m
+src/lib/demoSession.ts:43: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:44: trailing whitespace.
+[32m+[m[32m  let parsed: unknown;[m[41m[m
+src/lib/demoSession.ts:45: trailing whitespace.
+[32m+[m[32m  try {[m[41m[m
+src/lib/demoSession.ts:46: trailing whitespace.
+[32m+[m[32m    parsed = JSON.parse(raw);[m[41m[m
+src/lib/demoSession.ts:47: trailing whitespace.
+[32m+[m[32m  } catch {[m[41m[m
+src/lib/demoSession.ts:48: trailing whitespace.
+[32m+[m[32m    window.localStorage.removeItem(DEMO_SESSION_KEY);[m[41m[m
+src/lib/demoSession.ts:49: trailing whitespace.
+[32m+[m[32m    return null;[m[41m[m
+src/lib/demoSession.ts:50: trailing whitespace.
+[32m+[m[32m  }[m[41m[m
+src/lib/demoSession.ts:51: trailing whitespace.
+[32m+[m[32m  if ([m[41m[m
+src/lib/demoSession.ts:52: trailing whitespace.
+[32m+[m[32m    !isRecord(parsed) ||[m[41m[m
+src/lib/demoSession.ts:53: trailing whitespace.
+[32m+[m[32m    parsed.version !== 1 ||[m[41m[m
+src/lib/demoSession.ts:54: trailing whitespace.
+[32m+[m[32m    parsed.address !== DEMO_WALLET_ADDRESS ||[m[41m[m
+src/lib/demoSession.ts:55: trailing whitespace.
+[32m+[m[32m    !isDemoState(parsed.state)[m[41m[m
+src/lib/demoSession.ts:56: trailing whitespace.
+[32m+[m[32m  ) {[m[41m[m
+src/lib/demoSession.ts:57: trailing whitespace.
+[32m+[m[32m    window.localStorage.removeItem(DEMO_SESSION_KEY);[m[41m[m
+src/lib/demoSession.ts:58: trailing whitespace.
+[32m+[m[32m    return null;[m[41m[m
+src/lib/demoSession.ts:59: trailing whitespace.
+[32m+[m[32m  }[m[41m[m
+src/lib/demoSession.ts:60: trailing whitespace.
+[32m+[m[32m  return { version: 1, address: DEMO_WALLET_ADDRESS, state: parsed.state };[m[41m[m
+src/lib/demoSession.ts:61: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/demoSession.ts:62: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:63: trailing whitespace.
+[32m+[m[32mexport function saveDemoSession(state: DemoAppState) {[m[41m[m
+src/lib/demoSession.ts:64: trailing whitespace.
+[32m+[m[32m  if (!state.user || state.user.walletAddress !== DEMO_WALLET_ADDRESS) {[m[41m[m
+src/lib/demoSession.ts:65: trailing whitespace.
+[32m+[m[32m    throw new Error("Cannot persist a non-demo wallet session");[m[41m[m
+src/lib/demoSession.ts:66: trailing whitespace.
+[32m+[m[32m  }[m[41m[m
+src/lib/demoSession.ts:67: trailing whitespace.
+[32m+[m[32m  const session: StoredDemoSession = { version: 1, address: DEMO_WALLET_ADDRESS, state };[m[41m[m
+src/lib/demoSession.ts:68: trailing whitespace.
+[32m+[m[32m  window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(session));[m[41m[m
+src/lib/demoSession.ts:69: trailing whitespace.
+[32m+[m[32m}[m[41m[m
+src/lib/demoSession.ts:70: trailing whitespace.
+[32m+[m[41m[m
+src/lib/demoSession.ts:71: trailing whitespace.
+[32m+[m[32mexport function clearDemoSession() {[m[41m[m
+src/lib/demoSession.ts:72: trailing whitespace.
+[32m+[m[32m  window.localStorage.removeItem(DEMO_SESSION_KEY);[m[41m[m
+src/lib/demoSession.ts:73: trailing whitespace.
+[32m+[m[32m}[m[41m[
