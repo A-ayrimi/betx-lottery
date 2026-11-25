@@ -174,9 +174,9 @@ async function listIncomingUsdc(
   }
 
   return out;
-}import { creditOnchain, settleSolanaDeposit } from "@/lib/solanaDeposits";
+}
 
-
+import { creditOnchain, settleSolanaDeposit } from "@/lib/solanaDeposits";
 import { payoutConfig, processAutoPayouts } from "@/lib/payout";
 import { feeConfig, feeQueue } from "@/lib/fees";
 import { sendMessage } from "@/lib/telegram";

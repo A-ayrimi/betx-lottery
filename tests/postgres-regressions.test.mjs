@@ -151,9 +151,9 @@ test(
       const requests = Array.from({ length: 10 }, () =>
         reserveDeposit(db, {
           userId: limitUser.id,
-          provider: "tron",
+          provider: "solana",
           amount: 1,
-          orderId: `TRX-${randomUUID()}`,
+          orderId: `SOL-${randomUUID()}`,
           idempotencyKey: randomUUID(),
         }),
       );
@@ -180,13 +180,13 @@ test(
       ).rows[0];
       const reservation = {
         userId: idempotentUser.id,
-        provider: "tron",
+        provider: "solana",
         amount: 1,
         idempotencyKey: key,
       };
-      await reserveDeposit(db, { ...reservation, orderId: `TRX-${randomUUID()}` });
+      await reserveDeposit(db, { ...reservation, orderId: `SOL-${randomUUID()}` });
       await assert.rejects(
-        reserveDeposit(db, { ...reservation, orderId: `TRX-${randomUUID()}` }),
+        reserveDeposit(db, { ...reservation, orderId: `SOL-${randomUUID()}` }),
         (error) => error instanceof DepositReservationError && error.code === "idempotency_conflict",
       );
     } finally {

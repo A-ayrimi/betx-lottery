@@ -1,3 +1,5 @@
+import { isMaintenanceMode } from "./gameConfig.ts";
+
 /**
  * Central runtime configuration. Everything sensitive comes from env vars.
  *
@@ -79,6 +81,10 @@ export const config = {
       ""
     ).trim();
   },
+  /** Temporary pre-launch maintenance switch; unset means maintenance is ON. */
+  get maintenanceMode() {
+    return isMaintenanceMode();
+  },
   fees: {
     get autoSweep() {
       return false;
@@ -111,8 +117,8 @@ export function publicConfig() {
     supportEmail: process.env.SUPPORT_EMAIL || "support.betx@gmail.com",
     helpUrl: process.env.GAMBLING_HELP_URL || "https://www.begambleaware.org",
     live: config.live,
-    maintenance:
-      process.env.NEXT_PUBLIC_MAINTENANCE_MODE === "true" || process.env.MAINTENANCE_MODE === "true",
+    maintenance: config.maintenanceMode,
+    maintenanceMode: config.maintenanceMode,
     paymentsEnabled: false,
     botUsername: config.telegram.username || null,
     minDeposit: config.limits.minDeposit,

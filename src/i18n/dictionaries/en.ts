@@ -3,7 +3,18 @@
     title: "BETX | One ticket. One chance. Administrator-reviewed draws.",
     description:
       "Play BETX: $1 golden tickets, 20-ticket rounds on Solana (SPL-USDC) with administrator-reviewed results, a free daily lucky wheel, and verified draws. 18+.",
-    keywords: ["BETX", "crypto lottery", "lucky ticket", "USDC lottery", "SPL", "provably fair draws", "daily lucky wheel", "administrator-reviewed draws", "online raffle", "Solana lottery"],
+    keywords: [
+      "BETX",
+      "crypto lottery",
+      "lucky ticket",
+      "USDC lottery",
+      "SPL",
+      "provably fair draws",
+      "daily lucky wheel",
+      "administrator-reviewed draws",
+      "online raffle",
+      "Solana lottery",
+    ],
   },
   lang: { label: "Language" },
   nav: { pool: "Lucky pool", wheel: "Daily wheel", wallet: "Wallet", invite: "Invite", faq: "FAQ" },
@@ -54,7 +65,7 @@
     treasuryNote: "$3 USDC is allocated to treasury per settled 20-ticket round.",
     treasuryAllocation: "Treasury allocation",
     adminEarnings: "Admin gross revenue",
-    autoFee: "Recorded after approved settlement"
+    autoFee: "Recorded after approved settlement",
   },
   pool: {
     titleBefore: "Only",
@@ -242,7 +253,7 @@
     showing: "Showing {n} of {total}",
     loading: "Loading…",
     autoDrawNote: "A completed 20-ticket round produces a provisional result requiring administrator approval prior to settlement and opening the next round.",
-    treasuryNote: "Settlement records $3 for treasury and $2 as gross admin revenue separately."
+    treasuryNote: "Settlement records $3 for treasury and $2 as gross admin revenue separately.",
   },
   wc: {
     connectWallet: "Connect wallet",
@@ -445,11 +456,24 @@
     pwaInstall: "Install app",
     pwaLater: "Not now",
     pwaIosTitle: "Add to Home Screen on iPhone / iPad",
-    pwaIosSteps: ["Open this site in Safari", "Tap Share (square with arrow)", "Select “Add to Home Screen”", "Tap “Add” to install BETX"],
+    pwaIosSteps: [
+      "Open this site in Safari",
+      "Tap Share (square with arrow)",
+      "Select “Add to Home Screen”",
+      "Tap “Add” to install BETX",
+    ],
     pwaDesktopTitle: "Install on desktop",
-    pwaDesktopSteps: ["In Chrome or Edge, click the install icon in the address bar", "Select “Install BETX”", "Launch from your desktop or taskbar"],
+    pwaDesktopSteps: [
+      "In Chrome or Edge, click the install icon in the address bar",
+      "Select “Install BETX”",
+      "Launch from your desktop or taskbar",
+    ],
     pwaAndroidTitle: "Install on Android",
-    pwaAndroidSteps: ["Open the browser menu (⋮)", "Tap “Install app” or “Add to Home screen”", "Confirm to install BETX"],
+    pwaAndroidSteps: [
+      "Open the browser menu (⋮)",
+      "Tap “Install app” or “Add to Home screen”",
+      "Confirm to install BETX",
+    ],
     pwaInstalled: "BETX is installed on this device",
     pwaMenu: "Install app",
     pwaNote: "Progressive Web App · works on Android, iOS, Windows, macOS, and Linux.",
@@ -465,7 +489,12 @@
     installDesktop: "Windows · macOS · Linux",
     installGuide: "Installation guide",
     installBack: "Back to BETX",
-    installBenefits: ["Quick launch from home screen or desktop", "Full-screen app view", "Works across supported devices", "Automatic updates"],
+    installBenefits: [
+      "Quick launch from home screen or desktop",
+      "Full-screen app view",
+      "Works across supported devices",
+      "Automatic updates",
+    ],
   },
   vaultChart: {
     kicker: "VAULT ANALYTICS · LIVE",

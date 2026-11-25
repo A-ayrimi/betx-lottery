@@ -11,6 +11,9 @@ export async function POST(req: NextRequest) {
   try {
     const me = await getSessionUser();
     if (!me) return unauthorized();
+    if (config.maintenanceMode) {
+      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+    }
     await rateLimit("withdraw", me.id, 5);
     const body = await req.json().catch(() => ({}));
     const w = await requestWithdrawal(me.id, Number(body.amount), String(body.address ?? "").trim());

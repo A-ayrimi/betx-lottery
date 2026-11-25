@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { buildPostgresConfig } from "../src/lib/postgresConfig.ts";
 import { DepositReservationError, isValidDepositIdempotencyKey } from "../src/lib/depositReservations.ts";
-import { broadcastSolanaSignedTransaction } from "../src/lib/solana.ts";
+import { broadcast, broadcastSolanaSignedTransaction, isSolanaBroadcastAuthorized } from "../src/lib/solana.ts";
 
 test("remote PostgreSQL connections always use certificate verification", () => {
   const config = buildPostgresConfig(
@@ -19,11 +19,11 @@ test("remote PostgreSQL connections always use certificate verification", () => 
   );
 });
 
-test("local PostgreSQL connections require a CA for verified TLS", () => {
+test("local PostgreSQL connections require verified TLS when explicitly enabled", () => {
   assert.equal(buildPostgresConfig("postgres://test:test@127.0.0.1/betx", {}).ssl, undefined);
   assert.equal(
     buildPostgresConfig("postgres://test:test@127.0.0.1/betx", { DATABASE_SSL: "true" }).ssl?.rejectUnauthorized,
-    false,
+    true,
   );
   assert.equal(
     buildPostgresConfig("postgres://test:test@127.0.0.1/betx", {
@@ -31,6 +31,50 @@ test("local PostgreSQL connections require a CA for verified TLS", () => {
     }).ssl?.rejectUnauthorized,
     true,
   );
+});
+
+test("DEMO mode blocks the Solana broadcast before the sender can run", async () => {
+  const previousMode = process.env.BETX_MODE;
+  const previousAuthorization = process.env.SOLANA_BROADCAST_ENABLED;
+  let senderCalls = 0;
+  try {
+    process.env.BETX_MODE = "demo";
+    process.env.SOLANA_BROADCAST_ENABLED = "true";
+    assert.equal(isSolanaBroadcastAuthorized(), false);
+    const result = await broadcast({ signature: ["test-only"] }, async () => {
+      senderCalls++;
+      return { result: true };
+    });
+    assert.equal(result.ok, false);
+    assert.equal(senderCalls, 0);
+  } finally {
+    if (previousMode === undefined) delete process.env.BETX_MODE;
+    else process.env.BETX_MODE = previousMode;
+    if (previousAuthorization === undefined) delete process.env.SOLANA_BROADCAST_ENABLED;
+    else process.env.SOLANA_BROADCAST_ENABLED = previousAuthorization;
+  }
+});
+
+test("LIVE broadcast stays disabled without explicit server authorization", async () => {
+  const previousMode = process.env.BETX_MODE;
+  const previousAuthorization = process.env.SOLANA_BROADCAST_ENABLED;
+  let senderCalls = 0;
+  try {
+    process.env.BETX_MODE = "live";
+    delete process.env.SOLANA_BROADCAST_ENABLED;
+    assert.equal(isSolanaBroadcastAuthorized(), false);
+    const result = await broadcast({ signature: ["test-only"] }, async () => {
+      senderCalls++;
+      return { result: true };
+    });
+    assert.equal(result.ok, false);
+    assert.equal(senderCalls, 0);
+  } finally {
+    if (previousMode === undefined) delete process.env.BETX_MODE;
+    else process.env.BETX_MODE = previousMode;
+    if (previousAuthorization === undefined) delete process.env.SOLANA_BROADCAST_ENABLED;
+    else process.env.SOLANA_BROADCAST_ENABLED = previousAuthorization;
+  }
 });
 
 test("Solana broadcast rejects unsigned payloads before any RPC call", async () => {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { limitByIp, rateLimit } from "@/lib/ratelimit";
-import { config } from "@/lib/config";
 import { verifyInitData, sendMessage } from "@/lib/telegram";
 import { upsertTelegramUser } from "@/lib/tgUser";
 import { setSession, UserError } from "@/lib/store";
@@ -13,7 +12,6 @@ export const dynamic = "force-dynamic";
 /** Telegram Mini App sign-in: the client posts window.Telegram.WebApp.initData */
 export async function POST(req: NextRequest) {
   try {
-    if (config.tronOnly) throw new UserError("comingSoon", 503);
     const country = await assertRegion();
     await limitByIp("tgauth", 20);
     const { initData } = await req.json().catch(() => ({ initData: "" }));

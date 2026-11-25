@@ -1580,12 +1580,6 @@ export async function getState() {
         rpcUrl: process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
         explorer: "https://solscan.io",
       },
-        tron: {
-          enabled: true,
-          network: "mainnet-beta",
-          depositAddress: STORE_SOLANA_TREASURY,
-          explorer: "https://solscan.io",
-        },
     },
     region,
     vault: {

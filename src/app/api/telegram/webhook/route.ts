@@ -86,10 +86,6 @@ async function handleCommand(chatId: number, from: TgProfile, command: string, a
   }
 
   if (command === "login") {
-    if (config.tronOnly) {
-      await sendMessage(chatId, b.loginSoon, [[{ text: b.open, web_app: { url: `${config.appUrl}/${user.locale}` } }]]);
-      return;
-    }
     const link = await createLoginLink(user.id);
     await sendMessage(chatId, b.loginText, [[{ text: b.loginButton, url: link }]]);
     return;

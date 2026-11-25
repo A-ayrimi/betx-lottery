@@ -104,6 +104,7 @@ function SolanaDeposit({
   const { d, t } = useI18n();
   const user = state?.user;
   const treasuryAddress = state?.config?.solana?.treasuryAddress ?? "";
+  const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
   const [phase, setPhase] = useState<Phase>("");
   const [link, setLink] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -230,7 +231,7 @@ function SolanaDeposit({
 
       <button
         onClick={pay}
-        disabled={!paymentsReady || dataUnavailable || (phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
+        disabled={!paymentsReady || maintenance || dataUnavailable || (phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
         className="btn-neon focus-ring mt-3 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
       >
         {t(d.wc.payFromWallet, { amount: money(amount || 0) })}
@@ -298,7 +299,7 @@ function SolanaDeposit({
           />
           <button
             onClick={claim}
-            disabled={!paymentsReady || txid.trim().length < 32}
+            disabled={!paymentsReady || maintenance || txid.trim().length < 32}
             className="btn-foil rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50"
           >
             {d.wc.claim}

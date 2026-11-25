@@ -19,10 +19,22 @@ export function Wheel() {
   const [prize, setPrize] = useState<number | null>(null);
   const [confetti, setConfetti] = useState<number[]>([]);
   const [guestCanSpin, setGuestCanSpin] = useState(true);
+  const [now, setNow] = useState(0);
   const timers = useRef<number[]>([]);
   const wheelRef = useRef<HTMLDivElement>(null);
 
   const user = state?.user;
+  const maintenance = Boolean(
+    state?.config?.maintenanceMode ?? state?.config?.maintenance,
+  );
+
+  useEffect(() => {
+    const activeTimers = timers.current;
+    return () => {
+      activeTimers.forEach((id) => window.clearTimeout(id));
+    };
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
@@ -31,8 +43,8 @@ export function Wheel() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const [now, setNow] = useState(0);
   const target = user?.nextSpinAt ? new Date(user.nextSpinAt).getTime() : 0;
+
   useEffect(() => {
     if (!target) return;
     const tick = () => setNow(Date.now());
@@ -43,14 +55,21 @@ export function Wheel() {
       window.clearInterval(id);
     };
   }, [target]);
+
   const left = (() => {
     if (!target || !now) return "";
     const ms = Math.max(0, target - now);
-    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s2 = Math.floor((ms % 60000) / 1000);
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s2 = Math.floor((ms % 60000) / 1000);
     return [h, m, s2].map((x) => String(x).padStart(2, "0")).join(":");
   })();
+
   const freeSpinReady = !target || (now > 0 && now >= target);
-  const canSpin = user ? user.canSpin || user.bonusSpins > 0 || freeSpinReady : guestCanSpin;
+  const canSpin = user
+    ? Boolean(user.canSpin || user.bonusSpins > 0 || freeSpinReady)
+    : guestCanSpin;
+
   const sectors = WHEEL_SECTORS;
 
   const slices = useMemo(
@@ -63,12 +82,21 @@ export function Wheel() {
     [sectors],
   );
 
+  const calcNextRotation = (sectorIndex: number) => {
+    const sliceAngle = 360 / sectors.length;
+    const step =
+      (360 - ((rotation + sectorIndex * sliceAngle + sliceAngle / 2) % 360)) %
+      360;
+    return rotation + 360 * 5 + step;
+  };
+
   const doSpin = async () => {
-    if (loading || dataUnavailable) {
+    if (maintenance || loading || dataUnavailable) {
       setToast(d.errors.unavailable);
       return;
     }
     if (spinning) return;
+
     if (!user) {
       const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
       if (last && Date.now() - last < SPIN_COOLDOWN_MS) {
@@ -80,9 +108,10 @@ export function Wheel() {
       setGuestCanSpin(false);
       setSpinning(true);
       setPrize(null);
-      const i = Math.floor(Math.random() * sectors.length);
-      const step = (360 - ((rotation + i * (360 / sectors.length) + 360 / sectors.length / 2) % 360)) % 360;
-      setRotation(rotation + 360 * 5 + step);
+
+      const idx = Math.floor(Math.random() * sectors.length);
+      setRotation(calcNextRotation(idx));
+
       const timer = window.setTimeout(() => {
         setSpinning(false);
         setToast(d.wheel.guestPractice);
@@ -90,34 +119,44 @@ export function Wheel() {
       timers.current.push(timer);
       return;
     }
+
     if (!canSpin) {
       setToast(d.wheel.nextTomorrow);
       return;
     }
+
     setSpinning(true);
     setPrize(null);
+
     const res = await spin();
     if (!res.ok || res.index === undefined) {
       setSpinning(false);
       return;
     }
-    const i = res.index;
-    const step = (360 - ((rotation + i * (360 / sectors.length) + 360 / sectors.length / 2) % 360)) % 360;
-    const next = rotation + 360 * 5 + step;
-    setRotation(next);
 
-    const t = window.setTimeout(() => {
+    setRotation(calcNextRotation(res.index));
+
+    const t1 = window.setTimeout(() => {
       setSpinning(false);
-      setPrize(res.prize ?? 0);
       const won = res.prize ?? 0;
-      if (won > 0) burstFrom(wheelRef.current, { count: won >= 1 ? 24 : 12, power: won >= 1 ? 1.3 : 0.85 });
+      setPrize(won);
+      if (won > 0) {
+        burstFrom(wheelRef.current, {
+          count: won >= 1 ? 24 : 12,
+          power: won >= 1 ? 1.3 : 0.85,
+        });
+      }
       setConfetti(Array.from({ length: 26 }, (_, k) => k));
-      refresh();
+      void refresh();
+
       const t2 = window.setTimeout(() => setConfetti([]), 2600);
       timers.current.push(t2);
     }, 4300);
-    timers.current.push(t);
+
+    timers.current.push(t1);
   };
+
+  const isDisabled = spinning || loading || dataUnavailable || maintenance;
 
   return (
     <section id="wheel" className="relative overflow-hidden py-20 lg:py-28">
@@ -131,7 +170,8 @@ export function Wheel() {
               className="confetti"
               style={{
                 left: `${(k * 3.9 + 4) % 100}%`,
-                background: k % 3 === 0 ? "#E9C46A" : k % 3 === 1 ? "#35FFB0" : "#F6E3AE",
+                background:
+                  k % 3 === 0 ? "#E9C46A" : k % 3 === 1 ? "#35FFB0" : "#F6E3AE",
                 animationDuration: `${1.8 + (k % 5) * 0.32}s`,
                 animationDelay: `${(k % 7) * 0.08}s`,
               }}
@@ -141,7 +181,10 @@ export function Wheel() {
           {/* hooter */}
           <div className="absolute left-1/2 top-[-6px] z-20 -translate-x-1/2">
             <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden>
-              <path d="M17,32 L6,6 A2,2 0 0 1 8,3 L26,3 A2,2 0 0 1 28,6 Z" fill="#E9C46A" />
+              <path
+                d="M17,32 L6,6 A2,2 0 0 1 8,3 L26,3 A2,2 0 0 1 28,6 Z"
+                fill="#E9C46A"
+              />
               <path d="M17,26 L11,9 L23,9 Z" fill="#12100A" opacity="0.65" />
             </svg>
           </div>
@@ -149,12 +192,16 @@ export function Wheel() {
           <button
             type="button"
             onClick={() => void doSpin()}
-            disabled={spinning || loading || dataUnavailable}
+            disabled={isDisabled}
             aria-label={d.wheel.spinBtn}
             aria-disabled={!canSpin}
-            className={`wheel-shadow focus-ring relative aspect-square w-full rounded-full border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-70 ${!canSpin ? "cursor-not-allowed opacity-70" : ""}`}
+            className={`wheel-shadow focus-ring relative aspect-square w-full rounded-full border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-70 ${
+              !canSpin ? "cursor-not-allowed opacity-70" : ""
+            }`}
             style={{
-              transition: spinning ? "transform 4200ms cubic-bezier(0.12,0.72,0.06,1)" : "none",
+              transition: spinning
+                ? "transform 4200ms cubic-bezier(0.12,0.72,0.06,1)"
+                : "none",
               transform: `rotate(${rotation}deg)`,
             }}
           >
@@ -183,7 +230,9 @@ export function Wheel() {
                   <g key={i}>
                     <path
                       d={`M${cx},${cy} L${x0},${y0} A${r},${r} 0 ${big} 1 ${x1},${y1} Z`}
-                      fill={gold ? "#E9C46A" : i % 2 === 0 ? "#0d2a22" : "#123a2c"}
+                      fill={
+                        gold ? "#E9C46A" : i % 2 === 0 ? "#0d2a22" : "#123a2c"
+                      }
                       stroke="#0b1512"
                       strokeWidth="1"
                     />
@@ -204,17 +253,42 @@ export function Wheel() {
                 );
               })}
 
-              <circle cx="100" cy="100" r="97" fill="none" stroke="#E9C46A" strokeWidth="2.5" opacity="0.85" />
-              <circle cx="100" cy="100" r="88" fill="none" stroke="#0b1512" strokeWidth="1.5" />
-              <circle cx="100" cy="100" r="30" fill="url(#wheel-hub)" stroke="#E9C46A" strokeWidth="2" />
+              <circle
+                cx="100"
+                cy="100"
+                r="97"
+                fill="none"
+                stroke="#E9C46A"
+                strokeWidth="2.5"
+                opacity="0.85"
+              />
+              <circle
+                cx="100"
+                cy="100"
+                r="88"
+                fill="none"
+                stroke="#0b1512"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="100"
+                cy="100"
+                r="30"
+                fill="url(#wheel-hub)"
+                stroke="#E9C46A"
+                strokeWidth="2"
+              />
             </svg>
           </button>
 
           <button
-            onClick={doSpin}
-            disabled={spinning || loading || dataUnavailable}
+            type="button"
+            onClick={() => void doSpin()}
+            disabled={isDisabled}
             aria-disabled={!canSpin}
-            className={`btn-foil focus-ring absolute left-1/2 top-1/2 z-10 h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 rounded-full text-base font-black disabled:opacity-70 ${!canSpin ? "cursor-not-allowed opacity-70" : ""}`}
+            className={`btn-foil focus-ring absolute left-1/2 top-1/2 z-10 h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 rounded-full text-base font-black disabled:opacity-70 ${
+              !canSpin ? "cursor-not-allowed opacity-70" : ""
+            }`}
           >
             {spinning ? "..." : canSpin ? d.wheel.spin : d.wheel.tomorrow}
           </button>
@@ -239,13 +313,16 @@ export function Wheel() {
 
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { v: "$0.10", l: d.wheel.tierBase },
-              { v: "$0.75", l: d.wheel.tierSilver },
-              { v: "$2.00", l: d.wheel.tierGold },
-              { v: "$5.00", l: d.wheel.tierJackpot },
+              { v: "$0.05", l: d.wheel.tierBase },
+              { v: "$0.10", l: d.wheel.tierSilver },
+              { v: "$0.25", l: d.wheel.tierGold },
+              { v: "$1.00", l: d.wheel.tierJackpot },
             ].map((c) => (
               <div key={c.v} className="panel rounded-2xl px-4 py-4 text-center">
-                <p dir="ltr" className="font-display tnum text-xl font-bold text-foil">
+                <p
+                  dir="ltr"
+                  className="font-display tnum text-xl font-bold text-foil"
+                >
                   {c.v}
                 </p>
                 <p className="mt-1 text-[11px] text-mint">{c.l}</p>
@@ -255,10 +332,13 @@ export function Wheel() {
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
-              onClick={doSpin}
-              disabled={spinning || loading || dataUnavailable}
+              type="button"
+              onClick={() => void doSpin()}
+              disabled={isDisabled}
               aria-disabled={!canSpin}
-              className={`btn-neon focus-ring rounded-2xl px-8 py-4 text-base font-bold disabled:opacity-55 ${!canSpin ? "cursor-not-allowed opacity-55" : ""}`}
+              className={`btn-neon focus-ring rounded-2xl px-8 py-4 text-base font-bold disabled:opacity-55 ${
+                !canSpin ? "cursor-not-allowed opacity-55" : ""
+              }`}
             >
               {spinning
                 ? d.wheel.spinning
@@ -279,16 +359,16 @@ export function Wheel() {
                 ) : null}
               </p>
             ) : (
-              <p className="text-sm text-mint">
-                {d.wheel.loginHint}
-              </p>
+              <p className="text-sm text-mint">{d.wheel.loginHint}</p>
             )}
           </div>
 
           {user && !canSpin && left ? (
             <p className="mt-4 text-sm text-mint">
               {t(d.wheel.nextIn, { time: "" })}
-              <span dir="ltr" className="font-display tnum ms-1 text-foil">{left}</span>
+              <span dir="ltr" className="font-display tnum ms-1 text-foil">
+                {left}
+              </span>
             </p>
           ) : null}
 
@@ -300,7 +380,9 @@ export function Wheel() {
               className="mt-7 rounded-2xl border border-rule bg-white/[0.03] px-5 py-4 text-[13px] leading-8 text-mint"
             >
               <span className="text-neon-2">◆</span>{" "}
-              {t(d.wheel.floor, { amount: `$${money(state.vault.initialCapital)}` })}
+              {t(d.wheel.floor, {
+                amount: `$${money(state.vault.initialCapital)}`,
+              })}
             </motion.p>
           ) : null}
 
@@ -314,9 +396,7 @@ export function Wheel() {
               <span className="gold-text font-display tnum text-4xl font-bold">
                 +${money(prize)}
               </span>
-              <p className="text-sm leading-7 text-mint">
-                {d.wheel.won}
-              </p>
+              <p className="text-sm leading-7 text-mint">{d.wheel.won}</p>
             </motion.div>
           ) : null}
         </div>
