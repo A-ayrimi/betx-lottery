@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, desc, inArray } from "drizzle-orm";
 import { rounds } from "@/db/schema";
 import { isNonLivePreview, isPreviewFallbackEnabled, previewProgress } from "@/lib/previewFallback";
+import { shouldUseDevPreviewFallback } from "@/lib/rateLimitFailOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export async function GET(_req: NextRequest) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    if (isPreviewFallbackEnabled()) return previewResponse();
+    if (isPreviewFallbackEnabled() || shouldUseDevPreviewFallback(error)) return previewResponse();
     const { handleError } = await import("@/lib/api");
     return handleError(error);
   }

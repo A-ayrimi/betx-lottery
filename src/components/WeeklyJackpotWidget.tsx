@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "./AppProvider";
 import { useI18n } from "@/i18n/client";
-import { formatNumber, formatPadded, money } from "@/lib/format";
+import { formatNumber, formatPadded, usd } from "@/lib/format";
 import type { Locale } from "@/i18n/config";
 import { weeklyJackpotSplit } from "@/lib/rewardEngine";
 import { allocateVault } from "@/lib/vaultAccounts";
@@ -62,7 +62,7 @@ export function WeeklyJackpotWidget() {
             <div className="rounded-2xl border border-rule bg-black/25 p-4">
               <p className="micro text-neon-2">{c.growthBudget}</p>
               <p dir="ltr" className="mt-2 font-display tnum text-2xl font-black text-white">
-                ${money(allocation.growthCents / 100, locale)}
+                {usd(allocation.growthCents / 100, locale)}
               </p>
             </div>
             <div className="rounded-2xl border border-rule bg-black/25 p-4">
@@ -74,15 +74,15 @@ export function WeeklyJackpotWidget() {
               <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-[10px] text-mint">{c.first}</p>
-                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">${money((pot?.firstCents ?? 0) / 100, locale)}</p>
+                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.firstCents ?? 0) / 100, locale)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-mint">{c.second}</p>
-                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">${money((pot?.secondCents ?? 0) / 100, locale)}</p>
+                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.secondCents ?? 0) / 100, locale)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-mint">{c.third}</p>
-                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">${money((pot?.thirdCents ?? 0) / 100, locale)}</p>
+                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.thirdCents ?? 0) / 100, locale)}</p>
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { isTransientDbError, shouldFailOpenRateLimit, shouldUseDevPreviewFallback } from "../src/lib/rateLimitFailOpen.ts";
 
 const databaseUrl = process.env.BETX_TEST_DATABASE_URL;
 const safeDatabaseTarget = (() => {
@@ -13,6 +14,57 @@ const safeDatabaseTarget = (() => {
     /^betx_[a-z0-9_]*test$/i.test(name)
   );
 })();
+
+test("transient TLS and network errors are recognized as rate-limit infrastructure failures", () => {
+  for (const code of ["SELF_SIGNED_CERT_IN_CHAIN", "ECONNRESET", "ETIMEDOUT", "08006", "57P03"]) {
+    assert.equal(isTransientDbError(Object.assign(new Error(code), { code })), true, code);
+  }
+  assert.equal(isTransientDbError(new Error("rateLimited")), false);
+  assert.equal(isTransientDbError(null), false);
+  const wrapped = Object.assign(new Error("Failed query"), {
+    cause: Object.assign(new Error("socket reset"), { code: "ECONNRESET" }),
+  });
+  assert.equal(isTransientDbError(wrapped), true);
+  assert.equal(isTransientDbError(new Error("Connection terminated unexpectedly")), true);
+  assert.equal(isTransientDbError(new Error("Connection ended unexpectedly")), true);
+});
+
+test("rate limiting only fails open for transient development errors", () => {
+  const tlsError = Object.assign(new Error("self signed certificate"), { code: "SELF_SIGNED_CERT_IN_CHAIN" });
+  assert.equal(shouldFailOpenRateLimit(tlsError, "development"), true);
+  assert.equal(shouldFailOpenRateLimit(tlsError, "test"), false);
+  assert.equal(shouldFailOpenRateLimit(tlsError, "production"), false);
+  assert.equal(shouldFailOpenRateLimit(new Error("boom"), "development"), false);
+
+  const wrapped = Object.assign(new Error("Failed query"), {
+    cause: Object.assign(new Error("self signed certificate"), { code: "SELF_SIGNED_CERT_IN_CHAIN" }),
+  });
+  assert.equal(shouldUseDevPreviewFallback(wrapped, "development"), true);
+  assert.equal(shouldUseDevPreviewFallback(wrapped, "production"), false);
+  assert.equal(shouldFailOpenRateLimit(new Error("Connection terminated unexpectedly"), "development"), true);
+});
+
+test("rate limiter uses development-only fail-open guard", async () => {
+  const source = await readFile(new URL("../src/lib/ratelimit.ts", import.meta.url), "utf8");
+  assert.match(source, /import \{ shouldFailOpenRateLimit \} from "@\/lib\/rateLimitFailOpen"/);
+  assert.match(source, /if \(shouldFailOpenRateLimit\(error\)\) return;/);
+  assert.match(source, /if \(\(rows\[0\]\?\.count \?\? 0\) > limit\) throw new UserError\("rateLimited", 429\)/);
+});
+
+test("public read routes use the development preview fallback for transient DB failures", async () => {
+  const routes = [
+    "../src/app/api/state/route.ts",
+    "../src/app/api/rounds/state/route.ts",
+    "../src/app/api/rounds/history/route.ts",
+    "../src/app/api/tiers/progress/route.ts",
+    "../src/app/api/vault/candles/route.ts",
+    "../src/app/api/vault/onchain/route.ts",
+  ];
+  for (const route of routes) {
+    const source = await readFile(new URL(route, import.meta.url), "utf8");
+    assert.match(source, /shouldUseDevPreviewFallback/);
+  }
+});
 
 test(
   "PostgreSQL constraints, migration preflight, and concurrent deposit reservations",

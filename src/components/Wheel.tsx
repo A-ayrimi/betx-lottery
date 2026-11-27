@@ -75,6 +75,21 @@ export function Wheel() {
     : guestCanSpin);
 
   const sectors = WHEEL_SECTORS;
+  const prizeCards = (() => {
+    const labels = [
+      d.wheel.tierBase,
+      d.wheel.tierSilver,
+      d.wheel.tierGold,
+      d.wheel.tierPremium,
+      d.wheel.tierJackpot,
+    ];
+    return Array.from(new Set(sectors.map((s) => s.value)))
+      .sort((a, b) => a - b)
+      .map((value, i) => ({
+        value: formatCurrency(value, locale),
+        label: labels[i] ?? formatCurrency(value, locale),
+      }));
+  })();
 
   const slices = useMemo(
     () =>
@@ -335,21 +350,16 @@ export function Wheel() {
             </p>
           ) : null}
 
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { v: formatCurrency(sectors[0].value, locale), l: d.wheel.tierBase },
-              { v: formatCurrency(sectors[1].value, locale), l: d.wheel.tierSilver },
-              { v: formatCurrency(sectors[2].value, locale), l: d.wheel.tierGold },
-              { v: formatCurrency(sectors[8].value, locale), l: d.wheel.tierJackpot },
-            ].map((c) => (
-              <div key={c.v} className="panel rounded-2xl px-4 py-4 text-center">
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {prizeCards.map((c) => (
+              <div key={c.value} className="panel rounded-2xl px-4 py-4 text-center">
                 <p
                   dir="ltr"
                   className="font-display tnum text-xl font-bold text-foil"
                 >
-                  {c.v}
+                  {c.value}
                 </p>
-                <p className="mt-1 text-[11px] text-mint">{c.l}</p>
+                <p className="mt-1 text-[11px] text-mint">{c.label}</p>
               </div>
             ))}
           </div>

@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { AppState, DrawResult } from "@/lib/types";
 import { useI18n } from "@/i18n/client";
-import { money } from "@/lib/format";
+import { usd } from "@/lib/format";
 import { useStored, writeStored } from "@/lib/useStored";
 import {
   buyDemoTickets,
@@ -431,7 +431,7 @@ export function AppProvider({
         }
         saveDemoSession(next);
         setState(next);
-        setToast(t(d.toast.demoCredited, { amount: `$${money(amount, locale)}` }));
+        setToast(t(d.toast.demoCredited, { amount: `${usd(amount, locale)}` }));
         return true;
       }
       setToast(d.wc.comingSoonToast);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { intlTags } from "@/i18n/config";
-import { formatNumber, money } from "@/lib/format";
+import { formatNumber, usd } from "@/lib/format";
 import { useMounted } from "@/lib/useStored";
 
 interface Onchain {
@@ -86,7 +86,7 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
       {data && ok ? (
         <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-1">
           <p dir="ltr" className="font-display tnum text-2xl font-bold text-white">
-            {data.usdc === null ? d.ui.noData : `$${money(data.usdc, locale)}`}
+            {data.usdc === null ? d.ui.noData : `${usd(data.usdc, locale)}`}
             <span className="ms-1 text-[11px] font-medium text-mint">USDC</span>
           </p>
           <p dir="ltr" className="font-display tnum text-[12px] text-mint">

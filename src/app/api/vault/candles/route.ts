@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { VaultTf } from "@/lib/vaultCandles";
 import { previewVaultPayload } from "@/lib/previewCandles";
 import { isNonLivePreview, isPreviewFallbackEnabled } from "@/lib/previewFallback";
+import { shouldUseDevPreviewFallback } from "@/lib/rateLimitFailOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
       headers: { "Cache-Control": "public, max-age=5, stale-while-revalidate=25" },
     });
   } catch (e) {
-    if (isPreviewFallbackEnabled()) {
+    if (isPreviewFallbackEnabled() || shouldUseDevPreviewFallback(e)) {
       return NextResponse.json(previewVaultPayload(tf), {
         headers: { "Cache-Control": "no-store" },
       });

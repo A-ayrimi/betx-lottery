@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { burstFrom } from "@/lib/dollarFx";
 import { AnimatePresence, motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { money } from "@/lib/format";
+import { usd } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import type { DrawResult } from "@/lib/types";
 import { PurchaseReceipt } from "./TicketDetails";
@@ -148,11 +148,11 @@ function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }
               <div className="mt-6 grid grid-cols-2 gap-3 text-start">
                 <div className="panel rounded-xl p-4">
                   <p className="micro text-mint">{d.pool.prize}</p>
-                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-white">${money(draw.prize, locale)}</p>
+                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-white">{usd(draw.prize, locale)}</p>
                 </div>
                 <div className="panel rounded-xl p-4">
                   <p className="micro text-mint">{d.ui.houseEdge}</p>
-                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-foil">${money(draw.fee, locale)}</p>
+                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-foil">{usd(draw.fee, locale)}</p>
                 </div>
               </div>
 

@@ -34,16 +34,18 @@ export const formatPadded = (value: number, locale: Locale, width = 2) =>
 export const formatPercent = (ratio: number, locale: Locale, options?: Intl.NumberFormatOptions) =>
   formatNumber(ratio, locale, { style: "percent", maximumFractionDigits: 0, ...options });
 
-/** USD amounts keep the $ prefix; digits are localized when a locale is supplied. */
-export const money = (n: number | string, locale?: Locale) =>
-  locale
-    ? formatNumber(n, locale, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    : Number(n).toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+/** Base amount formatting always uses Latin digits; usd() localizes display. */
+export const money = (n: number | string, _locale?: Locale) =>
+  Number(n).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-export const formatCurrency = (n: number | string, locale: Locale) => `$${money(n, locale)}`;
+export function usd(n: number | string, locale: Locale) {
+  const amount = locale === "fa"
+    ? formatNumber(n, "fa", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : money(n, locale);
+  return locale === "fa" ? `${amount} دلار` : `$${amount}`;
+}
+
+export const formatCurrency = (n: number | string, locale: Locale) => usd(n, locale);

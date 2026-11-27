@@ -26,12 +26,19 @@ export function buildPostgresConfig(url: string, env: NodeJS.ProcessEnv = proces
   parsed.searchParams.delete("sslmode");
   parsed.searchParams.delete("sslrootcert");
   const useTls = !isLocal || env.DATABASE_SSL === "true" || Boolean(env.DATABASE_SSL_CA);
+  const explicitReject = env.DATABASE_SSL_REJECT_UNAUTHORIZED?.toLowerCase();
+  const rejectUnauthorized =
+    explicitReject === "true" ||
+    (explicitReject !== "false" &&
+      (Boolean(env.DATABASE_SSL_CA) ||
+        env.NODE_ENV === "production" ||
+        (isLocal && env.DATABASE_SSL === "true")));
 
   return {
     connectionString: parsed.toString(),
     ssl: useTls
       ? {
-          rejectUnauthorized: env.DATABASE_SSL_REJECT_UNAUTHORIZED === "false" ? false : true,
+          rejectUnauthorized,
           ...(env.DATABASE_SSL_CA ? { ca: env.DATABASE_SSL_CA } : {}),
         }
       : undefined,

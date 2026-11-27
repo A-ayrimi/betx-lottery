@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isNonLivePreview, isPreviewFallbackEnabled, previewRoundState } from "@/lib/previewFallback";
+import { shouldUseDevPreviewFallback } from "@/lib/rateLimitFailOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    if (isPreviewFallbackEnabled()) {
+    if (isPreviewFallbackEnabled() || shouldUseDevPreviewFallback(error)) {
       const fallback = previewRoundState(tierCode);
       return NextResponse.json(
         { ok: true, round: fallback.round, tiers: fallback.tiers },

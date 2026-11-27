@@ -2,7 +2,7 @@
 
 import type { Locale } from "@/i18n/config";
 import { useI18n } from "@/i18n/client";
-import { formatNumber, formatPercent, money } from "@/lib/format";
+import { formatNumber, formatPercent, usd } from "@/lib/format";
 import { useApp } from "@/components/AppProvider";
 
 type PayoutTier = {
@@ -28,12 +28,12 @@ export function payoutVars(tier: PayoutTier | null | undefined, locale: Locale) 
 
   return {
     capacity: formatNumber(capacity, locale),
-    price: `$${money(price, locale)}`,
-    pool: `$${money(price * capacity, locale)}`,
-    prize: `$${money(prize, locale)}`,
-    winner: `$${money(prize, locale)}`,
-    treasury: `$${money(treasury, locale)}`,
-    admin: `$${money(admin, locale)}`,
+    price: usd(price, locale),
+    pool: usd(price * capacity, locale),
+    prize: usd(prize, locale),
+    winner: usd(prize, locale),
+    treasury: usd(treasury, locale),
+    admin: usd(admin, locale),
     prizePct: formatPercent(prizePct / 100, locale),
     treasuryPct: formatPercent(treasuryPct / 100, locale),
     adminPct: formatPercent(adminPct / 100, locale),

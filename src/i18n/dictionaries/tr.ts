@@ -115,6 +115,7 @@ export const tr: Dict = {
     balance: "Bakiye:",
     topUp: "Cüzdanı yükle →",
     tickets: "{n} altın bilet",
+    boostLabel: "{n} bilet · {amount}",
     moneyKicker: "ROUND ALLOCATION",
     money1: "{capacity} bilet × {price} = tamamlanan tur başına toplam {pool}",
     money2: "Kazanana {winner}, hazineye {treasury} ve BETX platform ücreti olarak {admin}",
@@ -217,6 +218,7 @@ export const tr: Dict = {
     tierBase: "Temel ödül",
     tierSilver: "Gümüş ödül",
     tierGold: "Altın ödül",
+    tierPremium: "Premium ödül",
     tierJackpot: "En yüksek çark ödülü",
     spin: "Çevir!",
     tomorrow: "Yarın",
@@ -449,6 +451,7 @@ export const tr: Dict = {
   },
   footer: {
     about: "BETX, BETX otomatik doğrulamalı hesaplaşma ve doğrulama sunan {capacity} biletlik bir Solana (SPL-USDC) şans havuzudur.",
+    license: "Bağımsız, beceriye dayalı ve zincir üstü şans platformu",
     tags: ["Günlük çark", "Altın havuz", "Davet programı", "Doğrulanabilir adil"],
     product: "PRODUCT",
     legal: "LEGAL",

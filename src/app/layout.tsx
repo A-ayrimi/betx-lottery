@@ -44,6 +44,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang={locale} dir={dirOf(locale)}>
       <body className="min-h-screen antialiased">
+        {process.env.NODE_ENV === "production" ? null : <Script src="/dev-error-filter.js" strategy="beforeInteractive" />}
         {children}
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" />
       </body>

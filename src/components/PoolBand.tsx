@@ -12,7 +12,7 @@ import type { AppState } from "@/lib/types";
 import { TicketDetailModal, type TicketView } from "./TicketDetails";
 
 export function PoolBand() {
-  const { state, loading, dataUnavailable, demoEnabled, buy, setToast, openWalletConnect, selectedTierCode, setSelectedTierCode } = useApp();
+  const { state, loading, dataUnavailable, demoEnabled, isPreview, buy, setToast, openWalletConnect, selectedTierCode, setSelectedTierCode } = useApp();
   const { d, t, n, ago, dir, locale } = useI18n();
   const barRef = useRef<HTMLDivElement>(null);
   const lastSold = useRef<number | null>(null);
@@ -235,7 +235,6 @@ export function PoolBand() {
           {selectedTier ? (
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {[
-                [d.tiers.price, formatCurrency(selectedTier.priceUsd, locale)],
                 [d.tiers.capacity, n(selectedTier.capacity)],
                 [d.tiers.prize, formatCurrency(selectedTier.prize, locale)],
                 [d.tiers.treasury, formatCurrency(selectedTier.treasury, locale)],
@@ -417,11 +416,8 @@ export function PoolBand() {
                         c === 3 ? "btn-foil" : "btn-neon"
                       }`}
                     >
-                      <span dir="ltr" className="font-display tnum">
-                        {n(c)} × {formatCurrency(ticketPrice, locale)}
-                      </span>
-                      <span className="block text-[11px] font-medium opacity-80">
-                        {t(d.pool.tickets, { n: n(c) })}
+                      <span dir={locale === "fa" || locale === "ar" ? "rtl" : "ltr"} className="font-display tnum">
+                        {t(d.pool.boostLabel, { n: n(c), amount: formatCurrency(ticketPrice * c, locale) })}
                       </span>
                       {state?.user ? (
                         <span dir="ltr" className="block text-[10px] font-medium opacity-70">
@@ -460,7 +456,7 @@ export function PoolBand() {
           {/* live activity — real ledger rows only, usernames masked */}
           <div className="mt-6 overflow-hidden rounded-2xl border border-rule bg-black/20">
             <p className="micro flex items-center gap-2 border-b border-rule px-5 py-3 text-mint">
-              <span className="live-dot h-1.5 w-1.5 rounded-full bg-neon-2" /> {d.activity.kicker}
+              <span className={`h-1.5 w-1.5 rounded-full ${isPreview ? "bg-foil" : "live-dot bg-neon-2"}`} /> {d.activity.kicker}
             </p>
             {activity.length === 0 ? (
               <p className="px-5 py-4 text-sm text-mint">{d.activity.empty}</p>

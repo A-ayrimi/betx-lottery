@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { formatNumber, money } from "@/lib/format";
+import { formatNumber, usd } from "@/lib/format";
 import { useSelectedPayoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 
@@ -30,9 +30,10 @@ interface HistoryRow {
  * older pages load from /api/rounds/history.
  */
 export function WinnersHistory() {
-  const { state, demoEnabled, loading, dataUnavailable } = useApp();
+  const { state, demoEnabled, isPreview, loading, dataUnavailable } = useApp();
   const { d, t, n, date, href, locale } = useI18n();
   const payout = useSelectedPayoutVars();
+  const maintenance = !isPreview && Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
   const [extra, setExtra] = useState<HistoryRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -138,14 +139,14 @@ export function WinnersHistory() {
           <div className="flex items-center gap-2">
             <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
             <span dir="ltr" className="font-display text-[11px] tracking-[0.22em] text-neon-2">
-              {demoEnabled ? d.wc.demoBadge : d.board.live}
+              {isPreview ? d.wc.demoBadge : maintenance ? d.ui.statusMaintenance : d.board.live}
             </span>
           </div>
         </div>
 
         <div className="mt-6 rounded-2xl border border-neon/20 bg-neon/[0.05] px-5 py-4 text-[13px] leading-7 text-mint">
-          <span className="text-neon-2">◆</span> {demoEnabled ? d.draw.demoNotice : t(d.board.autoDrawNote, payout)}
-          {!demoEnabled ? (
+          <span className="text-neon-2">◆</span> {isPreview ? d.draw.demoNotice : t(d.board.autoDrawNote, payout)}
+          {!isPreview ? (
             <>
               <br />
               <span className="text-foil">◆</span> {t(d.board.treasuryNote, payout)}{" "}
@@ -203,7 +204,7 @@ export function WinnersHistory() {
                         {w.winningSerial}
                       </span>
                       <span dir="ltr" className="font-display tnum text-start text-[14px] font-bold text-foil">
-                        +${money(w.prize, locale)}
+                        +{usd(w.prize, locale)}
                       </span>
                       <span className="text-[12px] leading-5 text-mint">
                         {typeof e === "string" ? (

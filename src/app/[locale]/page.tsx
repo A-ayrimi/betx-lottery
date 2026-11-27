@@ -21,7 +21,7 @@ import { getDictionary } from "@/i18n";
 import { I18nProvider } from "@/i18n/client";
 import { isLocale } from "@/i18n/config";
 import { publicConfig } from "@/lib/config";
-import { formatNumber, money } from "@/lib/format";
+import { formatNumber, usd } from "@/lib/format";
 import { previewState } from "@/lib/previewFallback";
 import { buildMetadata } from "@/lib/site";
 
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]">): Prom
   const tier = previewState().tiers[0];
   const description = d.meta.description
     .split("{price}")
-    .join(money(tier?.priceUsd ?? publicConfig().ticketPrice))
+    .join(usd(tier?.priceUsd ?? publicConfig().ticketPrice, locale))
     .split("{capacity}")
     .join(formatNumber(tier?.capacity ?? publicConfig().roundCapacity, locale));
   return buildMetadata({ locale, path: "/", title: d.meta.title, description });

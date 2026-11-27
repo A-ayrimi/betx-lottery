@@ -124,6 +124,15 @@ test("number formatting localizes digits, separators, and percentages", async ()
   assert.match(client, /n: \(v\) => formatNumber\(v, locale\)/);
   assert.match(client, /format: \(v, options\) => formatNumber\(v, locale, options\)/);
   assert.match(weekly, /t\(c\.resetIn, \{ time: left \}\)/);
+
+  assert.match(format, /Number\(n\)\.toLocaleString\("en-US"/);
+  assert.match(format, /export function usd/);
+  assert.match(format, /formatNumber\(n, "fa"/);
+  const faCopy = JSON.stringify(fa);
+  assert.doesNotMatch(faCopy, /\$/);
+  assert.doesNotMatch(faCopy, /[0-9] دلار/);
+  assert.match(faCopy, /[۰-۹][٫۰-۹]* دلار/);
+  assert.match(faCopy, /[۰-۹] USDC/);
 });
 
 test("payout copy is tokenized against the selected tier", async () => {

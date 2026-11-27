@@ -11,7 +11,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/i18n/client";
 import { intlTags } from "@/i18n/config";
-import { formatCurrency, formatPercent, money } from "@/lib/format";
+import { formatCurrency, formatPercent, money, usd } from "@/lib/format";
 import { previewVaultPayload } from "@/lib/previewCandles";
 import { OnchainTreasury } from "./OnchainTreasury";
 import { useApp } from "./AppProvider";
@@ -311,19 +311,19 @@ function CandleChart({
           <p className="font-display text-[10px] tracking-[0.12em] text-mint">{fmt.format(hc.t)}</p>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
             <span className="text-mint">{labels.open}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.o, locale)}</span>
+            <span className="text-end font-display tnum text-white">{usd(hc.o, locale)}</span>
             <span className="text-mint">{labels.high}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.h, locale)}</span>
+            <span className="text-end font-display tnum text-white">{usd(hc.h, locale)}</span>
             <span className="text-mint">{labels.low}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.l, locale)}</span>
+            <span className="text-end font-display tnum text-white">{usd(hc.l, locale)}</span>
             <span className="text-mint">{labels.close}</span>
             <span className={`text-end font-display tnum font-bold ${hc.c >= hc.o ? "text-neon-2" : "text-red-300"}`}>
-              ${money(hc.c, locale)}
+              {usd(hc.c, locale)}
             </span>
             <span className="text-mint">{labels.volume}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.volume, locale)}</span>
+            <span className="text-end font-display tnum text-white">{usd(hc.volume, locale)}</span>
             <span className="text-mint">{labels.fees}</span>
-            <span className="text-end font-display tnum text-foil">+${money(hc.fees, locale)}</span>
+            <span className="text-end font-display tnum text-foil">+{usd(hc.fees, locale)}</span>
           </div>
         </div>
       ) : null}
@@ -499,14 +499,14 @@ export function VaultCandleChart() {
           <div className="relative flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="micro flex items-center gap-2 text-neon-2">
-                <span className="live-dot h-1.5 w-1.5 rounded-full bg-neon-2" />
-                {demoEnabled ? d.vaultChart.kickerDemo : d.vaultChart.kicker}
+                <span className={`h-1.5 w-1.5 rounded-full ${previewChart ? "bg-foil" : "live-dot bg-neon-2"}`} />
+                {previewChart ? d.vaultChart.kickerDemo : d.vaultChart.kicker}
               </p>
               <h2 id="vault-chart-title" className="mt-2 text-xl font-black text-white sm:text-2xl">
                 {d.vaultChart.title}
               </h2>
               <p className="mt-1 max-w-[56ch] text-[12px] leading-6 text-mint">
-                {state?.config.live ? d.vaultChart.subtitle : d.vaultChart.subtitleDemo}
+                {previewChart ? d.vaultChart.subtitleDemo : d.vaultChart.subtitle}
               </p>
               {!demoEnabled && state?.vault.ledgerStatus !== "verified" ? (
                 <p role="status" className="mt-2 max-w-[56ch] text-xs leading-5 text-foil">{d.vaultChart.ledgerWarning}</p>
@@ -515,7 +515,7 @@ export function VaultCandleChart() {
             <div className="text-end">
               <p className="micro text-mint">{d.vaultChart.now}</p>
               <p dir="ltr" className="font-display tnum text-3xl font-bold text-white">
-                {sum ? `$${money(sum.current, locale)}` : "—"}
+                {sum ? `${usd(sum.current, locale)}` : "—"}
               </p>
               {sum ? (
                 <p dir="ltr" className={`font-display tnum text-[12px] font-bold ${up ? "text-neon-2" : "text-red-300"}`}>
@@ -545,7 +545,7 @@ export function VaultCandleChart() {
 
           <p className="relative mt-3 text-[11px] leading-6 text-mint/70">{d.vaultChart.cardNote}</p>
           <div className="relative mt-3 max-w-xl">
-            <OnchainTreasury demo={demoEnabled} compact />
+            <OnchainTreasury demo={previewChart} compact />
           </div>
         </div>
       </div>
@@ -647,16 +647,16 @@ export function VaultCandleChart() {
               </div>
 
               <div className="grid grid-cols-2 gap-px bg-rule/40 sm:grid-cols-7">
-                <Stat label={d.vaultChart.now} value={sum ? `$${money(sum.current, locale)}` : "—"} />
+                <Stat label={d.vaultChart.now} value={sum ? `${usd(sum.current, locale)}` : "—"} />
                 <Stat
                   label={d.vaultChart.change}
                   value={sum ? `${up ? "+" : ""}${formatCurrency(sum.change, locale)} · ${up ? "+" : ""}${formatPercent(sum.changePct / 100, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                   tone={up ? "up" : "down"}
                 />
-                <Stat label={d.vaultChart.high} value={sum ? `$${money(sum.high, locale)}` : "—"} />
-                <Stat label={d.vaultChart.low} value={sum ? `$${money(sum.low, locale)}` : "—"} />
-                <Stat label={d.vaultChart.volume} value={sum ? `$${money(sum.volume, locale)}` : "—"} />
-                <Stat label={d.vaultChart.feesTotal} value={sum ? `$${money(sum.fees, locale)}` : "—"} tone="foil" />
+                <Stat label={d.vaultChart.high} value={sum ? `${usd(sum.high, locale)}` : "—"} />
+                <Stat label={d.vaultChart.low} value={sum ? `${usd(sum.low, locale)}` : "—"} />
+                <Stat label={d.vaultChart.volume} value={sum ? `${usd(sum.volume, locale)}` : "—"} />
+                <Stat label={d.vaultChart.feesTotal} value={sum ? `${usd(sum.fees, locale)}` : "—"} tone="foil" />
                 <Stat label={d.vaultChart.count} value={sum ? n(sum.count) : "—"} />
               </div>
 

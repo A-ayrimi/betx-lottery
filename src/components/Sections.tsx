@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
 import { Logo, Mark } from "./Logo";
-import { formatPadded, money } from "@/lib/format";
+import { formatPadded, usd } from "@/lib/format";
 import { useSelectedPayoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 
@@ -72,7 +72,7 @@ export function WinnersTicker() {
             <span className="text-mint">{d.board.historyHeaders[1]}</span>
             <span className="text-white">{w.winnerName}</span>
             <span className="font-display text-[11px] tracking-[0.18em] text-neon-2">{w.winningSerial}</span>
-            <span className="font-display tnum font-bold text-foil">+${money(w.prize, locale)}</span>
+            <span className="font-display tnum font-bold text-foil">+{usd(w.prize, locale)}</span>
             <span className="text-mint/50">|</span>
           </span>
         ))}
@@ -231,7 +231,7 @@ export function Leaderboard() {
                 </span>
                 <span className="truncate text-[14px] text-white">{r.displayName}</span>
                 <span className="font-display tnum text-[13px] text-neon-2">{n(r.tickets)}</span>
-                <span dir="ltr" className="font-display tnum text-start text-[13px] text-white">${money(r.won, locale)}</span>
+                <span dir="ltr" className="font-display tnum text-start text-[13px] text-white">{usd(r.won, locale)}</span>
               </div>
             ))}
             {rows.length === 0 ? (
@@ -256,7 +256,7 @@ export function Leaderboard() {
                   </div>
                 </div>
                 <div className="text-end">
-                  <p dir="ltr" className="font-display tnum text-lg font-bold text-foil">+${money(w.prize, locale)}</p>
+                  <p dir="ltr" className="font-display tnum text-lg font-bold text-foil">+{usd(w.prize, locale)}</p>
                   <p className="text-[11px] text-mint/70">{ago(w.drawnAt)}</p>
                   <a href={href("/verify")} className="text-[11px] text-neon-2/80 underline-offset-4 hover:underline">
                     {d.board.verify}
@@ -314,7 +314,7 @@ export function Invite() {
                 <span className="gold-text">{d.invite.titleGold}</span>
               </h2>
               <p className="mt-5 max-w-[52ch] text-[15px] leading-9 text-mint">
-                {t(d.invite.body, { bonus: `$${money(state?.config.referralDepositBonus ?? 0.5, locale)}` })}
+                {t(d.invite.body, { bonus: `${usd(state?.config.referralDepositBonus ?? 0.5, locale)}` })}
               </p>
 
               <div className="mt-5 rounded-2xl border border-foil/30 bg-foil/[0.06] px-4 py-3">
@@ -470,7 +470,7 @@ export function SiteFooter({ year }: { year: number }) {
             <div>
               <p className="micro text-foil">{d.footer.vault}</p>
               <p dir="ltr" className="font-display tnum mt-4 text-start text-2xl font-bold text-white">
-                {state ? `$${money(state.vault.balance, locale)}` : d.ui.noData}
+                {state ? `${usd(state.vault.balance, locale)}` : d.ui.noData}
               </p>
               <p className="mt-1 text-[12px] text-mint">
                 {state
@@ -489,9 +489,9 @@ export function SiteFooter({ year }: { year: number }) {
         <div className="mt-8 flex flex-col items-start justify-between gap-4 text-[12px] leading-6 text-mint/70 sm:flex-row sm:items-center">
           <div>
             <p>
-              © {n(year)} {cfg?.company ?? "BETX"} — {d.footer.rights} {cfg?.live ? d.footer.live : d.footer.demo}
+              © {formatPadded(year, locale, 4)} {cfg?.company ?? "BETX"} — {d.footer.rights} {cfg?.live ? d.footer.live : d.footer.demo}
             </p>
-            {cfg?.license ? <p dir="ltr" className="mt-1 text-start">{cfg.license}</p> : null}
+            {cfg?.license ? <p dir={locale === "fa" || locale === "ar" ? "rtl" : "ltr"} className="mt-1 text-start">{locale === "fa" ? d.footer.license : cfg.license}</p> : null}
           </div>
           <p dir="auto" className="font-display tracking-[0.18em]">{d.ui.footerTagline}</p>
         </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { formatNumber, money } from "@/lib/format";
+import { formatNumber, usd } from "@/lib/format";
 import { payoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 
@@ -74,7 +74,7 @@ export function VerifyExplorer({ rows, dataUnavailable = false }: { rows: Verify
                       {w.winningSerial}
                     </td>
                     <td className="px-5 py-4 font-display text-[14px] font-bold text-foil" dir="ltr">
-                      +${money(w.prize, locale)}
+                      +{usd(w.prize, locale)}
                     </td>
                     <td className="px-5 py-4 text-[12px] text-mint">
                       <time dateTime={w.drawnAt ?? undefined}>{date(w.drawnAt)}</time>

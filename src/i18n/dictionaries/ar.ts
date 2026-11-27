@@ -104,6 +104,7 @@ export const ar: Dict = {
     balance: "الرصيد:",
     topUp: "اشحن المحفظة ←",
     tickets: "{n} تذاكر ذهبية",
+    boostLabel: "{n} تذاكر · {amount}",
     moneyKicker: "HOW THE MONEY WORKS",
     money1: "{capacity} تذكرة × {price} = {pool} لكل جولة",
     money2: "{winner} للجائزة، و{treasury} للخزينة، و{admin} إيراد منصة BETX",
@@ -206,6 +207,7 @@ export const ar: Dict = {
     tierBase: "الجائزة الأساسية",
     tierSilver: "الجائزة الفضية",
     tierGold: "الجائزة الذهبية",
+    tierPremium: "الجائزة المميزة",
     tierJackpot: "الجائزة الكبرى",
     spin: "أدِر!",
     tomorrow: "غداً",
@@ -438,6 +440,7 @@ export const ar: Dict = {
   },
   footer: {
     about: "BETX مجمّع من {capacity} تذكرة على Solana (SPL-USDC) مع تسوية يراجعها نظام BETX والتحقق من النزاهة.",
+    license: "منصة يانصيب مستقلة تعتمد على المهارة وتقنية البلوكشين",
     tags: ["العجلة اليومية", "المجمّع الذهبي", "ادعُ أصدقاءك", "نزاهة قابلة للتحقق"],
     product: "PRODUCT",
     legal: "LEGAL",

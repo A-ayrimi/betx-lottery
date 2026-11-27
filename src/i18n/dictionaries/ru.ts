@@ -115,6 +115,7 @@ export const ru: Dict = {
     balance: "Баланс:",
     topUp: "Пополнить кошелёк →",
     tickets: "{n} золотых билета",
+    boostLabel: "{n} билетов · {amount}",
     moneyKicker: "HOW THE MONEY WORKS",
     money1: "{capacity} билетов × {price} = {pool} за раунд",
     money2: "{winner} призового распределения, {treasury} в казну и {admin} платформенного сбора BETX",
@@ -217,6 +218,7 @@ export const ru: Dict = {
     tierBase: "Базовый приз",
     tierSilver: "Серебряный приз",
     tierGold: "Золотой приз",
+    tierPremium: "Премиальный приз",
     tierJackpot: "Джекпот колеса",
     spin: "Крути!",
     tomorrow: "Завтра",
@@ -449,6 +451,7 @@ export const ru: Dict = {
   },
   footer: {
     about: "BETX — пул из {capacity} билетов на Solana (SPL-USDC) с расчётом под контролем системы BETX и проверкой честности.",
+    license: "Независимая платформа лотереи на основе навыков и блокчейна",
     tags: ["Колесо дня", "Золотой пул", "Пригласи друзей", "Provably fair"],
     product: "PRODUCT",
     legal: "LEGAL",

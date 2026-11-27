@@ -115,6 +115,7 @@ export const es: Dict = {
     balance: "Saldo:",
     topUp: "Recargar billetera →",
     tickets: "{n} boletos dorados",
+    boostLabel: "{n} boletos · {amount}",
     moneyKicker: "HOW THE MONEY WORKS",
     money1: "{capacity} boletos × {price} = {pool} por ronda",
     money2: "{winner} de premio, {treasury} para tesorería y {admin} de comisión de la plataforma BETX",
@@ -217,6 +218,7 @@ export const es: Dict = {
     tierBase: "Premio base",
     tierSilver: "Premio plata",
     tierGold: "Premio oro",
+    tierPremium: "Premio premium",
     tierJackpot: "Jackpot de la ruleta",
     spin: "¡Gira!",
     tomorrow: "Mañana",
@@ -449,6 +451,7 @@ export const es: Dict = {
   },
   footer: {
     about: "BETX es un pozo de {capacity} boletos en Solana (SPL-USDC) con liquidación revisada por el sistema BETX automatizado y verificación de equidad.",
+    license: "Plataforma de lotería independiente basada en habilidades y en cadena",
     tags: ["Ruleta diaria", "Pozo dorado", "Invita amigos", "Provably fair"],
     product: "PRODUCT",
     legal: "LEGAL",

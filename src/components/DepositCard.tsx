@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "./AppProvider";
 import { useWallet, walletErrorMessage } from "./WalletProvider";
 import { WalletList } from "./WalletConnect";
-import { formatNumber, money } from "@/lib/format";
+import { formatNumber, money, usd } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import { Transaction } from "@solana/web3.js";
 
@@ -40,7 +40,7 @@ export function DepositCard() {
         <p className="micro text-neon-2">{d.wallet.depositKicker} · {d.wc.demoBadge}</p>
         <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
         <p dir="ltr" className="font-display tnum mt-4 text-3xl font-bold text-white">
-          ${money(user?.balance ?? 0, locale)} USDC
+          {money(user?.balance ?? 0, locale)} USDC
         </p>
         <p className="mt-3 text-[12px] leading-6 text-mint/80">{d.wc.demoWalletNote}</p>
       </div>
@@ -52,7 +52,7 @@ export function DepositCard() {
       <p className="micro text-neon-2">{d.wallet.depositKicker}</p>
       <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
 
-      <div dir="ltr" className="mt-4 grid grid-cols-4 gap-2">
+      <div dir={locale === "fa" ? "rtl" : "ltr"} className="mt-4 grid grid-cols-4 gap-2">
         {AMOUNTS.map((a) => (
           <button
             key={a}
@@ -66,7 +66,7 @@ export function DepositCard() {
                 : "border-rule bg-black/25 text-white hover:border-mint/40"
             }`}
           >
-            ${n(a)}
+            {locale === "fa" ? usd(a, locale) : `$${n(a)}`}
           </button>
         ))}
       </div>
@@ -76,7 +76,7 @@ export function DepositCard() {
         inputMode="decimal"
         value={custom}
         onChange={(e) => setCustom(e.target.value.replace(/[^0-9.]/g, ""))}
-        placeholder={`${d.wallet.custom} · ${t(d.wallet.amountMin, { min: `$${money(cfg?.minDeposit ?? 1, locale)}` })}`}
+        placeholder={`${d.wallet.custom} · ${t(d.wallet.amountMin, { min: `${usd(cfg?.minDeposit ?? 1, locale)}` })}`}
         aria-label={d.wallet.custom}
         className="focus-ring mt-2 w-full rounded-xl border border-rule bg-black/30 px-4 py-2.5 font-display text-sm text-white placeholder:text-mint/40"
       />
@@ -144,7 +144,7 @@ function SolanaDeposit({
       if (r?.ok && r.credited) {
         setPhase("done");
         await refresh();
-        setToast(`${d.wc.step_done} +$${money(r.amount, locale)}`);
+        setToast(`${d.wc.step_done} +${usd(r.amount, locale)}`);
         return;
       }
       if (r?.ok && (r.status === "failed" || r.status === "expired")) {
@@ -208,7 +208,7 @@ function SolanaDeposit({
     if (!r.ok) return setToast(r.error);
     setTxid("");
     await refresh();
-    setToast(`${d.wc.step_done} +$${money(r.amount, locale)}`);
+    setToast(`${d.wc.step_done} +${usd(r.amount, locale)}`);
   };
 
   const steps: Phase[] = ["build", "sign", "broadcast", "confirm"];

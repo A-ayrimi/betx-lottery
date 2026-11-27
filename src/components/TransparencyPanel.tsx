@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "./AppProvider";
 import { useI18n } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
-import { formatPadded, money } from "@/lib/format";
+import { formatPadded, usd } from "@/lib/format";
 import { OnchainTreasury } from "./OnchainTreasury";
 
 function formatRemaining(ms: number, locale: Locale) {
@@ -86,7 +86,7 @@ export function TransparencyPanel() {
               <div>
                 <p className="text-[11px] text-mint">{c.ledgerBalance}</p>
                 <p dir="ltr" className="font-display tnum text-2xl font-black text-white">
-                  ${money(state?.vault.balance ?? 0, locale)}
+                  {usd(state?.vault.balance ?? 0, locale)}
                 </p>
               </div>
               <div>
@@ -102,7 +102,7 @@ export function TransparencyPanel() {
             </div>
             <p className="mt-3 text-[11px] leading-6 text-mint/80">{c.vaultNote}</p>
             <div className="mt-3">
-              <OnchainTreasury demo={demoEnabled} compact />
+              <OnchainTreasury demo={isPreview || demoEnabled} compact />
             </div>
           </div>
 

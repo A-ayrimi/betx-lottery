@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { money } from "@/lib/format";
+import { usd } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import { DepositCard } from "./DepositCard";
 import { TicketSerialRow } from "./TicketDetails";
@@ -19,6 +19,8 @@ export function Wallet() {
   const cfg = state?.config;
   const live = Boolean(cfg?.live);
   const maintenance = Boolean(cfg?.maintenanceMode ?? cfg?.maintenance);
+  const bodyText = maintenance ? d.ui.maintenanceBanner : live ? d.wallet.bodyLive : d.wallet.bodyDemo;
+  const statusBadge = maintenance ? d.ui.statusMaintenance : live ? null : d.wallet.demoBadge;
   const excluded = user?.selfExcludedUntil ?? null;
   const statusLabel = (s: string) => (d.wallet.status as Record<string, string>)[s] ?? s;
 
@@ -42,11 +44,11 @@ export function Wallet() {
               {d.wallet.title1}
               <span className="gold-text">{d.wallet.titleGold}</span>
             </h2>
-            <p className="mt-4 max-w-[60ch] text-[15px] leading-8 text-mint">{live ? d.wallet.bodyLive : d.wallet.bodyDemo}</p>
+            <p className="mt-4 max-w-[60ch] text-[15px] leading-8 text-mint">{bodyText}</p>
           </div>
-          {!live ? (
+          {statusBadge ? (
             <span dir="ltr" className="micro rounded-full border border-foil/40 bg-foil/10 px-4 py-2 text-foil">
-              {d.wallet.demoBadge}
+              {statusBadge}
             </span>
           ) : null}
         </div>
@@ -63,7 +65,7 @@ export function Wallet() {
             <div className="relative">
               <p className="micro text-mint">{d.wallet.balance}</p>
               <p dir="ltr" className="font-display tnum mt-3 text-start text-5xl font-bold text-white">
-                {user ? `$${money(user.balance, locale)}` : "—"}
+                {user ? `${usd(user.balance, locale)}` : "—"}
               </p>
               <p className="mt-2 text-sm text-mint">
                 {user
@@ -82,7 +84,7 @@ export function Wallet() {
               <div className="space-y-2 text-[13px] text-mint">
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.totalDeposited}</span>
-                  <span dir="ltr" className="font-display tnum text-white">{user ? `$${money(user.totalDeposited, locale)}` : "—"}</span>
+                  <span dir="ltr" className="font-display tnum text-white">{user ? `${usd(user.totalDeposited, locale)}` : "—"}</span>
                 </p>
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.bonusSpins}</span>
@@ -104,13 +106,13 @@ export function Wallet() {
             <p className="micro text-foil">{d.wallet.withdrawKicker}</p>
             <h3 className="mt-2 text-xl font-black text-white">{d.wallet.withdrawTitle}</h3>
             <label className="mt-5 block">
-              <span className="micro text-mint">{t(d.wallet.amountMin, { min: `$${money(cfg?.minWithdraw ?? 5, locale)}` })}</span>
+              <span className="micro text-mint">{t(d.wallet.amountMin, { min: `${usd(cfg?.minWithdraw ?? 5, locale)}` })}</span>
               <input
-                dir="ltr"
+                dir={locale === "fa" ? "rtl" : "ltr"}
                 inputMode="decimal"
                 value={wd.amount}
                 onChange={(e) => setWd({ ...wd, amount: e.target.value.replace(/[^0-9.]/g, "") })}
-                placeholder="15.00"
+                placeholder={locale === "fa" ? usd(15, locale) : "15.00"}
                 className="focus-ring mt-2 w-full rounded-xl border border-rule bg-black/30 px-4 py-3 font-display text-sm text-white placeholder:text-mint/40"
               />
             </label>
@@ -167,7 +169,7 @@ export function Wallet() {
                             ? d.wallet.ticketRefunded
                             : d.wallet.ticketLost}
                     </span>
-                    {ticket.status === "winner" ? <span dir="ltr" className="font-display text-sm text-foil">${money(ticket.prize, locale)}</span> : null}
+                    {ticket.status === "winner" ? <span dir="ltr" className="font-display text-sm text-foil">{usd(ticket.prize, locale)}</span> : null}
                   </div>
                   <div className="mt-3">
                     <TicketSerialRow
@@ -241,7 +243,7 @@ export function Wallet() {
                     ) : null}
                   </span>
                   <span dir="ltr" className={`font-display tnum font-bold ${r.sign === "+" ? "text-neon-2" : "text-foil"}`}>
-                    {r.sign}${money(r.amount, locale)}
+                    {r.sign}{usd(r.amount, locale)}
                   </span>
                 </div>
               ))}
@@ -280,12 +282,12 @@ function ResponsiblePanel() {
         <h3 className="mt-2 text-xl font-black text-white">{d.rg.title}</h3>
         <p className="mt-2 text-[13px] leading-7 text-mint">{d.rg.body}</p>
         <p className="mt-4 text-sm text-white">
-          {user.depositLimit === null ? d.rg.none : t(d.rg.current, { limit: `$${money(user.depositLimit, locale)}` })}
+          {user.depositLimit === null ? d.rg.none : t(d.rg.current, { limit: `${usd(user.depositLimit, locale)}` })}
         </p>
         {user.pendingLimit ? (
           <p className="mt-1 text-[12px] text-foil">
             {t(d.rg.pending, {
-              limit: user.pendingLimit.amount === null ? d.rg.none : `$${money(user.pendingLimit.amount, locale)}`,
+              limit: user.pendingLimit.amount === null ? d.rg.none : `${usd(user.pendingLimit.amount, locale)}`,
               time: date(user.pendingLimit.at),
             })}
           </p>

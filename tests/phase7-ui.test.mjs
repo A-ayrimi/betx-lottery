@@ -21,11 +21,19 @@ const maxWheelAmount = Math.max(...wheelAmounts);
 const minWheelLabel = minWheelAmount.toFixed(2);
 const maxWheelLabel = maxWheelAmount.toFixed(2);
 
+const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
+const persianAmount = (value) =>
+  value.toFixed(2).replace(/[0-9]/g, (digit) => persianDigits[Number(digit)]).replace(".", "٫");
+
 const amountTokenPattern =
-  /(?<![\d.,])(?:\$\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*\$)(?!\d)/gu;
+  /(?<![\d.,٫٬۰-۹])(?:\$\s*[\d۰-۹]+(?:[.,٫][\d۰-۹]+)?|[\d۰-۹]+(?:[.,٫][\d۰-۹]+)?\s*\$|[\d۰-۹]+(?:[.,٫][\d۰-۹]+)?\s*دلار)(?![\d۰-۹])/gu;
 
 function parseAmountToken(token) {
-  return Number(token.replace(/\s/g, "").replace("$", "").replace(",", "."));
+  const normalized = token
+    .replace(/[۰-۹]/g, (digit) => String(persianDigits.indexOf(digit)))
+    .replace(/[٫,]/g, ".")
+    .replace(/[\s$دلار]/g, "");
+  return Number(normalized);
 }
 
 function amountTokens(text) {
@@ -100,17 +108,18 @@ test("tier-specific round state endpoint is public and sanitized", async () => {
   assert.match(route, /\/\^\[A-Za-z0-9_\]\{2,64\}\$\/\.test\(raw\)/);
   assert.match(route, /getState\(tierCode\)/);
   assert.match(store, /export async function getState\(tierSelector\?: string \| number\)/);
+  assert.match(store, /resolveTierConfig\(db, tierSelector, true\)/);
 });
 
 test("hero and pool show active-tier economics instead of global config", async () => {
   const pool = await read("../src/components/PoolBand.tsx");
   const hero = await read("../src/components/Hero.tsx");
-  assert.match(pool, /selectedTier\.priceUsd/);
-  assert.match(pool, /selectedTier\.prize/);
+  assert.match(pool, /selectedTier\?\.priceUsd/);
+  assert.match(pool, /selectedTier\?\.prize/);
   assert.match(pool, /selectedTier\.treasury/);
   assert.match(pool, /selectedTier\.admin/);
   assert.match(hero, /state\?\.tiers\[0\]/);
-  assert.match(hero, /tier \? `\$\$\{money\(tier\.prize(?:, locale)?\)\}`/);
+  assert.match(hero, /tier \? `.*usd\(tier\.prize, locale\)/);
 });
 
 test("all locales expose the shared homepage UI copy", () => {
@@ -127,12 +136,50 @@ test("localized wheel copy matches the wheel sectors", () => {
   assert.equal(minWheelLabel, "0.05");
   assert.equal(maxWheelLabel, "1.00");
   const expectedPrizeRowAmount = `$${minWheelLabel} – $${maxWheelLabel}`;
-  const localizedPrizeRowAmounts = { fa: "$۰٫۰۵ – $۱٫۰۰" };
+  const faPrizeRowAmount = `${persianAmount(minWheelAmount)} دلار – ${persianAmount(maxWheelAmount)} دلار`;
 
   for (const [label, dict] of Object.entries(locales)) {
-    assert.equal(dict.prizes.rows[1].amount, localizedPrizeRowAmounts[label] ?? expectedPrizeRowAmount);
+    assert.equal(dict.prizes.rows[1].amount, label === "fa" ? faPrizeRowAmount : expectedPrizeRowAmount);
     assertWheelAmountsWithinConfiguredRange(dict, label);
   }
+});
+
+test("wheel cards render every configured prize value", async () => {
+  const wheel = await read("../src/components/Wheel.tsx");
+  assert.match(wheel, /new Set\(sectors\.map\(\(s\) => s\.value\)\)/);
+  assert.match(wheel, /sort\(\(a, b\) => a - b\)/);
+  assert.match(wheel, /lg:grid-cols-5/);
+  for (const [label, dict] of Object.entries(locales)) {
+    for (const key of ["tierBase", "tierSilver", "tierGold", "tierPremium", "tierJackpot"]) {
+      assert.ok(dict.wheel[key], `${label}.wheel.${key} is missing`);
+    }
+  }
+});
+
+test("base split copy keeps approval without duplicating a 20-ticket footnote", () => {
+  for (const [label, dict] of Object.entries({ en, fa })) {
+    assert.match(dict.pool.money3, /approv|review|تأیید|بررسی/, `${label}.pool.money3 must mention approval`);
+    assert.match(dict.prizes.rows[4].amount, /\$15|15 دلار|۱۵ دلار|\$۱۵/, `${label}.prizes.rows[4] must state the base split`);
+    assert.match(dict.faq.items[1].a, /admin|Manager|سیستمی BETX/, `${label}.faq.items[1].a must mention approval`);
+    assert.match(dict.board.autoDrawNote, /admin|Manager|سیستمی BETX/, `${label}.board.autoDrawNote must mention approval`);
+  }
+});
+
+test("Persian copy uses BETX wording and localized dollar amounts", () => {
+  const copy = JSON.stringify(fa);
+  assert.doesNotMatch(copy, /Manager|مدیر/);
+  assert.doesNotMatch(copy, /\$/);
+  assert.doesNotMatch(copy, /[0-9] دلار/);
+  assert.match(copy, /[۰-۹][٫۰-۹]* دلار/);
+  assert.doesNotMatch(copy, /مند\s*سطح/);
+  assert.doesNotMatch(copy, /MULTI-TICKET BOOST/);
+  assert.doesNotMatch(copy, /واریز و برداشت در حالت تعمیرات/);
+  assert.doesNotMatch(copy, /دور پایه ۲۰ بلیطی/);
+  assert.doesNotMatch(copy, /استخرشان بدون برنده/);
+  assert.match(copy, /خرید چندتایی · شانس بیشتر/);
+  assert.equal(fa.pool.boostLabel, "{n} بلیط · {amount}");
+  assert.match(fa.footer.license, /زنجیره\u200cای/);
+  assert.equal(fa.phase2.tiers.kicker, "هفت سطح شفاف");
 });
 
 test("wheel-copy guard rejects stale Turkish prize variants", () => {
@@ -150,6 +197,17 @@ test("wheel-copy guard rejects stale Turkish prize variants", () => {
       /configured|wheel amount/,
     );
   }
+});
+
+test("settlement copy no longer claims automated BETX verification", () => {
+  assert.doesNotMatch(JSON.stringify(en), /automated BETX verification|BETX platform fee/i);
+  assert.doesNotMatch(JSON.stringify(fa), /خودکار سیستم BETX|کارمزد پلتفرم BETX/);
+});
+
+test("og image is generated instead of referencing a missing asset", async () => {
+  const route = await read("../src/app/og.png/route.tsx");
+  assert.match(route, /ImageResponse/);
+  assert.match(route, /width: 1200, height: 630/);
 });
 
 test("homepage status banners and labels use localized copy", async () => {
@@ -220,7 +278,7 @@ test("phase 2 UI is wired to shared tier selection without financial side effect
   assert.match(cards, /maintenance \? c\.actionDisabled/);
   assert.doesNotMatch(cards, /buy\(/);
   assert.match(transparency, /seedHash/);
-  assert.match(transparency, /<OnchainTreasury demo=\{demoEnabled\} compact \/>/);
+  assert.match(transparency, /<OnchainTreasury demo=\{isPreview \|\| demoEnabled\} compact \/>/);
   assert.match(jackpot, /weeklyJackpotSplit\(allocation\.jackpotCents\)/);
   assert.match(jackpot, /nextSundayUtc/);
   assert.match(wallet, /disabled=\{busy !== null \|\| dataUnavailable \|\| maintenance\}/);
@@ -236,4 +294,26 @@ test("tier progress endpoint is public, sanitized and rate-limited", async () =>
   assert.match(route, /listActiveTiers\(\)/);
   assert.match(route, /Cache-Control": "no-store"/);
   assert.doesNotMatch(route, /buy|withdraw|deposit|automation/);
+});
+
+test("pool page polish uses localized labels and ignores extension-only errors", async () => {
+  const layout = await read("../src/app/layout.tsx");
+  const hero = await read("../src/components/Hero.tsx");
+  const pool = await read("../src/components/PoolBand.tsx");
+  const deposit = await read("../src/components/DepositCard.tsx");
+  const wallet = await read("../src/components/Wallet.tsx");
+  const sections = await read("../src/components/Sections.tsx");
+
+  const extensionFilter = await read("../public/dev-error-filter.js");
+  assert.match(layout, /dev-error-filter\.js/);
+  assert.match(layout, /strategy="beforeInteractive"/);
+  assert.match(extensionFilter, /chrome-extension:\/\//);
+  assert.match(hero, /\$\{n\(1\)\}\/\$\{n\(/);
+  assert.doesNotMatch(hero, /1\/\$\{n\(/);
+  assert.match(pool, /d\.pool\.boostLabel/);
+  assert.doesNotMatch(pool, /\[d\.tiers\.price/);
+  assert.match(deposit, /locale === "fa" \? usd\(a, locale\)/);
+  assert.match(wallet, /placeholder=\{locale === "fa" \? usd\(15, locale\) : "15\.00"\}/);
+  assert.match(sections, /formatPadded\(year, locale, 4\)/);
+  assert.match(sections, /locale === "fa" \? d\.footer\.license : cfg\.license/);
 });

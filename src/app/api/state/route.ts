@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isNonLivePreview, isPreviewFallbackEnabled, previewState, withPreviewFallback } from "@/lib/previewFallback";
+import { shouldUseDevPreviewFallback } from "@/lib/rateLimitFailOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (shouldUseDevPreviewFallback(error)) return previewResponse();
     if (isNonLivePreview()) return previewResponse();
     if (isPreviewFallbackEnabled()) return previewResponse();
     console.error(error);

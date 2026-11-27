@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { money } from "@/lib/format";
+import { usd } from "@/lib/format";
 import { payoutVars } from "@/lib/payoutCopy";
 import { AnimatedMoney } from "./AnimatedMoney";
 import { GoldDollars3D } from "./GoldDollars3D";
@@ -20,13 +20,13 @@ const fade = {
 };
 
 export function Hero() {
-  const { state, loading, dataUnavailable, demoEnabled, isDemoSession, setToast } = useApp();
+  const { state, loading, dataUnavailable, isPreview, isDemoSession, setToast } = useApp();
   const { d, t, n, locale } = useI18n();
   const v = state?.vault;
   const tier = state?.tiers[0];
   const profit = v ? v.balance - v.initialCapital : null;
   const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
-  const demo = demoEnabled || isDemoSession || (state ? !state.config.live : false);
+  const demo = isPreview || isDemoSession || (state ? !state.config.live : false);
   const statusLabel = dataUnavailable
     ? d.ui.statusUnavailable
     : loading
@@ -104,10 +104,10 @@ export function Hero() {
           </motion.div>
 
           <motion.div custom={4} variants={fade} initial="hidden" animate="show" className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <Stat label={d.ui.statInitialLabel} value={v ? `$${money(v.initialCapital, locale)}` : d.ui.noData} note={d.hero.statInitial} />
+            <Stat label={d.ui.statInitialLabel} value={v ? `${usd(v.initialCapital, locale)}` : d.ui.noData} note={d.hero.statInitial} />
             <Stat
               label={d.ui.statProfitLabel}
-              value={profit === null ? d.ui.noData : `${profit > 0 ? "+" : ""}$${money(profit, locale)}`}
+              value={profit === null ? d.ui.noData : `${profit > 0 ? "+" : ""}${usd(profit, locale)}`}
               note={d.hero.statProfit}
               tone="foil"
             />
@@ -151,13 +151,13 @@ export function Hero() {
                 <span>
                   {d.hero.treasuryAllocation}:{" "}
                   <span dir="ltr" className="font-display tnum font-bold text-white">
-                    {v ? `$${money(v.totalFees, locale)}` : d.ui.noData}
+                    {v ? `${usd(v.totalFees, locale)}` : d.ui.noData}
                   </span>
                 </span>
                 <span className="text-foil/80">
                   {d.hero.adminEarnings}:{" "}
                   <span dir="ltr" className="font-display tnum font-bold text-white">
-                    {v ? `$${money(v.adminEarnings, locale)}` : d.ui.noData}
+                    {v ? `${usd(v.adminEarnings, locale)}` : d.ui.noData}
                   </span>
                 </span>
               </div>
@@ -165,23 +165,23 @@ export function Hero() {
             </div>
 
             <div className="mt-3">
-              <OnchainTreasury demo={state ? !state.config.live : demoEnabled} />
+              <OnchainTreasury demo={state ? !state.config.live : demo} />
             </div>
 
             <div className="mt-7 grid grid-cols-2 gap-3">
               <Cell
                 label={d.hero.cellFee}
-                value={tier ? `$${money(tier.treasury, locale)} + $${money(tier.admin, locale)}` : state ? `$${money(state.config.treasuryContributionPerRound, locale)} + $${money(state.config.adminGrossRevenuePerRound, locale)}` : d.ui.noData}
+                value={tier ? `${usd(tier.treasury, locale)} + ${usd(tier.admin, locale)}` : state ? `${usd(state.config.treasuryContributionPerRound, locale)} + ${usd(state.config.adminGrossRevenuePerRound, locale)}` : d.ui.noData}
                 note={t(d.hero.cellFeeNote, payout)}
               />
-              <Cell label={d.hero.cellPrize} value={tier ? `$${money(tier.prize, locale)}` : state ? `$${money(state.config.prizePerRound, locale)}` : d.ui.noData} note={t(d.hero.cellPrizeNote, payout)} />
-              <Cell label={d.hero.cellOdds} value={tier ? `1/${n(tier.capacity)}` : state ? `1/${n(state.config.roundCapacity)}` : d.ui.noData} note={t(d.hero.cellOddsNote, payout)} />
+              <Cell label={d.hero.cellPrize} value={tier ? `${usd(tier.prize, locale)}` : state ? `${usd(state.config.prizePerRound, locale)}` : d.ui.noData} note={t(d.hero.cellPrizeNote, payout)} />
+              <Cell label={d.hero.cellOdds} value={tier ? `${n(1)}/${n(tier.capacity)}` : state ? `${n(1)}/${n(state.config.roundCapacity)}` : d.ui.noData} note={t(d.hero.cellOddsNote, payout)} />
               <Cell label={d.hero.cellCap} value={tier ? n(tier.capacity) : state ? n(state.config.roundCapacity) : d.ui.noData} note={t(d.hero.cellCapNote, payout)} />
             </div>
 
             {v ? (
               <p className="mt-6 rounded-xl border border-neon/20 bg-neon/[0.06] px-4 py-3 text-[13px] leading-7 text-mint">
-                <span className="text-neon-2">◆</span> {t(d.hero.floor, { amount: `$${money(v.initialCapital, locale)}` })}
+                <span className="text-neon-2">◆</span> {t(d.hero.floor, { amount: `${usd(v.initialCapital, locale)}` })}
               </p>
             ) : null}
           </div>

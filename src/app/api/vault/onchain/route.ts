@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { getTreasuryOnchain } from "@/lib/onchain";
+import { config } from "@/lib/config";
+import { addressExplorerUrl, getTreasuryOnchain } from "@/lib/onchain";
 import { limitByIp } from "@/lib/ratelimit";
 import { handleError } from "@/lib/api";
+import { shouldUseDevPreviewFallback } from "@/lib/rateLimitFailOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,21 @@ export async function GET() {
       { headers: { "Cache-Control": "public, max-age=20, stale-while-revalidate=40" } },
     );
   } catch (e) {
+    if (shouldUseDevPreviewFallback(e)) {
+      return NextResponse.json(
+        {
+          ok: true,
+          address: config.adminWallet,
+          network: "solana",
+          status: "unavailable",
+          usdc: null,
+          sol: null,
+          fetchedAt: new Date().toISOString(),
+          explorerUrl: addressExplorerUrl(config.adminWallet),
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     return handleError(e);
   }
 }

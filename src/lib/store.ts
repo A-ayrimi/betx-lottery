@@ -316,7 +316,11 @@ function tierConfigFromRow(row: typeof ticketTiers.$inferSelect): TierConfig {
   };
 }
 
-async function resolveTierConfig(q: Q, selector?: string | number): Promise<TierConfig> {
+async function resolveTierConfig(
+  q: Q,
+  selector?: string | number,
+  fallbackToDefault = false,
+): Promise<TierConfig> {
   const condition =
     selector === undefined
       ? eq(ticketTiers.status, "ACTIVE")
@@ -324,7 +328,7 @@ async function resolveTierConfig(q: Q, selector?: string | number): Promise<Tier
           eq(ticketTiers.status, "ACTIVE"),
           typeof selector === "number" ? eq(ticketTiers.id, selector) : eq(ticketTiers.code, selector),
         );
-  const row = (
+  let row = (
     await q
       .select()
       .from(ticketTiers)
@@ -332,6 +336,16 @@ async function resolveTierConfig(q: Q, selector?: string | number): Promise<Tier
       .orderBy(asc(ticketTiers.displayOrder), asc(ticketTiers.id))
       .limit(1)
   )[0];
+  if (!row && fallbackToDefault && selector !== undefined) {
+    row = (
+      await q
+        .select()
+        .from(ticketTiers)
+        .where(eq(ticketTiers.status, "ACTIVE"))
+        .orderBy(asc(ticketTiers.displayOrder), asc(ticketTiers.id))
+        .limit(1)
+    )[0];
+  }
   if (!row) throw new Error("No active ticket tier is configured");
   return tierConfigFromRow(row);
 }
@@ -591,7 +605,7 @@ export async function openAdminRound(actor: string, tierSelector?: string | numb
 }
 
 export async function findOpenRound(tierSelector?: string | number) {
-  const tier = await resolveTierConfig(db, tierSelector);
+  const tier = await resolveTierConfig(db, tierSelector, true);
   return (
     (
       await db
