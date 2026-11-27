@@ -12,13 +12,31 @@ export function getBetxMode(): "live" | "demo" {
   throw new Error("BETX_MODE must be explicitly set to live or demo");
 }
 
+function getAppUrl(): string {
+  const raw = process.env.APP_URL?.trim();
+  if (!raw) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("APP_URL must be explicitly configured in production");
+    }
+    return "http://localhost:3000";
+  }
+  const url = new URL(raw);
+  if (
+    process.env.NODE_ENV === "production" &&
+    ["localhost", "127.0.0.1", "::1"].includes(url.hostname)
+  ) {
+    throw new Error("APP_URL must not point to localhost in production");
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
 export const config = {
   /** Mode must be explicitly configured; ambiguous values fail closed. */
   get live() {
     return getBetxMode() === "live";
   },
   get appUrl() {
-    return (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+    return getAppUrl();
   },
   get vaultInitial() {
     const raw = process.env.VAULT_INITIAL;

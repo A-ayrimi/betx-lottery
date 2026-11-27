@@ -4,7 +4,7 @@ import { UserError, type ErrorCode } from "@/lib/store";
 import { getDictionary, getRequestLocale } from "@/i18n";
 import { interpolate } from "@/i18n/config";
 import { regionStatus } from "@/lib/geo";
-import { ValidationError } from "@/lib/errors";
+import { MaintenanceError, ValidationError } from "@/lib/errors";
 import { isMaintenanceMode } from "@/lib/gameConfig";
 
 async function message(code: ErrorCode, vars?: Record<string, string | number>) {
@@ -18,6 +18,12 @@ export async function handleError(e: unknown) {
     return NextResponse.json(
       { ok: false, code: e.code, error: await message(e.code, e.vars) },
       { status: e.status },
+    );
+  }
+  if (e instanceof MaintenanceError) {
+    return NextResponse.json(
+      { ok: false, code: "maintenance", status: "MAINTENANCE", error: "maintenance" },
+      { status: 503 },
     );
   }
   if (e instanceof ValidationError) {

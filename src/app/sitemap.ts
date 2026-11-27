@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { locales } from "@/i18n/config";
+import { config } from "@/lib/config";
 
 /** All public, indexable routes across every locale (plus hreflang alternates). */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  const base = config.appUrl;
   const now = new Date();
   const pages: { path: string; priority: number; freq: "hourly" | "weekly" | "monthly" }[] = [
     { path: "", priority: 1, freq: "hourly" },

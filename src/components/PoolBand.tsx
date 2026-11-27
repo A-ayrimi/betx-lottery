@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { formatCurrency, formatPadded, formatPercent } from "@/lib/format";
+import { formatCurrency, formatDurationMinutes, formatPadded, formatPercent } from "@/lib/format";
 import { payoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 import { BalanceBadge } from "./BalanceBadge";
@@ -13,22 +13,17 @@ import type { AppState } from "@/lib/types";
 import { TicketDetailModal, type TicketView } from "./TicketDetails";
 
 export function PoolBand() {
-  const { state, loading, dataUnavailable, demoEnabled, isPreview, buy, setToast, openWalletConnect, selectedTierCode, setSelectedTierCode } = useApp();
+  const { state, loading, dataUnavailable, demoEnabled, isPreview, buy, setToast, openWalletConnect, selectedTierCode } = useApp();
   const { d, t, n, ago, dir, locale } = useI18n();
   const barRef = useRef<HTMLDivElement>(null);
   const lastSold = useRef<number | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tierCode, setTierCodeLocal] = useState("");
   const [tierRound, setTierRound] = useState<NonNullable<AppState["round"]> | null>(null);
   const [inspectTicket, setInspectTicket] = useState<TicketView | null>(null);
 
   const tiers = state?.tiers ?? [];
   const defaultRound = state?.round;
-  const setTierCode = (code: string) => {
-    setTierCodeLocal(code);
-    setSelectedTierCode(code);
-  };
-  const activeTierCode = tierCode || selectedTierCode || defaultRound?.tierCode || tiers[0]?.code || "usd_1";
+  const activeTierCode = selectedTierCode || defaultRound?.tierCode || tiers[0]?.code || "starter_1";
   const selectedTier = tiers.find((tier) => tier.code === activeTierCode);
   const round = activeTierCode === defaultRound?.tierCode ? defaultRound : tierRound;
   const sold = round?.sold ?? 0;
@@ -47,6 +42,7 @@ export function PoolBand() {
     locale
   );
   const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
+  const paused = maintenance || isPreview;
 
   // stubs sold after first render get the flash animation (keyed remount)
   const [initialMaxId] = useState(() => (state?.round?.tickets ?? []).reduce((m, x) => Math.max(m, x.id), 0));
@@ -83,8 +79,8 @@ export function PoolBand() {
   }, [activeTierCode, defaultRound]);
 
   const purchase = async (count: number, btn?: HTMLElement) => {
-    if (maintenance) {
-      setToast(d.errors.unavailable);
+    if (paused) {
+      setToast(maintenance ? d.ui.statusMaintenance : d.wc.demoBadge);
       return;
     }
     if (!round) {
@@ -165,45 +161,28 @@ export function PoolBand() {
         <GoldDollars3D count={18} seed={21} side="both" className="opacity-90" />
 
         <div className="relative mx-auto max-w-[1240px] px-4 py-14 sm:px-6 lg:py-20">
-          {tiers.length > 1 ? (
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="micro text-foil">{d.tiers.title}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {tiers.map((tier) => (
-                    <button
-                      key={tier.code}
-                      onClick={() => setTierCode(tier.code)}
-                      className={`focus-ring rounded-full border px-4 py-2 text-xs font-bold transition ${
-                        tier.code === activeTierCode
-                          ? "border-neon bg-neon/10 text-neon-2"
-                          : "border-rule text-mint hover:border-mint/50"
-                      }`}
-                    >
-                      {tier.name} · {formatCurrency(tier.priceUsd, locale)}
-                      {tier.code === round?.tierCode ? ` · ${d.tiers.current}` : ""}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-mint">{d.tiers.select}</p>
-            </div>
-          ) : null}
-
           <div className="flex flex-wrap items-end justify-between gap-8">
             <div>
               <p className="micro flex flex-wrap items-center gap-2 text-foil">
                 <span dir="auto">
                   {t(d.ui.roundPool, { round: formatPadded(round.id, locale), sold: n(sold), capacity: n(capacity) })}
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-neon/40 bg-neon/[0.08] px-2.5 py-1 text-neon-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${maintenance ? "bg-foil" : "live-dot bg-neon-2"}`} />
-                  {maintenance ? d.ui.statusMaintenance : d.pool.autoDraw}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-foil/40 bg-foil/[0.08] px-2.5 py-1 text-foil">
+                  <span className={`h-1.5 w-1.5 rounded-full ${paused ? "bg-foil" : "live-dot bg-neon-2"}`} />
+                  {maintenance ? d.ui.statusMaintenance : isPreview ? d.ui.statusDemo : d.pool.autoDraw}
                 </span>
               </p>
               <h2 className="mt-4 text-[clamp(2.1rem,5.4vw,3.9rem)] font-black leading-[1.08] text-white">
-                {d.pool.titleBefore} <span className="neon-text font-display tnum">{n(remaining)}</span>{" "}
-                {d.pool.titleAfter}
+                {paused ? (
+                  <span className="text-foil">
+                    {isPreview ? d.wc.demoBadge : d.ui.statusMaintenance} · {t(d.ui.roundPool, { round: formatPadded(round.id, locale), sold: n(sold), capacity: n(capacity) })}
+                  </span>
+                ) : (
+                  <>
+                    {d.pool.titleBefore} <span className="neon-text font-display tnum">{n(remaining)}</span>{" "}
+                    {d.pool.titleAfter}
+                  </>
+                )}
               </h2>
               <p className="mt-4 max-w-[58ch] text-[15px] leading-8 text-mint">
                 {t(d.pool.body, payout)}
@@ -242,7 +221,7 @@ export function PoolBand() {
                 [d.tiers.admin, formatCurrency(selectedTier.admin, locale)],
                 [
                   d.tiers.duration,
-                  t(d.tiers.minutes, { n: n(Number(selectedTier.drawDurationMinutes ?? 0)) }),
+                  formatDurationMinutes(selectedTier.drawDurationMinutes ?? 0, locale),
                 ],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-xl border border-rule bg-black/20 px-4 py-3">
@@ -257,47 +236,36 @@ export function PoolBand() {
           <div className="mt-12 grid grid-cols-4 gap-2.5 sm:grid-cols-5 lg:grid-cols-10">
             {stubs.map(({ index, ticket }) => {
               const filled = Boolean(ticket);
+              const disabled = !filled && paused;
               return (
-                <motion.div
+                <motion.button
                   key={ticket ? `t${ticket.id}` : `e${index}`}
+                  type="button"
+                  disabled={disabled}
+                  aria-label={filled ? `${d.ticket.inspect} ${ticket?.serial ?? ""}` : `${d.pool.open} ${n(index)}${paused ? ` · ${d.ui.statusMaintenance}` : ""}`}
                   initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-40px" }}
                   transition={{ duration: 0.4, delay: Math.min(index * 0.022, 0.5) }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={filled ? `${d.ticket.inspect} ${ticket?.serial ?? ""}` : `${d.pool.open} ${n(index)}`}
                   onClick={(e) => {
+                    if (disabled) return;
                     if (filled && ticket?.serial) {
                       setInspectTicket({
                         serial: ticket.serial,
                         roundId: tierRound?.id ?? defaultRound?.id ?? 0,
                         status: ticket.mine ? "pending" : "lost",
-                        kind: (tierCode || defaultRound?.tierCode || "").toUpperCase(),
+                        kind: activeTierCode.toUpperCase(),
                       });
                       return;
                     }
                     void purchase(1, e.currentTarget);
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (filled && ticket?.serial) {
-                        setInspectTicket({
-                          serial: ticket.serial,
-                          roundId: tierRound?.id ?? defaultRound?.id ?? 0,
-                          status: ticket.mine ? "pending" : "lost",
-                          kind: (tierCode || defaultRound?.tierCode || "").toUpperCase(),
-                        });
-                      } else {
-                        void purchase(1, e.currentTarget);
-                      }
-                    }
-                  }}
-                  className={`perf relative flex h-[104px] flex-col justify-between overflow-hidden rounded-[10px] px-2.5 py-2.5 ${
+                  className={`perf focus-ring relative flex h-[104px] flex-col justify-between overflow-hidden rounded-[10px] px-2.5 py-2.5 ${
                     filled
                       ? "stub-fill text-[#161206]"
-                      : `cursor-pointer border border-dashed border-rule bg-white/[0.02] text-mint transition-colors hover:border-neon/60 hover:bg-neon/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon ${index === sold + 1 ? "stub-next" : ""}`
+                      : disabled
+                        ? "cursor-not-allowed border border-dashed border-rule bg-white/[0.02] text-mint opacity-60"
+                        : `cursor-pointer border border-dashed border-rule bg-white/[0.02] text-mint transition-colors hover:border-neon/60 hover:bg-neon/[0.04] ${index === sold + 1 ? "stub-next" : ""}`
                   } ${ticket && ticket.id > initialMaxId ? "flash" : ""}`}
                 >
                   <div className="flex items-start justify-between">
@@ -318,35 +286,43 @@ export function PoolBand() {
 
                   {filled ? (
                     <>
-                      <p
+                      <span
                         dir="ltr"
-                        className="font-display truncate text-[10px] font-bold tracking-[0.08em]"
+                        className="block truncate font-display text-[10px] font-bold tracking-[0.08em]"
                       >
                         {ticket?.serial}
-                      </p>
-                      <p dir="ltr" className="truncate text-[10px] text-[#4a3a12]">
+                      </span>
+                      <span dir="ltr" className="block truncate text-[10px] text-[#4a3a12]">
                         @{ticket?.username}
-                      </p>
+                      </span>
                     </>
                   ) : (
                     <>
-                      <p className="text-[10px] leading-4 text-mint/70">{d.pool.empty}</p>
-                      <p
+                      <span className="block text-[10px] leading-4 text-mint/70">{d.pool.empty}</span>
+                      <span
                         dir="ltr"
-                        className="font-display text-[11px] tracking-[0.14em] text-neon-2/80"
+                        className={`block font-display text-[11px] tracking-[0.14em] ${paused ? "text-foil" : "text-neon-2/80"}`}
                       >
-                        {d.pool.open}
-                      </p>
+                        {paused ? d.ui.statusMaintenance : d.pool.open}
+                      </span>
                     </>
                   )}
-                </motion.div>
+                </motion.button>
               );
             })}
           </div>
 
           {/* progress + urgency */}
           <div className="mt-8">
-            <div ref={barRef} className="h-3 w-full overflow-hidden rounded-full border border-rule bg-black/40">
+            <div
+              ref={barRef}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={capacity}
+              aria-valuenow={sold}
+              aria-label={t(d.ui.roundPool, { round: formatPadded(round.id, locale), sold: n(sold), capacity: n(capacity) })}
+              className="h-3 w-full overflow-hidden rounded-full border border-rule bg-black/40"
+            >
               <motion.div
                 className="h-full rounded-full bg-[linear-gradient(90deg,#0b6b48,#10e28e_45%,#e9c46a)]"
                 initial={{ width: 0 }}
@@ -365,8 +341,8 @@ export function PoolBand() {
                 ) : null}
               </p>
               <p dir="auto" className="flex items-center gap-2 text-[13px] text-foil">
-                <span className="live-dot h-2 w-2 rounded-full bg-foil" />
-                {remaining <= 5 ? d.pool.hot : d.pool.cool}
+                <span className={`h-2 w-2 rounded-full bg-foil ${paused ? "" : "live-dot"}`} />
+                {paused ? d.ui.statusMaintenance : remaining <= 5 ? d.pool.hot : d.pool.cool}
               </p>
             </div>
           </div>
@@ -412,15 +388,19 @@ export function PoolBand() {
                   {[1, 3, 5].map((c) => (
                     <button
                       key={c}
-                      disabled={busy || remaining === 0 || maintenance}
+                      type="button"
+                      disabled={busy || remaining === 0 || paused}
+                      aria-busy={busy}
                       onClick={(e) => purchase(c, e.currentTarget)}
                       className={`focus-ring rounded-2xl px-6 py-4 font-bold disabled:opacity-50 ${
                         c === 3 ? "btn-foil" : "btn-neon"
                       }`}
                     >
-                      <span dir={locale === "fa" || locale === "ar" ? "rtl" : "ltr"} className="font-display tnum">
-                        {maintenance
-                          ? d.ui.statusMaintenance
+                      <span dir={dir} className="font-display tnum">
+                        {paused
+                          ? maintenance
+                            ? d.ui.statusMaintenance
+                            : d.ui.statusDemo
                           : t(d.pool.boostLabel, { n: n(c), amount: formatCurrency(ticketPrice * c, locale) })}
                       </span>
                       {state?.user ? (
@@ -445,9 +425,10 @@ export function PoolBand() {
                 ))}
               </ul>
               <button
+                type="button"
                 onClick={() =>
                   setToast(
-                    state?.config.live ? d.pool.transparencyLive : d.pool.transparencyDemo,
+                    paused ? d.pool.transparencyDemo : state?.config.live ? d.pool.transparencyLive : d.pool.transparencyDemo,
                   )
                 }
                 className="focus-ring mt-5 w-full rounded-xl border border-foil/30 px-5 py-3 text-xs text-foil transition-colors hover:bg-foil/10"
@@ -460,7 +441,7 @@ export function PoolBand() {
           {/* live activity — real ledger rows only, usernames masked */}
           <div className="mt-6 overflow-hidden rounded-2xl border border-rule bg-black/20">
             <p className="micro flex items-center gap-2 border-b border-rule px-5 py-3 text-mint">
-              <span className={`h-1.5 w-1.5 rounded-full ${isPreview ? "bg-foil" : "live-dot bg-neon-2"}`} /> {d.activity.kicker}
+              <span className={`h-1.5 w-1.5 rounded-full ${paused ? "bg-foil" : "live-dot bg-neon-2"}`} /> {d.activity.kicker}
             </p>
             {activity.length === 0 ? (
               <p className="px-5 py-4 text-sm text-mint">{d.activity.empty}</p>

@@ -665,7 +665,7 @@ function tierToForm(tier?: TierRow): TierForm {
     name: tier?.name ?? "",
     priceUsd: tier?.priceUsd ?? "1",
     ticketCapacity: String(tier?.ticketCapacity ?? 50),
-    drawDurationMinutes: String(tier?.drawDurationMinutes ?? 1440),
+    drawDurationMinutes: String(tier?.drawDurationMinutes ?? 4320),
     prizePercentage: tier?.prizePercentage ?? "75",
     treasuryPercentage: tier?.treasuryPercentage ?? "15",
     adminPercentage: tier?.adminPercentage ?? "10",

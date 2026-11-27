@@ -16,7 +16,7 @@ import {
   setSession,
   UserError,
 } from "@/lib/store";
-import { assertRegion, handleError } from "@/lib/api";
+import { assertRegion, handleError, maintenanceBlocked } from "@/lib/api";
 import { getRequestLocale } from "@/i18n";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,8 @@ export const dynamic = "force-dynamic";
  *  - new wallet         -> create an account (18+/Terms required)
  */
 export async function POST(req: NextRequest) {
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
   try {
     await limitByIp("verify", 20);
     const country = await assertRegion();

@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { config } from "@/lib/config";
+import { maintenanceBlocked } from "@/lib/api";
 import { createLoginLink, referralLink, sendMessage, tg } from "@/lib/telegram";
 import { upsertTelegramUser, type TgProfile } from "@/lib/tgUser";
 import { botStrings } from "@/i18n/bot";
@@ -96,6 +97,8 @@ async function handleCommand(chatId: number, from: TgProfile, command: string, a
 
 export async function POST(req: NextRequest) {
   if (!secretOk(req)) return NextResponse.json({ ok: false }, { status: 401 });
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
 
   let update: TgUpdate;
   try {

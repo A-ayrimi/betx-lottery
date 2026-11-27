@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { config } from "@/lib/config";
 import { makeReferralCode, rewardSignupReferral, setSession, UserError } from "@/lib/store";
-import { assertRegion, handleError } from "@/lib/api";
+import { assertRegion, handleError, maintenanceBlocked } from "@/lib/api";
 import { getRequestLocale } from "@/i18n";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,8 @@ const slug = (s: string) =>
   s.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24);
 
 export async function POST(req: NextRequest) {
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
   try {
     const country = await assertRegion();
     await limitByIp("connect", 10);

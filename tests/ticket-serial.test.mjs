@@ -161,7 +161,7 @@ test("all locales expose tokenized ticket, verification, and payout copy", () =>
     assert.match(getPath(dict, "meta.description"), /\{price\}/);
     assert.match(getPath(dict, "meta.description"), /\{capacity\}/);
     assert.match(getPath(dict, "hero.body"), /\{capacity\}/);
-    assert.match(getPath(dict, "hero.body"), /\{prize\}/);
+    assert.match(getPath(dict, "hero.body"), /\{winner\}|\{prize\}/);
     assert.match(getPath(dict, "pool.money1"), /\{capacity\}/);
     assert.match(getPath(dict, "pool.money1"), /\{price\}/);
     assert.match(getPath(dict, "pool.money1"), /\{pool\}/);

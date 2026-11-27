@@ -62,7 +62,7 @@ export function TierCards() {
   if (!tiers.length) return null;
 
   const c = d.phase2.tiers;
-  const maintenance = !isPreview && Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
+  const maintenance = isPreview || Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
   const active = selectedTierCode || state?.round?.tierCode || tiers[0]?.code;
 
   const selectTier = (code: string) => {
@@ -102,7 +102,11 @@ export function TierCards() {
             <article
               key={tier.code}
               className={`panel relative flex flex-col rounded-2xl p-5 transition ${
-                selected ? "border-foil/60 bg-foil/[0.07] shadow-[0_0_28px_rgba(233,196,106,0.12)]" : ""
+                selected
+                  ? maintenance
+                    ? "border-rule bg-white/[0.02] opacity-70"
+                    : "border-foil/60 bg-foil/[0.07] shadow-[0_0_28px_rgba(233,196,106,0.12)]"
+                  : ""
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -170,8 +174,8 @@ export function TierCards() {
                 onClick={() => selectTier(tier.code)}
                 disabled={maintenance}
                 aria-pressed={selected && !maintenance}
-                className={`focus-ring mt-5 w-full rounded-xl px-4 py-3 text-[12px] font-bold transition ${
-                  selected ? "btn-foil" : "btn-neon"
+                className={`focus-ring mt-5 w-full rounded-xl px-4 py-3 text-[12px] font-bold transition disabled:opacity-60 ${
+                  maintenance ? "border border-rule bg-white/[0.03] text-mint" : selected ? "btn-foil" : "btn-neon"
                 }`}
               >
                 {maintenance ? c.actionDisabled : selected ? c.selected : c.select}

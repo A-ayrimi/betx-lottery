@@ -7,9 +7,10 @@ import "@fontsource-variable/space-grotesk";
 import "@fontsource-variable/manrope";
 import "./globals.css";
 import { defaultLocale, dirOf, isLocale } from "@/i18n/config";
+import { config } from "@/lib/config";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(config.appUrl),
   // Titles are fully composed per page (each dictionary already ends with “| BETX”).
   title: "BETX | One ticket. One chance. Automated BETX-verified draws.",
   description:

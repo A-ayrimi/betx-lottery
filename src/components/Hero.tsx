@@ -93,13 +93,16 @@ export function Hero() {
             <a href="#wheel" className="btn-neon cta-breathe focus-ring rounded-2xl px-7 py-4 text-base font-bold">
               {d.hero.ctaWheel}
             </a>
-            <a
-              href="#pool"
-              aria-disabled={maintenance}
-              className={`btn-foil rounded-2xl px-7 py-4 text-base font-bold ${maintenance ? "opacity-60" : "cta-breathe focus-ring"}`}
+            <button
+              type="button"
+              disabled={maintenance}
+              onClick={() => document.getElementById("pool")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className={`btn-foil rounded-2xl px-7 py-4 text-base font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
+                maintenance ? "" : "cta-breathe focus-ring"
+              }`}
             >
               {maintenance ? d.ui.statusMaintenance : d.hero.ctaTicket}
-            </a>
+            </button>
             <button
               onClick={() => setToast(t(d.hero.howToast, payout))}
               className="focus-ring rounded-2xl border border-rule px-5 py-4 text-sm text-mint transition-colors hover:border-mint/50 hover:text-white"
@@ -150,7 +153,7 @@ export function Hero() {
             <div className="mt-4 rounded-xl border border-foil/25 bg-foil/[0.06] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="micro text-foil">{d.hero.treasury}</p>
-                <span className="live-dot h-1.5 w-1.5 rounded-full bg-foil" />
+                <span className={`h-1.5 w-1.5 rounded-full bg-foil ${statusOnline ? "live-dot" : ""}`} />
               </div>
               <p dir="ltr" className="font-display mt-2 truncate text-start text-[12px] tracking-[0.06em] text-foil">
                 {v?.adminWallet ?? state?.config.adminWallet ?? d.ui.noData}

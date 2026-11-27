@@ -185,7 +185,7 @@ export function Header() {
                     onClick={() => (window.location.hash = "wallet")}
                   />
                 ) : (
-                  <button onClick={openModal} className="btn-neon focus-ring rounded-full px-4 py-2 text-xs font-bold">
+                  <button type="button" dir={dir} onClick={openModal} className="btn-neon focus-ring rounded-full px-4 py-2 text-xs font-bold">
                     {!live ? d.wc.demoAlt : d.wc.linkWallet}
                   </button>
                 )}
@@ -217,6 +217,8 @@ export function Header() {
               </div>
             ) : (
               <button
+                type="button"
+                dir={dir}
                 onClick={openModal}
                 aria-label={d.wc.connectWallet}
                 className="btn-foil focus-ring flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2.5 text-[13px] font-bold min-[400px]:px-4 sm:px-5"
@@ -320,6 +322,8 @@ export function Header() {
                       <Field label={d.header.referral} value={form.referral} onChange={(v) => setForm({ ...form, referral: v })} placeholder="BETX01" />
                       <button
                         type="submit"
+                        dir={dir}
+                        aria-busy={busy}
                         disabled={busy || !form.accept}
                         className="btn-neon focus-ring w-full rounded-xl px-6 py-3 text-sm font-bold disabled:opacity-60"
                       >
@@ -330,6 +334,8 @@ export function Header() {
                 ) : null}
 
                 <button
+                  type="button"
+                  dir={dir}
                   onClick={() => {
                     closeWalletConnect();
                     if (!user) setToast(d.header.guestToast);

@@ -20,7 +20,10 @@ function authorized(req: NextRequest) {
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   if (config.maintenanceMode) {
-    return NextResponse.json({ ok: true, skipped: "maintenance" });
+    return NextResponse.json(
+      { ok: false, code: "maintenance", status: "MAINTENANCE", error: "maintenance" },
+      { status: 503 },
+    );
   }
   try {
     const result = await runAutomation("cron");

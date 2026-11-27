@@ -49,3 +49,25 @@ export function usd(n: number | string, locale: Locale) {
 }
 
 export const formatCurrency = (n: number | string, locale: Locale) => usd(n, locale);
+
+const DURATION_UNITS: Record<Locale, { day: string; hour: string; minute: string }> = {
+  en: { day: "d", hour: "h", minute: "m" },
+  es: { day: "d", hour: "h", minute: "min" },
+  fa: { day: "روز", hour: "ساعت", minute: "دقیقه" },
+  ar: { day: "يوم", hour: "ساعة", minute: "دقيقة" },
+  tr: { day: "g", hour: "sa", minute: "dk" },
+  ru: { day: "д", hour: "ч", minute: "мин" },
+};
+
+export function formatDurationMinutes(minutes: number | string, locale: Locale) {
+  const safeLocale: Locale = isLocale(locale) ? locale : "en";
+  const value = Math.max(0, Math.round(Number(minutes) || 0));
+  const units = DURATION_UNITS[safeLocale];
+  if (value > 0 && value % 1440 === 0) {
+    return `${formatNumber(value / 1440, safeLocale, { useGrouping: false })} ${units.day}`;
+  }
+  if (value > 0 && value % 60 === 0) {
+    return `${formatNumber(value / 60, safeLocale, { useGrouping: false })} ${units.hour}`;
+  }
+  return `${formatNumber(value, safeLocale, { useGrouping: false })} ${units.minute}`;
+}

@@ -24,7 +24,7 @@ async function post(url: string, body: unknown) {
 
 export function DepositCard() {
   const { state, setToast, isDemoSession, dataUnavailable } = useApp();
-  const { d, t, n, locale } = useI18n();
+  const { d, t, n, dir: direction, locale } = useI18n();
   const cfg = state?.config;
   const user = state?.user;
   const paymentsReady = Boolean(
@@ -55,10 +55,12 @@ export function DepositCard() {
       <p className="micro text-neon-2">{d.wallet.depositKicker}</p>
       <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
 
-      <div dir={locale === "fa" ? "rtl" : "ltr"} className="mt-4 grid grid-cols-4 gap-2">
+      <div dir={direction} className="mt-4 grid grid-cols-4 gap-2">
         {AMOUNTS.map((a) => (
           <button
             key={a}
+            type="button"
+            aria-pressed={!custom && amount === a}
             onClick={() => {
               setAmount(a);
               setCustom("");
@@ -104,7 +106,7 @@ function SolanaDeposit({
 }) {
   const { state, refresh, setToast } = useApp();
   const wallet = useWallet();
-  const { d, t, locale } = useI18n();
+  const { d, t, dir: direction, locale } = useI18n();
   const user = state?.user;
   const treasuryAddress = state?.config?.solana?.treasuryAddress ?? "";
   const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
@@ -235,6 +237,9 @@ function SolanaDeposit({
       </div>
 
       <button
+        type="button"
+        aria-busy={phase !== "" && phase !== "done"}
+        dir={direction}
         onClick={pay}
         disabled={!paymentsReady || maintenance || dataUnavailable || (phase !== "" && phase !== "done") || !amount || Boolean(user.selfExcludedUntil)}
         className="btn-neon focus-ring mt-3 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
@@ -267,7 +272,7 @@ function SolanaDeposit({
             {d.wc.viewTx} ↗
           </a>
           {phase === "confirm" && pendingId ? (
-            <button onClick={() => poll(pendingId)} className="text-mint hover:text-white">
+            <button type="button" dir={direction} onClick={() => poll(pendingId)} className="text-mint hover:text-white">
               {d.wc.checkAgain}
             </button>
           ) : null}
@@ -284,6 +289,9 @@ function SolanaDeposit({
             {treasuryAddress}
           </code>
           <button
+            type="button"
+            dir={direction}
+            aria-label={`${d.wc.copy} ${treasuryAddress}`}
             onClick={async () => {
               await navigator.clipboard.writeText(treasuryAddress).catch(() => {});
               setCopied(true);
@@ -297,12 +305,16 @@ function SolanaDeposit({
         <div className="mt-2 flex gap-2">
           <input
             dir="ltr"
+            aria-label={d.wc.txidPlaceholder}
             value={txid}
             onChange={(e) => setTxid(e.target.value)}
             placeholder={d.wc.txidPlaceholder}
             className="focus-ring min-w-0 flex-1 rounded-lg border border-rule bg-black/30 px-3 py-2 font-display text-[11px] text-white placeholder:text-mint/40"
           />
           <button
+            type="button"
+            dir={direction}
+            aria-busy={phase === "confirm"}
             onClick={claim}
             disabled={!paymentsReady || maintenance || txid.trim().length < 32}
             className="btn-foil rounded-lg px-3 py-2 text-[12px] font-bold disabled:opacity-50"

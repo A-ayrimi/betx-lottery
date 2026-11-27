@@ -44,6 +44,8 @@ export function TransparencyPanel() {
   const round = state?.round ?? null;
   const left = useCountdown(round?.closesAt ?? null, locale);
   const hash = round?.seedHash ?? null;
+  const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
+  const paused = maintenance || isPreview;
 
   return (
     <section id="transparency" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="transparency-title">
@@ -130,7 +132,7 @@ export function TransparencyPanel() {
             <p className="micro text-foil">{c.refundTitle}</p>
             <p className="mt-3 text-[12px] leading-7 text-mint">{c.refundNote}</p>
             <p dir="ltr" className="mt-3 font-display tnum text-2xl font-black text-foil">
-              {left || c.noRound}
+              {paused ? (maintenance ? d.ui.statusMaintenance : d.ui.statusDemo) : left || c.noRound}
             </p>
           </div>
         </div>

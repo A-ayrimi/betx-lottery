@@ -25,6 +25,8 @@ import {
   type User,
 } from "@/db/schema";
 import { config, publicConfig } from "@/lib/config";
+import { isMaintenanceMode } from "@/lib/gameConfig";
+import { MaintenanceError } from "@/lib/errors";
 import { isTicketSerialCollision, makeTicketSerial } from "@/lib/ticketSerial";
 import { appendAdminAuditEvent, writePhase2DrawEvidence, writePhase2SettlementProof } from "@/lib/phase2Runtime";
 import { evaluatePhase2Refund } from "@/lib/phase2Policy";
@@ -37,6 +39,10 @@ const STORE_SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL ||
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   "https://api.mainnet-beta.solana.com";
+
+function assertMutationsOpen() {
+  if (isMaintenanceMode()) throw new MaintenanceError();
+}
 
 function isSolanaAddress(addr: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test((addr || "").trim());
@@ -653,6 +659,7 @@ export async function ensureOpenRound(tierSelector?: string | number) {
  * Idempotent: only acts on a still-open round with tickets.
  */
 export async function refundRound(roundId: number) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const r = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
     if (!r || normalizeRoundStatus(r.status) !== ROUND_STATUSES.OPEN || r.sold === 0) return null;
@@ -788,6 +795,7 @@ export async function setSession(userId: number) {
 
 /** Called once when a brand-new user signs up with a code. */
 export async function rewardSignupReferral(q: Q, inviteeId: number, code: string) {
+  assertMutationsOpen();
   const r = await q.select().from(users).where(eq(users.referralCode, code)).limit(1);
   const inviter = r[0];
   if (!inviter || inviter.id === inviteeId) return null;
@@ -837,6 +845,7 @@ export async function canSpin(q: Q, userId: number, bonusSpins: number) {
 }
 
 export async function spinWheel(userId: number) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const me = (await tx.select().from(users).where(eq(users.id, userId)).for("update"))[0];
     if (!me) throw new UserError("userNotFound", 404);
@@ -1097,6 +1106,7 @@ export async function autoDrawExpiredRounds(triggerUserId = 0): Promise<DrawOutc
 }
 
 export async function approveRoundResult(roundId: number, approved: boolean, actor: string) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const row = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
     if (!row) return null;
@@ -1183,6 +1193,7 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
 }
 
 export async function settleApprovedRound(roundId: number, actor: string) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const row = (await tx.select().from(rounds).where(eq(rounds.id, roundId)).for("update"))[0];
     if (!row) return null;
@@ -1488,6 +1499,7 @@ export async function getDrawHistory(limit = 20, offset = 0) {
 }
 
 export async function buyTickets(userId: number, requested: number, tierSelector?: string | number) {
+  assertMutationsOpen();
   const count = Math.min(10, Math.max(1, Math.floor(requested) || 1));
   const serialRetryLimit = 5;
 
@@ -1629,6 +1641,7 @@ export async function buyTickets(userId: number, requested: number, tierSelector
  * for the same deposit (duplicate webhooks, retries, manual reconciliation).
  */
 export async function creditDeposit(depositId: number, status = "finished") {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const dep = (await tx.select().from(deposits).where(eq(deposits.id, depositId)).for("update"))[0];
     if (!dep) return null;
@@ -1721,6 +1734,7 @@ export async function creditDeposit(depositId: number, status = "finished") {
 /* ------------------------------------------------------------ withdrawals */
 
 export async function requestWithdrawal(userId: number, amount: number, address: string) {
+  assertMutationsOpen();
   const amt = Math.round(amount * 100) / 100;
   if (!Number.isFinite(amt) || amt < config.limits.minWithdraw) {
     throw new UserError("withdrawMin", 400, { min: usd(config.limits.minWithdraw) });
@@ -1769,6 +1783,7 @@ export async function processWithdrawal(
   note?: string,
   actor = "admin",
 ) {
+  assertMutationsOpen();
   let verifiedTxHash: string | null = null;
   if (action === "paid") {
     const clean = txHash?.trim() ?? "";

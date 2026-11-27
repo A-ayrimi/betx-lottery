@@ -67,20 +67,20 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           </div>
           <main>
             <Hero />
-            <WinnersTicker />
             <PoolBand />
             <TierCards />
-            <HowItWorks />
             <Prizes />
             <TransparencyPanel />
             <WeeklyJackpotWidget />
-            <Wheel />
+            <WinnersTicker />
             <Leaderboard />
             <WinnersHistory />
             <VaultCandleChart />
+            <Faq />
+            <HowItWorks />
+            <Wheel />
             <Invite />
             <Wallet />
-            <Faq />
           </main>
           <SiteFooter year={new Date(SERVER_RENDERED_AT).getUTCFullYear()} />
           <Toasts />

@@ -128,7 +128,7 @@ export function WinnersHistory() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <p className="micro flex items-center gap-2 text-foil">
-              <span className="live-dot h-1.5 w-1.5 rounded-full bg-neon-2" />
+              <span className={`h-1.5 w-1.5 rounded-full bg-foil ${maintenance || isPreview ? "" : "live-dot"}`} />
               {d.board.historyKicker}
             </p>
             <h2 className="mt-4 text-[clamp(1.9rem,4.4vw,2.9rem)] font-black leading-[1.15] text-white">
@@ -137,15 +137,20 @@ export function WinnersHistory() {
             <p className="mt-3 max-w-[64ch] text-[15px] leading-8 text-mint">{d.board.historyBody}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
-            <span dir="ltr" className="font-display text-[11px] tracking-[0.22em] text-neon-2">
+            <span className={`h-2 w-2 rounded-full bg-foil ${maintenance || isPreview ? "" : "live-dot"}`} />
+            <span dir="ltr" className={`font-display text-[11px] tracking-[0.22em] ${maintenance || isPreview ? "text-foil" : "text-neon-2"}`}>
               {isPreview ? d.wc.demoBadge : maintenance ? d.ui.statusMaintenance : d.board.live}
             </span>
           </div>
         </div>
 
         <div className="mt-6 rounded-2xl border border-neon/20 bg-neon/[0.05] px-5 py-4 text-[13px] leading-7 text-mint">
-          <span className="text-neon-2">◆</span> {isPreview ? d.draw.demoNotice : t(d.board.autoDrawNote, payout)}
+          <span className="text-neon-2">◆</span>{" "}
+          {isPreview
+            ? d.draw.demoNotice
+            : maintenance
+              ? d.ui.maintenanceBanner
+              : t(d.board.autoDrawNote, payout)}
           {!isPreview ? (
             <>
               <br />

@@ -2,7 +2,8 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { appendAdminAuditEvent } from "@/lib/phase2Runtime";
 import { adminAuditLog, ticketTiers } from "@/db/schema";
-import { ValidationError } from "@/lib/errors";
+import { MaintenanceError, ValidationError } from "@/lib/errors";
+import { isMaintenanceMode } from "@/lib/gameConfig";
 import { roundMoney } from "@/lib/tierAccounting";
 import { deriveTierAmounts } from "@/lib/tierMath";
 
@@ -42,6 +43,10 @@ type ValidatedTier = {
 
 function invalid(message: string): never {
   throw new ValidationError(message);
+}
+
+function assertMutationsOpen() {
+  if (isMaintenanceMode()) throw new MaintenanceError();
 }
 
 function finite(value: unknown, label: string): number {
@@ -137,6 +142,7 @@ export async function listAllTiers() {
 }
 
 export async function createTier(input: TierInput, actor: string) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const values = serialize(validate(input));
     const existing = (await tx.select({ id: ticketTiers.id }).from(ticketTiers).where(eq(ticketTiers.code, values.code)).limit(1))[0];
@@ -160,6 +166,7 @@ export async function createTier(input: TierInput, actor: string) {
 }
 
 export async function updateTier(id: number, input: Partial<TierInput>, actor: string) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const before = (await tx.select().from(ticketTiers).where(eq(ticketTiers.id, id)).for("update"))[0];
     if (!before) invalid("Tier not found");
@@ -210,6 +217,7 @@ export async function updateTier(id: number, input: Partial<TierInput>, actor: s
 }
 
 export async function setTierStatus(id: number, status: TierStatus, actor: string) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const before = (await tx.select().from(ticketTiers).where(eq(ticketTiers.id, id)).for("update"))[0];
     if (!before) invalid("Tier not found");

@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { TicketPublicCopy, TicketPublicQr } from "@/components/TicketDetails";
 import { getDictionary } from "@/i18n";
 import { dirOf, intlTags, isLocale } from "@/i18n/config";
 import { formatNumber } from "@/lib/format";
+import { config } from "@/lib/config";
 import { isNonLivePreview, isPreviewFallbackEnabled, previewTicketBySerial } from "@/lib/previewFallback";
 import { isTicketSerial } from "@/lib/ticketSerial";
 
@@ -18,9 +18,6 @@ export default async function TicketPage({ params }: PageProps<"/[locale]/ticket
   const d = getDictionary(locale);
   const v = d.verification;
   const home = `/${locale}`;
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
   let ticket = null;
   const decoded = decodeURIComponent(serial);
   if (isPreviewFallbackEnabled() && isTicketSerial(decoded)) {
@@ -45,7 +42,7 @@ export default async function TicketPage({ params }: PageProps<"/[locale]/ticket
     ? new Intl.DateTimeFormat(intlTags[locale], { dateStyle: "medium", timeStyle: "short" }).format(new Date(ticket.createdAt))
     : "";
   const ticketPath = `${home}/ticket/${encodeURIComponent(decoded)}`;
-  const lookupUrl = `${protocol}://${host}${ticketPath}`;
+  const lookupUrl = `${config.appUrl}${ticketPath}`;
   const roundVerification = ticket ? `${home}/verify/${ticket.roundId}` : home;
 
   return (

@@ -12,7 +12,7 @@ import { TicketSerialRow } from "./TicketDetails";
 
 export function Wallet() {
   const { state, withdraw, setToast, isDemoSession, loading, dataUnavailable, demoEnabled } = useApp();
-  const { d, t, n, ago, date, locale } = useI18n();
+  const { d, t, n, ago, date, dir: direction, locale } = useI18n();
   const [busy, setBusy] = useState<"dep" | "wd" | null>(null);
   const [wd, setWd] = useState({ amount: "", address: "" });
 
@@ -112,7 +112,8 @@ export function Wallet() {
             <label className="mt-5 block">
               <span className="micro text-mint">{t(d.wallet.amountMin, { min: `${usd(cfg?.minWithdraw ?? 5, locale)}` })}</span>
               <input
-                dir={locale === "fa" ? "rtl" : "ltr"}
+                dir={direction}
+                aria-label={d.wallet.amountMin.replace("{min}", `${usd(cfg?.minWithdraw ?? 5, locale)}`)}
                 inputMode="decimal"
                 value={wd.amount}
                 onChange={(e) => setWd({ ...wd, amount: e.target.value.replace(/[^0-9.]/g, "") })}
@@ -135,6 +136,7 @@ export function Wallet() {
               </span>
               <input
                 dir="ltr"
+                aria-label={d.wallet.address}
                 value={wd.address}
                 onChange={(e) => setWd({ ...wd, address: e.target.value })}
                 placeholder={user?.payoutAddress || d.wallet.address}
@@ -143,6 +145,8 @@ export function Wallet() {
             </label>
             <button
               type="submit"
+              dir={direction}
+              aria-busy={busy === "wd"}
               disabled={busy !== null || dataUnavailable || maintenance}
               className="btn-foil focus-ring mt-5 w-full rounded-xl px-6 py-3.5 text-base font-bold disabled:opacity-60"
             >
@@ -262,7 +266,7 @@ export function Wallet() {
 
 function ResponsiblePanel() {
   const { state, account, setToast } = useApp();
-  const { d, t, date, href, locale } = useI18n();
+  const { d, t, date, href, dir: direction, locale } = useI18n();
   const [limit, setLimit] = useState("");
   const user = state?.user;
   if (!user) return null;
@@ -307,6 +311,8 @@ function ResponsiblePanel() {
             className="focus-ring min-w-[180px] flex-1 rounded-xl border border-rule bg-black/30 px-4 py-3 font-display text-sm text-white placeholder:text-mint/40"
           />
           <button
+            type="button"
+            dir={direction}
             onClick={() => saveLimit(Number(limit))}
             disabled={!limit}
             className="btn-neon focus-ring rounded-xl px-5 py-3 text-sm font-bold disabled:opacity-50"
@@ -314,7 +320,7 @@ function ResponsiblePanel() {
             {d.rg.save}
           </button>
           {user.depositLimit !== null ? (
-            <button onClick={() => saveLimit(null)} className="focus-ring rounded-xl border border-rule px-4 py-3 text-sm text-mint hover:text-white">
+            <button type="button" dir={direction} onClick={() => saveLimit(null)} className="focus-ring rounded-xl border border-rule px-4 py-3 text-sm text-mint hover:text-white">
               {d.rg.remove}
             </button>
           ) : null}
@@ -337,6 +343,8 @@ function ResponsiblePanel() {
           ].map(([days, label]) => (
             <button
               key={String(days)}
+              type="button"
+              dir={direction}
               onClick={() => exclude(Number(days))}
               className="focus-ring rounded-xl border border-foil/30 px-3 py-3 text-sm text-foil transition-colors hover:bg-foil/10"
             >

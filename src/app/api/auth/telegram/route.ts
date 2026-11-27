@@ -3,7 +3,7 @@ import { limitByIp, rateLimit } from "@/lib/ratelimit";
 import { verifyInitData, sendMessage } from "@/lib/telegram";
 import { upsertTelegramUser } from "@/lib/tgUser";
 import { setSession, UserError } from "@/lib/store";
-import { assertRegion, handleError } from "@/lib/api";
+import { assertRegion, handleError, maintenanceBlocked } from "@/lib/api";
 import { botStrings } from "@/i18n/bot";
 import { interpolate } from "@/i18n/config";
 
@@ -11,6 +11,8 @@ export const dynamic = "force-dynamic";
 
 /** Telegram Mini App sign-in: the client posts window.Telegram.WebApp.initData */
 export async function POST(req: NextRequest) {
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
   try {
     const country = await assertRegion();
     await limitByIp("tgauth", 20);

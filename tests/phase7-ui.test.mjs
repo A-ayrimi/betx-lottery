@@ -96,9 +96,11 @@ test("public buy flow carries the selected tier", async () => {
   const pool = await read("../src/components/PoolBand.tsx");
   assert.match(provider, /buy: \(count: number, tierCode\?: string\)/);
   assert.match(provider, /post\("\/api\/tickets\/buy", \{ count, tierCode \}\)/);
-  assert.match(pool, /onClick=\{\(\) => setTierCode\(tier\.code\)\}/);
+  assert.match(pool, /activeTierCode = selectedTierCode \|\| defaultRound/);
   assert.match(pool, /await buy\(count, activeTierCode\)/);
-  assert.match(pool, /tiers\.map\(\(tier\) =>/);
+  const tiers = await read("../src/components/TierCards.tsx");
+  assert.match(tiers, /setSelectedTierCode\(code\)/);
+  assert.match(tiers, /tiers\.map\(\(tier\) =>/);
 });
 
 test("tier-specific round state endpoint is public and sanitized", async () => {
@@ -122,7 +124,7 @@ test("hero and pool show active-tier economics instead of global config", async 
   assert.match(hero, /tier \? `.*usd\(tier\.prize, locale\)/);
 });
 
-test("all locales expose the shared homepage UI copy", () => {
+test("all locales expose the shared homepage UI copy", async () => {
   const expected = Object.keys(en.ui).sort();
   assert.deepEqual(Object.keys(fa.ui).sort(), expected);
   assert.deepEqual(Object.keys(es.ui).sort(), expected);
@@ -130,10 +132,21 @@ test("all locales expose the shared homepage UI copy", () => {
   assert.deepEqual(Object.keys(tr.ui).sort(), expected);
   assert.deepEqual(Object.keys(ru.ui).sort(), expected);
   for (const [label, dict] of Object.entries(locales)) {
-    assert.equal(dict.ui.balanceOnchain, "ON-CHAIN", `${label} must label on-chain balances`);
-    assert.equal(dict.ui.balanceLedger, "INTERNAL LEDGER", `${label} must label internal ledger balances`);
-    assert.equal(dict.ui.balanceDemo, "SIMULATED/DEMO", `${label} must label simulated balances`);
+    const isFa = label === "fa";
+    assert.equal(dict.ui.balanceOnchain, isFa ? "روی بلاکچین" : "ON-CHAIN");
+    assert.equal(dict.ui.balanceLedger, isFa ? "دفترکل داخلی" : "INTERNAL LEDGER");
+    assert.equal(
+      dict.ui.balanceDemo.replace(/\u200c/g, ""),
+      isFa ? "شبیهسازی/دمو" : "SIMULATED/DEMO",
+    );
   }
+  const balanceStatus = await read("../src/lib/balanceStatus.ts");
+  assert.match(balanceStatus, /ONCHAIN: "ON-CHAIN"/);
+  assert.match(balanceStatus, /LEDGER: "INTERNAL LEDGER"/);
+  assert.match(balanceStatus, /DEMO: "SIMULATED\/DEMO"/);
+  const badge = await read("../src/components/BalanceBadge.tsx");
+  assert.match(badge, /data-balance-source=\{SOURCE_BY_KIND\[kind\]\}/);
+  assert.match(badge, /aria-label=\{`\$\{ARIA_PREFIX\[locale\]\}: \$\{label\}`\}/);
 });
 
 test("localized wheel copy matches the wheel sectors", () => {
@@ -321,4 +334,66 @@ test("pool page polish uses localized labels and ignores extension-only errors",
   assert.match(wallet, /placeholder=\{locale === "fa" \? usd\(15, locale\) : "15\.00"\}/);
   assert.match(sections, /formatPadded\(year, locale, 4\)/);
   assert.match(sections, /locale === "fa" \? d\.footer\.license : cfg\.license/);
+});
+
+test("public copy uses single-winner economics without legacy tier-one examples", () => {
+  for (const [label, dict] of Object.entries(locales)) {
+    const copy = JSON.stringify(dict);
+    assert.doesNotMatch(copy, /Tier 1 example/i, `${label} must not describe a legacy Tier 1 example`);
+    assert.doesNotMatch(copy, /50 tickets × \$1/, `${label} must not hardcode 50 × $1`);
+  }
+});
+
+test("draw duration is localized instead of showing raw minutes", async () => {
+  const format = await read("../src/lib/format.ts");
+  const pool = await read("../src/components/PoolBand.tsx");
+  assert.match(format, /export function formatDurationMinutes/);
+  assert.match(format, /fa: \{ day: "روز", hour: "ساعت", minute: "دقیقه" \}/);
+  assert.match(format, /value % 1440 === 0/);
+  assert.match(pool, /formatDurationMinutes\(selectedTier\.drawDurationMinutes \?\? 0, locale\)/);
+  assert.doesNotMatch(pool, /d\.tiers\.minutes, \{ n: n\(/);
+});
+
+test("maintenance preview shows a disabled empty pool with accessible controls", async () => {
+  const pool = await read("../src/components/PoolBand.tsx");
+  assert.match(pool, /const paused = maintenance \|\| isPreview/);
+  assert.match(pool, /<motion\.button/);
+  assert.doesNotMatch(pool, /role="button"/);
+  assert.match(pool, /role="progressbar"/);
+  assert.match(pool, /aria-valuenow=\{sold\}/);
+  assert.match(pool, /disabled=\{disabled\}/);
+  assert.match(pool, /paused \? d\.ui\.statusMaintenance/);
+});
+
+test("homepage hierarchy follows the pool narrative before secondary modules", async () => {
+  const page = await read("../src/app/[locale]/page.tsx");
+  const order = [
+    "<Hero />",
+    "<PoolBand />",
+    "<TierCards />",
+    "<Prizes />",
+    "<TransparencyPanel />",
+    "<WeeklyJackpotWidget />",
+    "<WinnersHistory />",
+    "<Faq />",
+    "<Wheel />",
+    "<Invite />",
+    "<Wallet />",
+  ];
+  const positions = order.map((component) => {
+    const index = page.indexOf(component);
+    assert.ok(index >= 0, `${component} must be rendered on the homepage`);
+    return index;
+  });
+  assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
+});
+
+test("form controls expose busy and pressed state", async () => {
+  const deposit = await read("../src/components/DepositCard.tsx");
+  const wallet = await read("../src/components/Wallet.tsx");
+  const header = await read("../src/components/Header.tsx");
+  assert.match(deposit, /aria-pressed=\{!custom && amount === a\}/);
+  assert.match(deposit, /aria-busy=\{phase !== "" && phase !== "done"\}/);
+  assert.match(wallet, /aria-busy=\{busy === "wd"\}/);
+  assert.match(header, /aria-busy=\{busy\}/);
 });
