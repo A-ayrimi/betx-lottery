@@ -129,6 +129,11 @@ test("all locales expose the shared homepage UI copy", () => {
   assert.deepEqual(Object.keys(ar.ui).sort(), expected);
   assert.deepEqual(Object.keys(tr.ui).sort(), expected);
   assert.deepEqual(Object.keys(ru.ui).sort(), expected);
+  for (const [label, dict] of Object.entries(locales)) {
+    assert.equal(dict.ui.balanceOnchain, "ON-CHAIN", `${label} must label on-chain balances`);
+    assert.equal(dict.ui.balanceLedger, "INTERNAL LEDGER", `${label} must label internal ledger balances`);
+    assert.equal(dict.ui.balanceDemo, "SIMULATED/DEMO", `${label} must label simulated balances`);
+  }
 });
 
 test("localized wheel copy matches the wheel sectors", () => {
@@ -156,10 +161,10 @@ test("wheel cards render every configured prize value", async () => {
   }
 });
 
-test("base split copy keeps approval without duplicating a 20-ticket footnote", () => {
+test("single-winner split copy keeps approval without duplicating a 20-ticket footnote", () => {
   for (const [label, dict] of Object.entries({ en, fa })) {
     assert.match(dict.pool.money3, /approv|review|تأیید|بررسی/, `${label}.pool.money3 must mention approval`);
-    assert.match(dict.prizes.rows[4].amount, /\$15|15 دلار|۱۵ دلار|\$۱۵/, `${label}.prizes.rows[4] must state the base split`);
+    assert.match(dict.prizes.rows[4].amount, /\$37\.50|۳۷٫۵۰/, `${label}.prizes.rows[4] must state the single-winner split`);
     assert.match(dict.faq.items[1].a, /admin|Manager|سیستمی BETX/, `${label}.faq.items[1].a must mention approval`);
     assert.match(dict.board.autoDrawNote, /admin|Manager|سیستمی BETX/, `${label}.board.autoDrawNote must mention approval`);
   }
@@ -241,7 +246,7 @@ test("all locales expose the phase 2 tier, transparency, jackpot, referral and w
     assert.deepEqual(Object.keys(dict.phase2.wheel).sort(), expectedWheel);
     assert.match(dict.phase2.tiers.refund, /72|۷۲|٧٢/, `${label} must disclose the 72h refund window`);
     assert.match(dict.phase2.referral.body, /2|۲|٢/, `${label} must disclose the 2% referral rate`);
-    assert.match(dict.phase2.jackpot.body, /50|۵۰|٥٠/, `${label} must disclose the 50/30/20 split`);
+    assert.match(dict.phase2.jackpot.body, /100|۱۰۰/, `${label} must disclose the single-winner 100% pot`);
   }
 });
 
@@ -255,8 +260,8 @@ test("seven tier winner tables match the published policy matrix", () => {
     "starter_1",
     "vip_whale_200",
   ]);
-  assert.deepEqual(WINNER_AMOUNTS_BY_CODE.starter_1, [30, 5, 2.5]);
-  assert.deepEqual(WINNER_AMOUNTS_BY_CODE.vip_whale_200, [1300, 200, 100]);
+  assert.deepEqual(WINNER_AMOUNTS_BY_CODE.starter_1, [37.5]);
+  assert.deepEqual(WINNER_AMOUNTS_BY_CODE.vip_whale_200, [1600]);
 });
 
 test("phase 2 UI is wired to shared tier selection without financial side effects", async () => {

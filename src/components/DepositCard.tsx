@@ -6,6 +6,7 @@ import { useWallet, walletErrorMessage } from "./WalletProvider";
 import { WalletList } from "./WalletConnect";
 import { formatNumber, money, usd } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
+import { BalanceBadge } from "./BalanceBadge";
 import { Transaction } from "@solana/web3.js";
 
 const AMOUNTS = [1, 3, 5, 10];
@@ -37,7 +38,9 @@ export function DepositCard() {
   if (isDemoSession) {
     return (
       <div className="panel min-w-0 rounded-2xl p-6">
-        <p className="micro text-neon-2">{d.wallet.depositKicker} · {d.wc.demoBadge}</p>
+        <p className="micro flex flex-wrap items-center gap-2 text-neon-2">
+          {d.wallet.depositKicker} <BalanceBadge kind="demo" />
+        </p>
         <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
         <p dir="ltr" className="font-display tnum mt-4 text-3xl font-bold text-white">
           {money(user?.balance ?? 0, locale)} USDC
@@ -223,7 +226,9 @@ function SolanaDeposit({
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between gap-3 rounded-xl border border-rule bg-black/25 px-4 py-2.5 text-[12px]">
-        <span className="text-mint">{d.wc.walletBalance}</span>
+        <span className="flex flex-wrap items-center gap-2 text-mint">
+          {d.wc.walletBalance} <BalanceBadge kind="onchain" />
+        </span>
         <span dir="ltr" className="font-display tnum text-white">
           {bal ? `${money(bal.usdc, locale)} USDC  · ${formatNumber(bal.sol, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} SOL` : "-"}
         </span>

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const me = await getSessionUser();
     if (!me) return unauthorized("loginToDeposit");
     if (config.maintenanceMode) {
-      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+      return NextResponse.json({ ok: false, code: "maintenance", status: "MAINTENANCE", error: "maintenance" }, { status: 503 });
     }
     if (!publicConfig().paymentsEnabled) {
       return NextResponse.json({ ok: false, error: "paymentsDisabled" }, { status: 503 });

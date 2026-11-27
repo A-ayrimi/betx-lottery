@@ -7,6 +7,7 @@ import { useApp } from "./AppProvider";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { AddressChip, SoonBadge, WalletList } from "./WalletConnect";
 import { AnimatedMoney } from "./AnimatedMoney";
+import { BalanceBadge } from "./BalanceBadge";
 import { useWallet } from "./WalletProvider";
 import { useI18n } from "@/i18n/client";
 
@@ -151,6 +152,7 @@ export function Header() {
             <div className="hidden items-center gap-2 rounded-full border border-rule px-3 py-2 lg:flex">
               <span className={`h-2 w-2 rounded-full ${vaultStatusOnline ? "live-dot bg-neon-2" : "bg-foil"}`} />
               <span className="micro text-mint">{d.footer.vault}</span>
+              <BalanceBadge kind={demoEnabled || isDemoSession ? "demo" : "ledger"} />
               <span dir="ltr" className="font-display tnum text-sm font-bold text-neon-2">
                 {state ? <AnimatedMoney value={state.vault.balance} /> : d.ui.noData}
               </span>
@@ -164,9 +166,14 @@ export function Header() {
             {user ? (
               <div className="flex items-center gap-2">
                 {walletMatchesAccount ? (
-                  <span dir="ltr" className="hidden font-display tnum text-sm font-bold text-white sm:inline">
-                    <AnimatedMoney value={user.balance} />
-                  </span>
+                  <>
+                    <span dir="ltr" className="hidden font-display tnum text-sm font-bold text-white sm:inline">
+                      <AnimatedMoney value={user.balance} />
+                    </span>
+                    <span className="hidden sm:inline">
+                      <BalanceBadge kind={isDemoSession ? "demo" : "ledger"} />
+                    </span>
+                  </>
                 ) : null}
                 {walletAddress ? (
                   <AddressChip

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/client";
+import { BalanceBadge } from "./BalanceBadge";
 import { intlTags } from "@/i18n/config";
 import { formatNumber, usd } from "@/lib/format";
 import { useMounted } from "@/lib/useStored";
@@ -58,7 +59,9 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
   if (demo) {
     return (
       <div className="rounded-xl border border-foil/30 bg-foil/[0.05] px-4 py-3">
-        <p className="micro text-foil">{d.onchain.title} · {d.ui.statusDemo}</p>
+        <p className="micro flex flex-wrap items-center gap-2 text-foil">
+          {d.onchain.title} <BalanceBadge kind="demo" />
+        </p>
         <p className="mt-2 text-[12px] leading-6 text-mint/80">{d.onchain.demoNote}</p>
       </div>
     );
@@ -75,6 +78,7 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
         <p className="micro flex items-center gap-1.5 text-neon-2">
           <span className={`h-1.5 w-1.5 rounded-full ${ok ? "live-dot bg-neon-2" : "bg-foil"}`} />
           {d.onchain.title}
+          <BalanceBadge kind="onchain" />
         </p>
         {data ? (
           <a href={data.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-neon-2 underline-offset-4 hover:underline">

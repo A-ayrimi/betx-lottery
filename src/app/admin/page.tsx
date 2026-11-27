@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Transaction } from "@solana/web3.js";
 import { Logo } from "@/components/Logo";
+import { BALANCE_SOURCE } from "@/lib/balanceStatus";
 import { WalletProvider, useWallet, walletErrorMessage } from "@/components/WalletProvider";
 
 interface W {
@@ -145,7 +146,12 @@ function AdminInner() {
         <>
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="panel rounded-2xl p-5">
-              <p className="micro text-mint">VAULT</p>
+              <p className="micro flex flex-wrap items-center gap-2 text-mint">
+                VAULT
+                <span dir="ltr" className="rounded-full border border-foil/40 bg-foil/10 px-2 py-0.5 text-[9px] font-bold tracking-[0.12em] text-foil">
+                  {BALANCE_SOURCE.LEDGER}
+                </span>
+              </p>
               <p dir="ltr" className="font-display mt-1 text-2xl text-white">${data.vault.balance.toFixed(2)}</p>
             </div>
             <div className="panel rounded-2xl p-5">
@@ -658,7 +664,7 @@ function tierToForm(tier?: TierRow): TierForm {
     code: tier?.code ?? "",
     name: tier?.name ?? "",
     priceUsd: tier?.priceUsd ?? "1",
-    ticketCapacity: String(tier?.ticketCapacity ?? 20),
+    ticketCapacity: String(tier?.ticketCapacity ?? 50),
     drawDurationMinutes: String(tier?.drawDurationMinutes ?? 1440),
     prizePercentage: tier?.prizePercentage ?? "75",
     treasuryPercentage: tier?.treasuryPercentage ?? "15",

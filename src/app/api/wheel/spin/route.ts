@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const me = await getSessionUser();
     if (!me) return unauthorized("loginToSpin");
     if (config.maintenanceMode) {
-      return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+      return NextResponse.json({ ok: false, code: "maintenance", status: "MAINTENANCE", error: "maintenance" }, { status: 503 });
     }
     await rateLimit("spin", me.id, 10);
     await assertRegion();

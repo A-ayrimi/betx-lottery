@@ -12,12 +12,13 @@ export const TOKEN_SYMBOL = "USDC";
 export const TOKEN_LABEL = "USDC (SPL)";
 
 export const TICKET_PRICE = 1;
-export const POOL_CAPACITY = 20;
+export const POOL_CAPACITY = 50;
 export const TOTAL_TICKET_REVENUE = TICKET_PRICE * POOL_CAPACITY;
-export const PRIZE = 15;
-export const TREASURY_CONTRIBUTION = 3;
-export const ADMIN_GROSS_REVENUE = 2;
+export const PRIZE = 37.5;
+export const TREASURY_CONTRIBUTION = 7.5;
+export const ADMIN_GROSS_REVENUE = 5;
 export const FEE = TREASURY_CONTRIBUTION + ADMIN_GROSS_REVENUE;
+export const WINNERS_PER_POOL = 1;
 export const SPIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 /** Deposit / withdrawal limits (USD). */

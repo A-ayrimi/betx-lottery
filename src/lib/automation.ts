@@ -478,6 +478,7 @@ async function dailyReport() {
 /* -------------------------------------------------------------- runner */
 
 export async function runAutomation(trigger: Trigger) {
+  if (config.maintenanceMode) return { skipped: true as const, reason: "maintenance" as const };
   if (!(await acquire(trigger))) return { skipped: true as const };
   const started = Date.now();
   const report: Record<string, unknown> = {};

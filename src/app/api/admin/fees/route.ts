@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
   if (config.maintenanceMode) {
-    return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+    return NextResponse.json({ ok: false, code: "maintenance", status: "MAINTENANCE", error: "maintenance" }, { status: 503 });
   }
   return NextResponse.json(
     { ok: false, error: "Treasury transfers are paused until historical accounting is reconciled." },

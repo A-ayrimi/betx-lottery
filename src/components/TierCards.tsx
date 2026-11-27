@@ -94,9 +94,7 @@ export function TierCards() {
           const sold = Math.max(0, Math.min(capacity, live?.sold ?? fallback.sold));
           const remaining = Math.max(0, capacity - sold);
           const pct = Math.min(100, Math.round((sold / capacity) * 100));
-          const winners = Array.isArray(tier.winnerAmounts) && tier.winnerAmounts.length === 3
-            ? tier.winnerAmounts
-            : winnerAmountsForTier({ code: tier.code, prize: tier.prize, rules: tier.rules });
+          const winnerAmount = winnerAmountsForTier({ code: tier.code, prize: tier.prize, rules: tier.rules })[0];
           const kyc = tier.displayOrder >= 6 || /diamond|vip/i.test(tier.code);
           const selected = active === tier.code;
 
@@ -127,12 +125,10 @@ export function TierCards() {
 
               <div className="mt-5 space-y-2 rounded-xl border border-rule bg-black/20 p-3">
                 <p className="micro text-neon-2">{c.prizes}</p>
-                {winners.map((amount, index) => (
-                  <div key={index} className="flex items-center justify-between gap-2 text-[12px]">
-                    <span className="text-mint">{index === 0 ? c.first : index === 1 ? c.second : c.third}</span>
-                    <span dir="ltr" className="font-display tnum font-bold text-white">{formatCurrency(amount, locale)}</span>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between gap-2 text-[12px]">
+                  <span className="text-mint">{c.winner}</span>
+                  <span dir="ltr" className="font-display tnum font-bold text-white">{formatCurrency(winnerAmount, locale)}</span>
+                </div>
               </div>
 
               <div className="mt-4">
@@ -172,12 +168,13 @@ export function TierCards() {
               <button
                 type="button"
                 onClick={() => selectTier(tier.code)}
-                aria-pressed={selected}
+                disabled={maintenance}
+                aria-pressed={selected && !maintenance}
                 className={`focus-ring mt-5 w-full rounded-xl px-4 py-3 text-[12px] font-bold transition ${
                   selected ? "btn-foil" : "btn-neon"
                 }`}
               >
-                {selected ? c.selected : maintenance ? c.actionDisabled : c.select}
+                {maintenance ? c.actionDisabled : selected ? c.selected : c.select}
               </button>
             </article>
           );

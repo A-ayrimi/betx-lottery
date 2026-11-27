@@ -7,16 +7,16 @@ const { deriveTierAmounts, tierLockKey } = await import("../src/lib/tierMath.ts"
 test("tier allocation derives all four financial buckets", () => {
   assert.deepEqual(deriveTierAmounts({
     priceUsd: 1,
-    capacity: 20,
+    capacity: 50,
     prizePercentage: 75,
     treasuryPercentage: 15,
     adminPercentage: 10,
   }), {
-    totalPool: 20,
-    prize: 15,
-    treasury: 3,
-    admin: 2,
-    fee: 5,
+    totalPool: 50,
+    prize: 37.5,
+    treasury: 7.5,
+    admin: 5,
+    fee: 12.5,
   });
 
   assert.deepEqual(deriveTierAmounts({
@@ -37,7 +37,7 @@ test("tier allocation derives all four financial buckets", () => {
 test("tier allocation rejects invalid configuration", () => {
   assert.throws(() => deriveTierAmounts({
     priceUsd: 1,
-    capacity: 20,
+    capacity: 50,
     prizePercentage: 75,
     treasuryPercentage: 15,
     adminPercentage: 11,
@@ -45,7 +45,7 @@ test("tier allocation rejects invalid configuration", () => {
 
   assert.throws(() => deriveTierAmounts({
     priceUsd: 0,
-    capacity: 20,
+    capacity: 50,
     prizePercentage: 75,
     treasuryPercentage: 15,
     adminPercentage: 10,

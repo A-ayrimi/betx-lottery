@@ -5,6 +5,7 @@ import { getDictionary, getRequestLocale } from "@/i18n";
 import { interpolate } from "@/i18n/config";
 import { regionStatus } from "@/lib/geo";
 import { ValidationError } from "@/lib/errors";
+import { isMaintenanceMode } from "@/lib/gameConfig";
 
 async function message(code: ErrorCode, vars?: Record<string, string | number>) {
   const d = getDictionary(await getRequestLocale());
@@ -28,6 +29,14 @@ export async function handleError(e: unknown) {
 
 export async function unauthorized(code: ErrorCode = "notLoggedIn") {
   return NextResponse.json({ ok: false, code, error: await message(code) }, { status: 401 });
+}
+
+export function maintenanceBlocked() {
+  if (!isMaintenanceMode()) return null;
+  return NextResponse.json(
+    { ok: false, code: "maintenance", status: "MAINTENANCE", error: "maintenance" },
+    { status: 503 },
+  );
 }
 
 /** Throw 451 when the request comes from a restricted jurisdiction. */

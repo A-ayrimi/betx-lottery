@@ -54,8 +54,8 @@ export interface IntegrityInvariants {
 
 export function evaluateIntegrityInvariants(input: IntegrityInvariants): string[] {
   const violations: string[] = [];
-  if (input.winnerCount !== 3) violations.push("winner-count");
-  if (input.distinctWinnerCount !== 3) violations.push("duplicate-winners");
+  if (input.winnerCount !== 1) violations.push("winner-count");
+  if (input.distinctWinnerCount !== 1) violations.push("duplicate-winners");
   if (input.referralBeforeSettlement) violations.push("referral-before-settlement");
   if (input.growthCents + input.jackpotCents !== input.grossCents) violations.push("vault-split");
   if (input.blockedGeoAllowed) violations.push("blocked-geo");

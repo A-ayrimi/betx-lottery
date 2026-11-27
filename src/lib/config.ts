@@ -138,11 +138,11 @@ export function publicConfig() {
       rpcUrl: (process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com").trim(),
       explorer: "https://solscan.io",
     },
-    totalRoundRevenue: 20,
-    prizePerRound: 15,
-    treasuryContributionPerRound: 3,
-    adminGrossRevenuePerRound: 2,
-    roundCapacity: 20,
+    totalRoundRevenue: 50,
+    prizePerRound: 37.5,
+    treasuryContributionPerRound: 7.5,
+    adminGrossRevenuePerRound: 5,
+    roundCapacity: 50,
     ticketPrice: 1,
   };
 }

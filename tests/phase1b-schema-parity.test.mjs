@@ -110,3 +110,41 @@ test("maintenance, payments and withdrawals remain hard-disabled by guards", asy
     assert.match(source, /publicConfig\(\)\.paymentsEnabled/);
   }
 });
+
+test("single-winner migration collapses legacy splits in schema and SQL", async () => {
+  const migration = await readFile(new URL("supabase/migrations/20261128_phase1_single_winner.sql", root), "utf8");
+  for (const source of [schemaSql, drizzleSchema, migration]) {
+    assert.match(source, /winner_count|winnerCount/);
+    assert.match(source, /\[100\]/);
+  }
+  assert.match(migration, /jsonb_array_length\("winner_amounts_usd"\) = 1/);
+  assert.match(migration, /CHECK \("place" = 1\)/);
+  assert.match(migration, /SET DEFAULT 50/);
+});
+
+test("every mutating route rejects maintenance with an explicit status", async () => {
+  const apiHelper = await readFile(new URL("src/lib/api.ts", root), "utf8");
+  assert.match(apiHelper, /status: "MAINTENANCE"/);
+  const routes = [
+    "src/app/api/tickets/buy/route.ts",
+    "src/app/api/wheel/spin/route.ts",
+    "src/app/api/wallet/deposit/route.ts",
+    "src/app/api/wallet/claim/route.ts",
+    "src/app/api/payments/withdraw/route.ts",
+    "src/app/api/admin/withdrawals/route.ts",
+    "src/app/api/admin/withdrawals/pay/route.ts",
+    "src/app/api/admin/fees/route.ts",
+    "src/app/api/admin/automation/route.ts",
+    "src/app/api/admin/rounds/open/route.ts",
+    "src/app/api/admin/rounds/[id]/review/route.ts",
+    "src/app/api/admin/rounds/[id]/settle/route.ts",
+    "src/app/api/admin/treasury/initialize/route.ts",
+  ];
+  for (const route of routes) {
+    const source = await readFile(new URL(route, root), "utf8");
+    assert.ok(
+      /maintenanceBlocked\(\)/.test(source) || /status: "MAINTENANCE"/.test(source),
+      `${route} must reject maintenance with an explicit status`,
+    );
+  }
+});

@@ -1,3 +1,4 @@
+import { balanceSources } from "@/lib/balanceStatus";
 import { config } from "@/lib/config";
 import {
   getSolanaUsdcBalance,
@@ -22,6 +23,7 @@ export interface OnchainTreasury {
   address: string;
   network: string;
   status: OnchainStatus;
+  source: "ON-CHAIN";
   usdc: number | null;
   sol: number | null;
   usdt?: number | null;
@@ -42,9 +44,10 @@ async function fetchTreasury(): Promise<OnchainTreasury> {
   const base = {
     address,
     network: "solana",
+    source: balanceSources(true).onchainTreasury,
     fetchedAt: new Date().toISOString(),
     explorerUrl: addressExplorerUrl(address),
-  };
+  } as const;
   if (!isValidSolanaAddress(address)) return { ...base, status: "invalid", usdc: null, sol: null };
   try {
     const [usdc, lamports] = await Promise.all([

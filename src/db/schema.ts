@@ -31,7 +31,7 @@ export const ticketTiers = pgTable("ticket_tiers", {
   status: text("status").notNull().default("INACTIVE"),
   displayOrder: integer("display_order").notNull().default(0),
   tierNumber: integer("tier_number"),
-  winnerCount: integer("winner_count").notNull().default(3),
+  winnerCount: integer("winner_count").notNull().default(1),
   maxUserPoolPercent: integer("max_user_pool_percent").notNull().default(20),
   refundWindowHours: integer("refund_window_hours").notNull().default(72),
   kycLevelRequired: text("kyc_level_required").notNull().default("BASIC"),
@@ -84,10 +84,10 @@ export const users = pgTable("users", {
 export const rounds = pgTable("rounds", {
   id: serial("id").primaryKey(),
   status: text("status").notNull().default("LOCKED"),
-  capacity: integer("capacity").notNull().default(20),
+  capacity: integer("capacity").notNull().default(50),
   sold: integer("sold").notNull().default(0),
-  prize: numeric("prize", { precision: 12, scale: 2 }).notNull().default("15"),
-  fee: numeric("fee", { precision: 12, scale: 2 }).notNull().default("5"),
+  prize: numeric("prize", { precision: 12, scale: 2 }).notNull().default("37.5"),
+  fee: numeric("fee", { precision: 12, scale: 2 }).notNull().default("12.5"),
   treasuryContribution: numeric("treasury_contribution", { precision: 12, scale: 2 }),
   adminGrossRevenue: numeric("admin_gross_revenue", { precision: 12, scale: 2 }),
   tierId: integer("tier_id").notNull().default(1).references(() => ticketTiers.id, { onDelete: "restrict" }),
@@ -359,8 +359,8 @@ export const rateLimits = pgTable(
 );
 
 /**
-- One row per settled round for the $3 treasury allocation. The separate
-- $2 gross administrator revenue is recorded in the accounting ledger.
+- One row per settled round for the $7.50 treasury allocation. The separate
+- $5 gross administrator revenue is recorded in the accounting ledger.
 - `paid` is set only after a verified on-chain transfer.
  */
 export const feeTransfers = pgTable("fee_transfers", {
@@ -414,7 +414,7 @@ export const tierPolicyVersions = pgTable("tier_policy_versions", {
   referralBlockedOnRefund: boolean("referral_blocked_on_refund").notNull().default(true),
   weeklyJackpotEnabled: boolean("weekly_jackpot_enabled").notNull().default(true),
   weeklyJackpotSchedule: text("weekly_jackpot_schedule").notNull().default("SUNDAY_0000_UTC"),
-  weeklyJackpotSplit: jsonb("weekly_jackpot_split").$type<number[]>().notNull().default([50, 30, 20]),
+  weeklyJackpotSplit: jsonb("weekly_jackpot_split").$type<number[]>().notNull().default([100]),
   consolationSpinEnabled: boolean("consolation_spin_enabled").notNull().default(true),
   consolationRewards: jsonb("consolation_rewards").$type<Array<{ amount_usd: string; probability_percent: number }>>().notNull().default([]),
   consolationFallback: text("consolation_fallback").notNull().default("LOYALTY_CREDIT"),

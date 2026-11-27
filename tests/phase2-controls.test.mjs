@@ -5,7 +5,7 @@ import { evaluateAdminSession, resolveLegacyAdminRole, roleHasPermission, verify
 import { auditHead, nextAuditEvent, verifyAuditChain } from "../src/lib/auditChain.ts";
 import { drawDistinctWinners, failClosedVrfProvider, randomBelow, createVrfProvider, createReplayableVrfProvider, hashTicketSnapshot } from "../src/lib/drawRandomness.ts";
 import { allocateVault, computeReferralCommission, validateVaultLedger } from "../src/lib/vaultAccounts.ts";
-import { consolationProbabilityTotal, drawConsolationReward, weeklyJackpotSplit } from "../src/lib/rewardEngine.ts";
+import { consolationProbabilityTotal, drawConsolationReward, validateJackpotSplit, weeklyJackpotSplit } from "../src/lib/rewardEngine.ts";
 import { buildRefundEntry, buildRolloverEntry, evaluateRefundEligibility } from "../src/lib/refundRollover.ts";
 import { evaluateCompliance, isGeoEnforcementRequired, readCountryFromHeaders } from "../src/lib/complianceGuard.ts";
 import { createSimulatedKycProvider, resolveKycProvider } from "../src/lib/kycProvider.ts";
@@ -68,11 +68,11 @@ test("Phase 2 row 11: VRF proof is verified and winners are distinct", async () 
     verify: async () => true,
     randomBytes: async (_candidate, index) => new Uint8Array([1, 2, index + 3]),
   });
-  const winners = await drawDistinctWinners(provider, proof, 10, 3);
-  assert.equal(winners.length, 3);
-  assert.equal(new Set(winners).size, 3);
+  const winners = await drawDistinctWinners(provider, proof, 10, 1);
+  assert.equal(winners.length, 1);
+  assert.equal(new Set(winners).size, 1);
   assert.equal(randomBelow(10, new Uint8Array([255, 255])), null);
-  await assert.rejects(() => drawDistinctWinners(failClosedVrfProvider, { ...proof, providerId: "fail-closed" }, 10, 3));
+  await assert.rejects(() => drawDistinctWinners(failClosedVrfProvider, { ...proof, providerId: "fail-closed" }, 10, 1));
 });
 
 test("Phase 2 VRF adapter: replay is deterministic and tampering is rejected", async () => {
@@ -81,10 +81,10 @@ test("Phase 2 VRF adapter: replay is deterministic and tampering is rejected", a
   assert.equal(proof.algorithm, "HMAC-SHA256-REPLAY-v1");
   assert.equal(await provider.replay?.(proof), true);
   assert.deepEqual(
-    await drawDistinctWinners(provider, proof, 8, 3),
-    await drawDistinctWinners(provider, proof, 8, 3),
+    await drawDistinctWinners(provider, proof, 8, 1),
+    await drawDistinctWinners(provider, proof, 8, 1),
   );
-  await assert.rejects(() => drawDistinctWinners(provider, { ...proof, signature: "tampered" }, 8, 3));
+  await assert.rejects(() => drawDistinctWinners(provider, { ...proof, signature: "tampered" }, 8, 1));
 
   const tickets = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, userId: index + 1, serial: `R${index + 1}`, tierId: 1 }));
   const first = await derivePhase2Draw({ roundId: 9, serverSeed: "seed", tickets, live: false });
@@ -132,7 +132,9 @@ test("Phase 2 row 12: vault, referral and reward splits match approved parameter
   assert.equal(computeReferralCommission({ grossCents: 10000, settled: true, directReferral: true, kycApproved: true, refunded: false }).amountCents, 200);
   assert.equal(consolationProbabilityTotal(), 10000);
   assert.equal(drawConsolationReward(0.99).prizeCents, 100);
-  assert.deepEqual(weeklyJackpotSplit(1001), { firstCents: 501, secondCents: 300, thirdCents: 200 });
+  assert.deepEqual(weeklyJackpotSplit(1001), { winnerCents: 1001 });
+  assert.equal(validateJackpotSplit({ winnerCents: 1001 }, 1001), true);
+  assert.equal(validateJackpotSplit({ winnerCents: 1000 }, 1001), false);
 });
 
 test("Phase 2 row 13: refund and rollover follow the 72h same-tier rule", () => {
@@ -170,7 +172,7 @@ test("Phase 2 row 15: integrity proof and readiness gate are fail-closed", async
   assert.equal(await verifyIntegrityProof(proof), true);
   assert.equal(await verifyIntegrityProof({ ...proof, stateVersion: 2 }), false);
   assert.deepEqual(evaluateIntegrityInvariants({
-    winnerCount: 3,
+    winnerCount: 1,
     distinctWinnerCount: 2,
     referralBeforeSettlement: true,
     growthCents: 800,
@@ -224,10 +226,10 @@ test("Phase 2 integration policy wires RBAC, compliance, draw and settlement con
     serial: `S${index + 1}`,
     tierId: 1,
   }));
-  const draw = await derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: false, winnerCount: 3 });
-  assert.equal(draw.indices.length, 3);
-  assert.equal(new Set(draw.indices).size, 3);
-  await assert.rejects(() => derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: true, winnerCount: 3 }));
+  const draw = await derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: false, winnerCount: 1 });
+  assert.equal(draw.indices.length, 1);
+  assert.equal(new Set(draw.indices).size, 1);
+  await assert.rejects(() => derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: true, winnerCount: 1 }));
 
   const plan = buildPhase2SettlementPlan({
     grossUsd: 1000,
@@ -298,7 +300,7 @@ test("non-live preview supplies complete tier, pool and candle data", () => {
       assert.ok(Number.isFinite(tier.priceUsd) && tier.priceUsd > 0);
       assert.ok(Number.isFinite(tier.capacity) && tier.capacity > 0);
       assert.ok(Number.isFinite(tier.prize) && tier.prize > 0);
-      assert.ok(Array.isArray(tier.winnerAmounts) && tier.winnerAmounts.length === 3);
+      assert.ok(Array.isArray(tier.winnerAmounts) && tier.winnerAmounts.length === 1);
     }
 
     const progress = previewProgress();

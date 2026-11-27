@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
 import { usd } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
+import { BalanceBadge } from "./BalanceBadge";
 import { DepositCard } from "./DepositCard";
 import { TicketSerialRow } from "./TicketDetails";
 
@@ -63,7 +64,10 @@ export function Wallet() {
           <div className="panel grain relative overflow-hidden rounded-2xl p-6">
             <div className="guilloche pointer-events-none absolute inset-0 opacity-60" />
             <div className="relative">
-              <p className="micro text-mint">{d.wallet.balance}</p>
+              <p className="micro flex flex-wrap items-center gap-2 text-mint">
+                {d.wallet.balance}
+                <BalanceBadge kind={demoEnabled || isDemoSession ? "demo" : "ledger"} />
+              </p>
               <p dir="ltr" className="font-display tnum mt-3 text-start text-5xl font-bold text-white">
                 {user ? `${usd(user.balance, locale)}` : "—"}
               </p>

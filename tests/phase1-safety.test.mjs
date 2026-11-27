@@ -24,23 +24,23 @@ test("demo and test modes reject remote database targets", () => {
   assert.doesNotThrow(() => assertDatabaseTarget("demo", "postgres://user:pass@127.0.0.1:54329/db"));
 });
 
-test("ticket capacity permits the twentieth ticket and rejects ticket twenty-one", () => {
-  assert.equal(getTicketPurchaseCount(20, 19, 1), 1);
-  assert.equal(getTicketPurchaseCount(20, 20, 1), 0);
-  assert.equal(getTicketPurchaseCount(20, 19, 21), 1);
+test("ticket capacity permits the fiftieth ticket and rejects ticket fifty-one", () => {
+  assert.equal(getTicketPurchaseCount(50, 49, 1), 1);
+  assert.equal(getTicketPurchaseCount(50, 50, 1), 0);
+  assert.equal(getTicketPurchaseCount(50, 49, 51), 1);
 });
 
-test("settlement allocation is exactly $20 = $15 + $3 + $2 and balances", () => {
+test("settlement allocation is exactly $50 = $37.50 + $7.50 + $5 and balances", () => {
   const entries = getRoundAccountingEntries({
-    ticketRevenue: 20,
-    prize: 15,
-    treasury: 3,
-    adminRevenue: 2,
+    ticketRevenue: 50,
+    prize: 37.5,
+    treasury: 7.5,
+    adminRevenue: 5,
   });
-  assert.deepEqual(entries.map(({ amount }) => amount), [-20, 15, 3, 2]);
+  assert.deepEqual(entries.map(({ amount }) => amount), [-50, 37.5, 7.5, 5]);
   assert.equal(entries.reduce((sum, entry) => sum + entry.amount, 0), 0);
   assert.throws(
-    () => getRoundAccountingEntries({ ticketRevenue: 20, prize: 15, treasury: 5, adminRevenue: 2 }),
+    () => getRoundAccountingEntries({ ticketRevenue: 50, prize: 37.5, treasury: 5, adminRevenue: 5 }),
     /do not reconcile/,
   );
 });

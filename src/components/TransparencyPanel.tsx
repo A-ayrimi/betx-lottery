@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/client";
 import type { Locale } from "@/i18n/config";
 import { formatPadded, usd } from "@/lib/format";
 import { OnchainTreasury } from "./OnchainTreasury";
+import { BalanceBadge } from "./BalanceBadge";
 
 function formatRemaining(ms: number, locale: Locale) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -84,7 +85,10 @@ export function TransparencyPanel() {
             <p className="micro text-foil">{c.vaultTitle}</p>
             <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-2">
               <div>
-                <p className="text-[11px] text-mint">{c.ledgerBalance}</p>
+                <p className="flex flex-wrap items-center gap-2 text-[11px] text-mint">
+                  {c.ledgerBalance}
+                  <BalanceBadge kind={isPreview || demoEnabled ? "demo" : "ledger"} />
+                </p>
                 <p dir="ltr" className="font-display tnum text-2xl font-black text-white">
                   {usd(state?.vault.balance ?? 0, locale)}
                 </p>

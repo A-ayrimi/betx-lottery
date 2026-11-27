@@ -101,7 +101,7 @@ export async function derivePhase2Draw(input: Phase2DrawInput): Promise<Phase2Dr
         seed: input.serverSeed,
         ticketSnapshotHash: snapshotHash,
       });
-  const indices = await drawDistinctWinners(provider, proof, input.tickets.length, input.winnerCount ?? 3);
+  const indices = await drawDistinctWinners(provider, proof, input.tickets.length, input.winnerCount ?? 1);
   return { indices, proof, proofHash: await hashVrfProof(proof), ticketSnapshotHash: snapshotHash };
 }
 
@@ -125,7 +125,7 @@ export function buildPhase2SettlementPlan(input: Phase2SettlementInput) {
     kycApproved: input.kycApproved,
     refunded: input.refunded,
   });
-  const winnerCount = input.winnerCount ?? 3;
+  const winnerCount = input.winnerCount ?? 1;
   return {
     grossCents,
     vault,

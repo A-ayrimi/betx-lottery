@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "./AppProvider";
 import { useI18n } from "@/i18n/client";
+import { BalanceBadge } from "./BalanceBadge";
 import { formatNumber, formatPadded, usd } from "@/lib/format";
 import type { Locale } from "@/i18n/config";
 import { weeklyJackpotSplit } from "@/lib/rewardEngine";
@@ -24,7 +25,7 @@ function formatCountdown(ms: number, locale: Locale) {
 }
 
 export function WeeklyJackpotWidget() {
-  const { state } = useApp();
+  const { state, demoEnabled, isPreview } = useApp();
   const { d, t, locale } = useI18n();
   const c = d.phase2.jackpot;
   const [left, setLeft] = useState("");
@@ -70,19 +71,14 @@ export function WeeklyJackpotWidget() {
               <p dir="ltr" className="mt-2 font-display tnum text-xl font-black text-foil">{left}</p>
             </div>
             <div className="rounded-2xl border border-rule bg-black/25 p-4 sm:col-span-2">
-              <p className="micro text-foil">{c.potEstimate}</p>
-              <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+              <p className="flex flex-wrap items-center gap-2 text-foil">
+                {c.potEstimate}
+                <BalanceBadge kind={demoEnabled || isPreview ? "demo" : "ledger"} />
+              </p>
+              <div className="mt-2 grid grid-cols-1 gap-2 text-center">
                 <div>
-                  <p className="text-[10px] text-mint">{c.first}</p>
-                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.firstCents ?? 0) / 100, locale)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-mint">{c.second}</p>
-                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.secondCents ?? 0) / 100, locale)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-mint">{c.third}</p>
-                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.thirdCents ?? 0) / 100, locale)}</p>
+                  <p className="text-[10px] text-mint">{c.winner}</p>
+                  <p dir="ltr" className="font-display tnum text-[13px] font-bold text-white">{usd((pot?.winnerCents ?? 0) / 100, locale)}</p>
                 </div>
               </div>
             </div>

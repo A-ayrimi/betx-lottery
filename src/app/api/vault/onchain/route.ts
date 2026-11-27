@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { balanceSources } from "@/lib/balanceStatus";
 import { config } from "@/lib/config";
 import { addressExplorerUrl, getTreasuryOnchain } from "@/lib/onchain";
 import { limitByIp } from "@/lib/ratelimit";
@@ -23,6 +24,7 @@ export async function GET() {
           ok: true,
           address: config.adminWallet,
           network: "solana",
+          source: balanceSources(true).onchainTreasury,
           status: "unavailable",
           usdc: null,
           sol: null,

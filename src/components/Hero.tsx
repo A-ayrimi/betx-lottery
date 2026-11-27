@@ -8,6 +8,7 @@ import { payoutVars } from "@/lib/payoutCopy";
 import { AnimatedMoney } from "./AnimatedMoney";
 import { GoldDollars3D } from "./GoldDollars3D";
 import { OnchainTreasury } from "./OnchainTreasury";
+import { BalanceBadge } from "./BalanceBadge";
 import { useI18n } from "@/i18n/client";
 
 const fade = {
@@ -92,8 +93,12 @@ export function Hero() {
             <a href="#wheel" className="btn-neon cta-breathe focus-ring rounded-2xl px-7 py-4 text-base font-bold">
               {d.hero.ctaWheel}
             </a>
-            <a href="#pool" className="btn-foil cta-breathe focus-ring rounded-2xl px-7 py-4 text-base font-bold">
-              {d.hero.ctaTicket}
+            <a
+              href="#pool"
+              aria-disabled={maintenance}
+              className={`btn-foil rounded-2xl px-7 py-4 text-base font-bold ${maintenance ? "opacity-60" : "cta-breathe focus-ring"}`}
+            >
+              {maintenance ? d.ui.statusMaintenance : d.hero.ctaTicket}
             </a>
             <button
               onClick={() => setToast(t(d.hero.howToast, payout))}
@@ -125,7 +130,10 @@ export function Hero() {
           <div className="guilloche pointer-events-none absolute inset-0 opacity-80" />
           <div className="relative">
             <div className="flex items-center justify-between">
-              <p className="micro text-mint">{d.hero.liveVault}</p>
+              <p className="micro flex flex-wrap items-center gap-2 text-mint">
+                {d.hero.liveVault}
+                <BalanceBadge kind={demo ? "demo" : "ledger"} />
+              </p>
               <span className="flex items-center gap-2" aria-live="polite">
                 <span className={`h-2 w-2 rounded-full ${statusOnline ? "live-dot bg-neon-2" : "bg-foil"}`} />
                 <span dir="auto" className="font-display text-[11px] tracking-[0.14em] text-neon-2">{statusLabel}</span>

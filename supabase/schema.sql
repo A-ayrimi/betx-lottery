@@ -144,10 +144,10 @@ INSERT INTO "ticket_tiers" (
 CREATE TABLE "rounds" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"status" text DEFAULT 'LOCKED' NOT NULL,
-	"capacity" integer DEFAULT 20 NOT NULL,
+	"capacity" integer DEFAULT 50 NOT NULL,
 	"sold" integer DEFAULT 0 NOT NULL,
-	"prize" numeric(12, 2) DEFAULT '15' NOT NULL,
-	"fee" numeric(12, 2) DEFAULT '5' NOT NULL,
+	"prize" numeric(12, 2) DEFAULT '37.5' NOT NULL,
+	"fee" numeric(12, 2) DEFAULT '12.5' NOT NULL,
 	"treasury_contribution" numeric(12, 2),
 	"admin_gross_revenue" numeric(12, 2),
 	"tier_id" integer DEFAULT 1 NOT NULL,
@@ -422,7 +422,7 @@ ALTER TABLE "treasury_transactions"
 
 ALTER TABLE "ticket_tiers"
   ADD COLUMN IF NOT EXISTS "tier_number" integer,
-  ADD COLUMN IF NOT EXISTS "winner_count" integer DEFAULT 3 NOT NULL,
+  ADD COLUMN IF NOT EXISTS "winner_count" integer DEFAULT 1 NOT NULL,
   ADD COLUMN IF NOT EXISTS "max_user_pool_percent" integer DEFAULT 20 NOT NULL,
   ADD COLUMN IF NOT EXISTS "refund_window_hours" integer DEFAULT 72 NOT NULL,
   ADD COLUMN IF NOT EXISTS "kyc_level_required" text DEFAULT 'BASIC' NOT NULL,
@@ -510,7 +510,7 @@ CREATE TABLE IF NOT EXISTS "tier_policy_versions" (
 	"referral_blocked_on_refund" boolean DEFAULT true NOT NULL,
 	"weekly_jackpot_enabled" boolean DEFAULT true NOT NULL,
 	"weekly_jackpot_schedule" text DEFAULT 'SUNDAY_0000_UTC' NOT NULL,
-	"weekly_jackpot_split" jsonb DEFAULT '[50,30,20]'::jsonb NOT NULL,
+	"weekly_jackpot_split" jsonb DEFAULT '[100]'::jsonb NOT NULL,
 	"consolation_spin_enabled" boolean DEFAULT true NOT NULL,
 	"consolation_rewards" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"consolation_fallback" text DEFAULT 'LOYALTY_CREDIT' NOT NULL,
@@ -529,7 +529,7 @@ CREATE TABLE IF NOT EXISTS "tier_policy_versions" (
 	"status" text DEFAULT 'ACTIVE' NOT NULL,
 	"effective_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "tier_policy_versions_winners_valid" CHECK (jsonb_array_length("winner_amounts_usd") = 3),
+	CONSTRAINT "tier_policy_versions_winners_valid" CHECK (jsonb_array_length("winner_amounts_usd") = 1),
 	CONSTRAINT "tier_policy_versions_percentages_valid" CHECK ((("prize_percent" + "vault_percent" + "site_percent") = 100)),
 	CONSTRAINT "tier_policy_versions_vault_split_valid" CHECK ((("vault_growth_percent" + "vault_development_percent") = 100)),
 	CONSTRAINT "tier_policy_versions_referral_timing_valid" CHECK ("referral_event_timing" = 'POST_SETTLEMENT'),
@@ -557,7 +557,8 @@ CREATE TABLE IF NOT EXISTS "draw_reveals" (
 	"server_seed" text NOT NULL,
 	"client_seed" text NOT NULL,
 	"proof_payload" jsonb DEFAULT '{}'::jsonb NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "draw_reveals_place_valid" CHECK ("place" = 1)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "draw_reveals_commitment_nonce_unique" ON "draw_reveals" ("commitment_id", "nonce");
 CREATE UNIQUE INDEX IF NOT EXISTS "draw_reveals_round_place_unique" ON "draw_reveals" ("round_id", "place");
@@ -572,7 +573,8 @@ CREATE TABLE IF NOT EXISTS "round_winners" (
 	"reveal_id" integer,
 	"ledger_reference" text,
 	"status" text DEFAULT 'PENDING' NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "round_winners_place_valid" CHECK ("place" = 1)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "round_winners_round_place_unique" ON "round_winners" ("round_id", "place");
 CREATE UNIQUE INDEX IF NOT EXISTS "round_winners_round_ticket_unique" ON "round_winners" ("round_id", "ticket_id");
@@ -810,13 +812,13 @@ ON CONFLICT ("code") DO NOTHING;
 INSERT INTO "tier_policy_versions" ("tier_id", "version", "price_usd", "capacity", "prize_percent", "vault_percent", "site_percent", "winner_amounts_usd", "consolation_rewards")
 SELECT t."id", 1, t."price_usd", t."ticket_capacity", t."prize_percentage", t."treasury_percentage", t."admin_percentage",
   CASE t."code"
-    WHEN 'starter_1' THEN '["30","5","2.50"]'::jsonb
-    WHEN 'bronze_5' THEN '["120","20","10"]'::jsonb
-    WHEN 'silver_10' THEN '["180","30","15"]'::jsonb
-    WHEN 'gold_25' THEN '["300","50","25"]'::jsonb
-    WHEN 'platinum_50' THEN '["650","100","50"]'::jsonb
-    WHEN 'diamond_100' THEN '["975","150","75"]'::jsonb
-    WHEN 'vip_whale_200' THEN '["1300","200","100"]'::jsonb
+    WHEN 'starter_1' THEN '["37.50"]'::jsonb
+    WHEN 'bronze_5' THEN '["150.00"]'::jsonb
+    WHEN 'silver_10' THEN '["225.00"]'::jsonb
+    WHEN 'gold_25' THEN '["375.00"]'::jsonb
+    WHEN 'platinum_50' THEN '["800.00"]'::jsonb
+    WHEN 'diamond_100' THEN '["1200.00"]'::jsonb
+    WHEN 'vip_whale_200' THEN '["1600.00"]'::jsonb
   END,
   '[{"amount_usd":"0.05","probability_percent":45},{"amount_usd":"0.10","probability_percent":30},{"amount_usd":"0.25","probability_percent":15},{"amount_usd":"0.50","probability_percent":7},{"amount_usd":"1.00","probability_percent":3}]'::jsonb
 FROM "ticket_tiers" t

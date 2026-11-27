@@ -32,28 +32,14 @@ export function drawConsolationReward(randomUnit: number): ConsolationReward {
 }
 
 export interface JackpotSplit {
-  firstCents: number;
-  secondCents: number;
-  thirdCents: number;
+  winnerCents: number;
 }
 
 export function weeklyJackpotSplit(potCents: number): JackpotSplit {
   if (!Number.isSafeInteger(potCents) || potCents < 0) throw new Error("Invalid jackpot pot");
-  const firstCents = Math.floor((potCents * 5000) / 10000);
-  const secondCents = Math.floor((potCents * 3000) / 10000);
-  const thirdCents = Math.floor((potCents * 2000) / 10000);
-  return {
-    firstCents: firstCents + (potCents - firstCents - secondCents - thirdCents),
-    secondCents,
-    thirdCents,
-  };
+  return { winnerCents: potCents };
 }
 
 export function validateJackpotSplit(split: JackpotSplit, potCents: number): boolean {
-  const expected = weeklyJackpotSplit(potCents);
-  return (
-    expected.firstCents === split.firstCents &&
-    expected.secondCents === split.secondCents &&
-    expected.thirdCents === split.thirdCents
-  );
+  return weeklyJackpotSplit(potCents).winnerCents === split.winnerCents;
 }

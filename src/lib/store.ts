@@ -152,11 +152,11 @@ export { effectiveLimit } from "@/lib/responsibleGaming";
 
 export const SESSION_COOKIE = "betx_session";
 export const TICKET_PRICE = 1;
-export const POOL_CAPACITY = 20;
+export const POOL_CAPACITY = 50;
 export const TOTAL_TICKET_REVENUE = TICKET_PRICE * POOL_CAPACITY;
-export const PRIZE = 15;
-export const TREASURY_CONTRIBUTION = 3;
-export const ADMIN_GROSS_REVENUE = 2;
+export const PRIZE = 37.5;
+export const TREASURY_CONTRIBUTION = 7.5;
+export const ADMIN_GROSS_REVENUE = 5;
 export const FEE = TREASURY_CONTRIBUTION + ADMIN_GROSS_REVENUE;
 export const SPIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -1017,7 +1017,7 @@ async function drawRound(
     roundId,
     serverSeed: row.serverSeed,
     live: config.live,
-    winnerCount: Math.min(3, pool.length),
+    winnerCount: 1,
     tickets: pool.map((ticket) => ({
       id: ticket.id,
       userId: ticket.userId,

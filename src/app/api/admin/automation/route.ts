@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { withdrawals } from "@/db/schema";
 import { requireAdminRole } from "@/lib/admin";
+import { balanceSources } from "@/lib/balanceStatus";
 import { automationStatus, healthChecks, runAutomation } from "@/lib/automation";
 import { evaluate, payoutConfig } from "@/lib/payout";
 import { readinessChecks } from "@/lib/readiness";
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     getTreasuryOnchain(true).catch((e) => ({ error: e instanceof Error ? e.message : "on-chain balance unavailable" })),
     Promise.resolve(phase2Readiness()),
   ]);
-  return NextResponse.json({ ok: true, status, health, readiness, phase2Gate, onchain });
+  return NextResponse.json({ ok: true, balanceSources: balanceSources(true), status, health, readiness, phase2Gate, onchain });
 }
 
 /** { action: "run" } runs the autopilot now; { action: "evaluate" } previews payout decisions. */
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
   if (isMaintenanceMode()) {
-    return NextResponse.json({ ok: false, error: "Maintenance mode is active. Admin automation execution is disabled." }, { status: 503 });
+    return NextResponse.json({ ok: false, code: "maintenance", status: "MAINTENANCE", error: "Maintenance mode is active. Admin automation execution is disabled." }, { status: 503 });
   }
   const body = await req.json().catch(() => ({}));
   if (body.action === "evaluate") {

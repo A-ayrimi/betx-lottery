@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { balanceSources } from "@/lib/balanceStatus";
 import { getSessionUser, UserError } from "@/lib/store";
 import { getSolanaUsdcBalance, getSolanaConfig, getSolanaConnection } from "@/lib/solana";
 import { PublicKey } from "@solana/web3.js";
@@ -21,6 +22,7 @@ export async function GET() {
       ok: true,
       address: me.walletAddress,
       network: getSolanaConfig().cluster,
+      source: balanceSources(true).onchainTreasury,
       balances,
     });
   } catch (e) {

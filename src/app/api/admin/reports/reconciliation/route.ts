@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin";
+import { balanceSources } from "@/lib/balanceStatus";
 import { handleError } from "@/lib/api";
 import { getTreasuryReconciliation } from "@/lib/treasuryAccounting";
 import { assertLegacyPermission, phase2Readiness } from "@/lib/phase2Policy";
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
       getPhase2ProofSummary(),
       Promise.resolve(phase2Readiness()),
     ]);
-    return NextResponse.json({ ok: true, report, proofs, phase2Gate });
+    return NextResponse.json({ ok: true, balanceSources: balanceSources(true), report, proofs, phase2Gate });
   } catch (error) {
     return handleError(error);
   }

@@ -141,7 +141,7 @@ export async function drawDistinctWinners(
   provider: VrfProvider,
   proof: VrfProof,
   ticketCount: number,
-  winnerCount = 3,
+  winnerCount = 1,
 ): Promise<number[]> {
   if (!Number.isSafeInteger(ticketCount) || ticketCount <= 0) throw new Error("Invalid ticket count");
   if (!Number.isSafeInteger(winnerCount) || winnerCount <= 0 || winnerCount > ticketCount) {

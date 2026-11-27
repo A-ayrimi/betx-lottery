@@ -6,6 +6,7 @@ import { useApp } from "./AppProvider";
 import { formatCurrency, formatPadded, formatPercent } from "@/lib/format";
 import { payoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
+import { BalanceBadge } from "./BalanceBadge";
 import { GoldDollars3D } from "./GoldDollars3D";
 import { burstDollars, burstFrom } from "@/lib/dollarFx";
 import type { AppState } from "@/lib/types";
@@ -398,7 +399,8 @@ export function PoolBand() {
                         {d.pool.balance}{" "}
                         <span dir="ltr" className="font-display tnum text-neon-2">
                           {formatCurrency(state.user.balance, locale)}
-                        </span>
+                        </span>{" "}
+                        <BalanceBadge kind={demoEnabled || isPreview ? "demo" : "ledger"} />
                       </span>
                     ) : null}{" "}
                     <a href="#wallet" className="text-foil underline-offset-4 hover:underline">
@@ -417,7 +419,9 @@ export function PoolBand() {
                       }`}
                     >
                       <span dir={locale === "fa" || locale === "ar" ? "rtl" : "ltr"} className="font-display tnum">
-                        {t(d.pool.boostLabel, { n: n(c), amount: formatCurrency(ticketPrice * c, locale) })}
+                        {maintenance
+                          ? d.ui.statusMaintenance
+                          : t(d.pool.boostLabel, { n: n(c), amount: formatCurrency(ticketPrice * c, locale) })}
                       </span>
                       {state?.user ? (
                         <span dir="ltr" className="block text-[10px] font-medium opacity-70">

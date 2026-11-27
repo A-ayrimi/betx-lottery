@@ -3,8 +3,9 @@ import { desc } from "drizzle-orm";
 import { db } from "@/db";
 import { deposits, withdrawals } from "@/db/schema";
 import { requireAdminRole } from "@/lib/admin";
+import { balanceSources } from "@/lib/balanceStatus";
 import { processWithdrawal, getState } from "@/lib/store";
-import { handleError } from "@/lib/api";
+import { handleError, maintenanceBlocked } from "@/lib/api";
 import { sendMessage } from "@/lib/telegram";
 import { botStrings } from "@/i18n/bot";
 import { interpolate } from "@/i18n/config";
@@ -23,7 +24,14 @@ export async function GET(req: NextRequest) {
     db.select().from(deposits).orderBy(desc(deposits.id)).limit(50),
     getState(),
   ]);
-  return NextResponse.json({ ok: true, withdrawals: list, deposits: deps, vault: state.vault });
+  return NextResponse.json({
+    ok: true,
+    balanceSources: balanceSources(true),
+    vaultSource: balanceSources(true).internalLedger,
+    withdrawals: list,
+    deposits: deps,
+    vault: state.vault,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -32,6 +40,8 @@ export async function POST(req: NextRequest) {
   if (!assertLegacyPermission(auth.role, "reconciliation:write")) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
   try {
     const body = await req.json().catch(() => ({}));
     if (body.action !== "rejected") {

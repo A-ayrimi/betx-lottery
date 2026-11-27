@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminRole } from "@/lib/admin";
-import { handleError } from "@/lib/api";
+import { handleError, maintenanceBlocked } from "@/lib/api";
 import { openAdminRound } from "@/lib/store";
 import { assertLegacyPermission } from "@/lib/phase2Policy";
 
@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
   if (!assertLegacyPermission(auth.role, "rounds:draw")) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
   try {
     const body = await req.json().catch(() => ({}));
     const selector = body.tierId ?? body.tierCode;
