@@ -12,7 +12,8 @@ import {
   verifySolanaUsdcDepositOnChain,
 } from "@/lib/solana";
 import { handleError, unauthorized } from "@/lib/api";
-import { config } from "@/lib/config";
+import { config, publicConfig } from "@/lib/config";
+import { assessSensitiveAction } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,12 @@ export async function POST(req: NextRequest) {
     if (config.maintenanceMode) {
       return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
     }
+    if (!publicConfig().paymentsEnabled) {
+      return NextResponse.json({ ok: false, error: "paymentsDisabled" }, { status: 503 });
+    }
     await rateLimit("claim", me.id, 10);
+    const compliance = assessSensitiveAction(me, req.headers);
+    if (!compliance.allowed) throw new UserError("region", 403, { country: compliance.reasons.join(",") });
     if (!me.walletAddress) throw new UserError("walletRequired");
     const solana = getSolanaConfig();
     if (!solana.treasuryAddress) throw new UserError("gatewayOff", 503);

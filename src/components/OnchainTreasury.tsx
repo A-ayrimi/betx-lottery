@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { intlTags } from "@/i18n/config";
-import { money } from "@/lib/format";
+import { formatNumber, money } from "@/lib/format";
+import { useMounted } from "@/lib/useStored";
 
 interface Onchain {
   ok: boolean;
@@ -22,6 +23,7 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
   const { d, t, locale } = useI18n();
   const [data, setData] = useState<Onchain | null>(null);
   const [failed, setFailed] = useState(false);
+  const mounted = useMounted();
 
   useEffect(() => {
     if (demo) return;
@@ -56,13 +58,13 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
   if (demo) {
     return (
       <div className="rounded-xl border border-foil/30 bg-foil/[0.05] px-4 py-3">
-        <p className="micro text-foil">{d.onchain.title} · DEMO</p>
+        <p className="micro text-foil">{d.onchain.title} · {d.ui.statusDemo}</p>
         <p className="mt-2 text-[12px] leading-6 text-mint/80">{d.onchain.demoNote}</p>
       </div>
     );
   }
 
-  const time = data
+  const time = mounted && data
     ? new Intl.DateTimeFormat(intlTags[locale], { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(data.fetchedAt))
     : "";
   const ok = data?.status === "ok" || data?.status === "inactive";
@@ -84,11 +86,11 @@ export function OnchainTreasury({ demo, compact = false }: { demo: boolean; comp
       {data && ok ? (
         <div className="mt-2 flex flex-wrap items-end gap-x-5 gap-y-1">
           <p dir="ltr" className="font-display tnum text-2xl font-bold text-white">
-            {data.usdc === null ? "—" : `$${money(data.usdc)}`}
+            {data.usdc === null ? d.ui.noData : `$${money(data.usdc, locale)}`}
             <span className="ms-1 text-[11px] font-medium text-mint">USDC</span>
           </p>
           <p dir="ltr" className="font-display tnum text-[12px] text-mint">
-            {data.sol === null ? "—" : `${data.sol.toFixed(3)} SOL`} · SOL
+            {data.sol === null ? d.ui.noData : `${formatNumber(data.sol, locale, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} SOL`} · SOL
           </p>
         </div>
       ) : (

@@ -23,7 +23,7 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
           "One account per person. Accounts are personal and non-transferable.",
         ] },
         { h: "3. The games", p: [
-          "Lucky pool: each round has a fixed capacity of 20 tickets priced at $1 each. A full round receives a provisional random result and must be approved by an administrator before settlement. On settlement, $15 is allocated to the winner, $3 to treasury and $2 as gross administrator revenue, recorded separately. Withdrawals require review and administrative approval.",
+          "Lucky pool: published tiers define each round's ticket price, capacity and allocation. A completed round receives a provisional random result that must be verified by the BETX automated system before settlement; winner, treasury and BETX platform fee amounts are published for the selected tier and recorded separately. Withdrawals are processed by the BETX automated system after security checks.",
           "Daily wheel: one free spin every 24 hours plus one bonus spin after each referred user's first golden-ticket purchase. Guest spins are previews only and cannot win prizes or receive balance.",
           "Draws are provably fair: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so results can be independently verified.",
         ] },

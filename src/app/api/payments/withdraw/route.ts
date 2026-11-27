@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { limitByIp, rateLimit } from "@/lib/ratelimit";
-import { getSessionUser, requestWithdrawal } from "@/lib/store";
+import { getSessionUser, requestWithdrawal, UserError } from "@/lib/store";
 import { handleError, unauthorized } from "@/lib/api";
-import { config } from "@/lib/config";
+import { config, publicConfig } from "@/lib/config";
 import { sendMessage } from "@/lib/telegram";
+import { assessSensitiveAction } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,12 @@ export async function POST(req: NextRequest) {
     if (config.maintenanceMode) {
       return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
     }
+    if (!publicConfig().paymentsEnabled) {
+      return NextResponse.json({ ok: false, error: "paymentsDisabled" }, { status: 503 });
+    }
     await rateLimit("withdraw", me.id, 5);
+    const compliance = assessSensitiveAction(me, req.headers);
+    if (!compliance.allowed) throw new UserError("region", 403, { country: compliance.reasons.join(",") });
     const body = await req.json().catch(() => ({}));
     const w = await requestWithdrawal(me.id, Number(body.amount), String(body.address ?? "").trim());
 

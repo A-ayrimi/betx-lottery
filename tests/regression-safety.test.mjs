@@ -96,6 +96,16 @@ test("automatic payouts remain hard-disabled and expose no key", () => {
   assert.doesNotMatch(source, /privateKey|fromSecretKey|Keypair\.fromSecretKey/i);
 });
 
+test("payments, automatic sweep, and maintenance defaults remain fail-closed", () => {
+  const config = readFileSync(new URL("../src/lib/config.ts", import.meta.url), "utf8");
+  const gameConfig = readFileSync(new URL("../src/lib/gameConfig.ts", import.meta.url), "utf8");
+  assert.match(config, /paymentsEnabled:\s*false/);
+  assert.match(config, /get autoSweep\(\)\s*\{\s*return false;/);
+  assert.match(config, /get maintenanceMode\(\)\s*\{\s*return isMaintenanceMode\(\);\s*\}/);
+  assert.match(config, /BETX_MODE must be explicitly set to live or demo/);
+  assert.match(gameConfig, /return raw !== "false";/);
+});
+
 test("deposit reservation keys are UUIDs and duplicate reservations have an explicit error", () => {
   assert.equal(isValidDepositIdempotencyKey("550e8400-e29b-41d4-a716-446655440000"), true);
   assert.equal(isValidDepositIdempotencyKey("not-a-key"), false);

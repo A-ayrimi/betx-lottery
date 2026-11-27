@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "BETX — Lucky Pool",
     short_name: "BETX",
     description:
-      "BETX lucky pool: $1 tickets, 20-ticket provably-fair draws with administrator review, a free daily wheel and reviewed SPL-USDC withdrawals on Solana.",
+      "BETX lucky pool: tiered tickets, provably-fair draws verified by the BETX automated system, a free daily wheel and secure SPL-USDC withdrawals on Solana.",
     id: "/en",
     start_url: "/en?utm_source=pwa",
     scope: "/",

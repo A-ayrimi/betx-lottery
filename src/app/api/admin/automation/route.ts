@@ -2,29 +2,43 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { withdrawals } from "@/db/schema";
-import { isAdmin } from "@/lib/admin";
+import { requireAdminRole } from "@/lib/admin";
 import { automationStatus, healthChecks, runAutomation } from "@/lib/automation";
 import { evaluate, payoutConfig } from "@/lib/payout";
 import { readinessChecks } from "@/lib/readiness";
 import { getTreasuryOnchain } from "@/lib/onchain";
+import { isMaintenanceMode } from "@/lib/gameConfig";
+import { assertLegacyPermission, phase2Readiness } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  const [status, health, readiness, onchain] = await Promise.all([
+  const auth = requireAdminRole(req, ["ADMIN"]);
+  if (!auth) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission(auth.role, "reports:read")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+  const [status, health, readiness, onchain, phase2Gate] = await Promise.all([
     automationStatus(),
     healthChecks(false).catch((e) => ({ error: String(e) })),
     readinessChecks(),
     getTreasuryOnchain(true).catch((e) => ({ error: e instanceof Error ? e.message : "on-chain balance unavailable" })),
+    Promise.resolve(phase2Readiness()),
   ]);
-  return NextResponse.json({ ok: true, status, health, readiness, onchain });
+  return NextResponse.json({ ok: true, status, health, readiness, phase2Gate, onchain });
 }
 
 /** { action: "run" } runs the autopilot now; { action: "evaluate" } previews payout decisions. */
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const auth = requireAdminRole(req, ["ADMIN"]);
+  if (!auth) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission(auth.role, "maintenance:write")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+  if (isMaintenanceMode()) {
+    return NextResponse.json({ ok: false, error: "Maintenance mode is active. Admin automation execution is disabled." }, { status: 503 });
+  }
   const body = await req.json().catch(() => ({}));
   if (body.action === "evaluate") {
     const cfg = payoutConfig();

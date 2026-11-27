@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminRole } from "@/lib/admin";
 import { handleError } from "@/lib/api";
+import { assertLegacyPermission } from "@/lib/phase2Policy";
 import { setTierStatus, updateTier, type TierInput } from "@/lib/tierAdmin";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ function parseId(value: string) {
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const auth = requireAdminRole(req, ["ADMIN"]);
   if (!auth) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission(auth.role, "tiers:write")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   const id = parseId((await ctx.params).id);
   if (id === null) return NextResponse.json({ ok: false, error: "invalid id" }, { status: 400 });
   try {
@@ -29,6 +33,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   const auth = requireAdminRole(req, ["ADMIN"]);
   if (!auth) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission(auth.role, "tiers:write")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   const id = parseId((await ctx.params).id);
   if (id === null) return NextResponse.json({ ok: false, error: "invalid id" }, { status: 400 });
   try {

@@ -4,7 +4,8 @@ import { useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
 import { Logo, Mark } from "./Logo";
-import { money } from "@/lib/format";
+import { formatPadded, money } from "@/lib/format";
+import { useSelectedPayoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 
 const subscribeToLocation = () => () => {};
@@ -50,12 +51,13 @@ function TicketArtwork({ className = "", label }: { className?: string; label?: 
 
 export function WinnersTicker() {
   const { state, loading, dataUnavailable } = useApp();
-  const { d } = useI18n();
+  const { d, t, locale } = useI18n();
+  const payout = useSelectedPayoutVars();
   const rows = state?.winners ?? [];
   if (rows.length === 0) {
     return (
       <div role={dataUnavailable ? "alert" : "status"} className="border-y border-rule bg-[#07110e] px-4 py-4 text-center text-sm text-mint">
-        {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : d.board.noDraws}
+        {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : t(d.board.noDraws, payout)}
       </div>
     );
   }
@@ -67,10 +69,10 @@ export function WinnersTicker() {
         {rows.map((w) => (
           <span key={w.roundId} className="flex items-center gap-3 text-sm">
             <span className="text-foil">◆</span>
-            <span className="text-mint">WINNER</span>
+            <span className="text-mint">{d.board.historyHeaders[1]}</span>
             <span className="text-white">{w.winnerName}</span>
             <span className="font-display text-[11px] tracking-[0.18em] text-neon-2">{w.winningSerial}</span>
-            <span className="font-display tnum font-bold text-foil">+${money(w.prize)}</span>
+            <span className="font-display tnum font-bold text-foil">+${money(w.prize, locale)}</span>
             <span className="text-mint/50">|</span>
           </span>
         ))}
@@ -82,7 +84,8 @@ export function WinnersTicker() {
 /* ------------------------------------------------------------------ prizes */
 
 export function Prizes() {
-  const { d } = useI18n();
+  const { d, t } = useI18n();
+  const payout = useSelectedPayoutVars();
   const tones = ["gold", "neon", "plain", "plain"];
   return (
     <section id="prizes" className="relative py-20 lg:py-28">
@@ -95,26 +98,26 @@ export function Prizes() {
               <br />
               <span className="neon-text">{d.prizes.titleNeon}</span>
             </h2>
-            <p className="mt-5 max-w-[46ch] text-[15px] leading-8 text-mint">{d.prizes.body}</p>
+            <p className="mt-5 max-w-[46ch] text-[15px] leading-8 text-mint">{t(d.prizes.body, payout)}</p>
             <div className="mt-8 grid grid-cols-2 gap-4">
               <div>
                 <p className="micro text-mint">{d.hero.treasuryAllocation}</p>
                 <p dir="ltr" className="font-display tnum text-start text-[clamp(2.4rem,6vw,4rem)] font-bold leading-none text-foil">
-                  15%
+                  {payout.treasuryPct}
                 </p>
               </div>
               <div>
                 <p className="micro text-mint">{d.hero.adminEarnings}</p>
                 <p dir="ltr" className="font-display tnum text-start text-[clamp(2.4rem,6vw,4rem)] font-bold leading-none text-foil">
-                  10%
+                  {payout.adminPct}
                 </p>
               </div>
             </div>
             <div className="mt-6 flex items-center gap-4 rounded-2xl border border-neon/25 bg-neon/[0.06] px-5 py-4">
-              <p dir="ltr" className="font-display tnum text-3xl font-bold text-neon-2">75%</p>
+              <p dir="ltr" className="font-display tnum text-3xl font-bold text-neon-2">{payout.prizePct}</p>
               <div>
                 <p className="micro text-neon-2">{d.prizes.rtp}</p>
-                <p className="mt-1 text-[13px] leading-6 text-mint">{d.prizes.rtpNote}</p>
+                <p className="mt-1 text-[13px] leading-6 text-mint">{t(d.prizes.rtpNote, payout)}</p>
               </div>
             </div>
           </div>
@@ -142,10 +145,10 @@ export function Prizes() {
                       tones[i] === "gold" ? "text-foil" : tones[i] === "neon" ? "text-neon-2" : "text-white"
                     }`}
                   >
-                    {r.amount}
+                    {t(r.amount, payout)}
                   </p>
-                  <p className="text-[13px] leading-6 text-mint">{r.how}</p>
-                  <p className="text-[12px] text-mint/80">{r.when}</p>
+                  <p className="text-[13px] leading-6 text-mint">{t(r.how, payout)}</p>
+                  <p className="text-[12px] text-mint/80">{t(r.when, payout)}</p>
                 </motion.div>
               ))}
             </div>
@@ -159,7 +162,8 @@ export function Prizes() {
 /* -------------------------------------------------------------- how it works */
 
 export function HowItWorks() {
-  const { d } = useI18n();
+  const { d, t, locale } = useI18n();
+  const payout = useSelectedPayoutVars();
   return (
     <section className="relative overflow-hidden py-20 lg:py-28">
       <div className="absolute inset-0 opacity-[0.16]">
@@ -185,11 +189,11 @@ export function HowItWorks() {
               }`}
             >
               <p dir="ltr" className="font-display tnum text-[clamp(2.6rem,7vw,4.4rem)] font-bold leading-none text-foil/80">
-                {String(i + 1).padStart(2, "0")}
+                  {formatPadded(i + 1, locale)}
               </p>
               <div>
                 <h3 className="text-2xl font-black text-white">{s.t}</h3>
-                <p className="mt-3 max-w-[62ch] text-[15px] leading-9 text-mint">{s.d}</p>
+                <p className="mt-3 max-w-[62ch] text-[15px] leading-9 text-mint">{t(s.d, payout)}</p>
               </div>
             </motion.div>
           ))}
@@ -203,7 +207,8 @@ export function HowItWorks() {
 
 export function Leaderboard() {
   const { state, loading, dataUnavailable } = useApp();
-  const { d, ago, href, n } = useI18n();
+  const { d, t, ago, href, n, locale } = useI18n();
+  const payout = useSelectedPayoutVars();
   const rows = state?.leaderboard ?? [];
   const winners = state?.winners ?? [];
 
@@ -222,11 +227,11 @@ export function Leaderboard() {
             {rows.map((r, i) => (
               <div key={r.username} className="grid grid-cols-[42px_minmax(0,1fr)_72px_96px] items-center gap-3 border-b border-rule/50 px-5 py-4 last:border-b-0 hover:bg-white/[0.03]">
                 <span dir="ltr" className={`font-display tnum text-start text-sm font-bold ${i === 0 ? "text-foil" : "text-mint/70"}`}>
-                  {String(i + 1).padStart(2, "0")}
+                {formatPadded(i + 1, locale)}
                 </span>
                 <span className="truncate text-[14px] text-white">{r.displayName}</span>
                 <span className="font-display tnum text-[13px] text-neon-2">{n(r.tickets)}</span>
-                <span dir="ltr" className="font-display tnum text-start text-[13px] text-white">${money(r.won)}</span>
+                <span dir="ltr" className="font-display tnum text-start text-[13px] text-white">${money(r.won, locale)}</span>
               </div>
             ))}
             {rows.length === 0 ? (
@@ -251,8 +256,8 @@ export function Leaderboard() {
                   </div>
                 </div>
                 <div className="text-end">
-                  <p dir="ltr" className="font-display tnum text-lg font-bold text-foil">+${money(w.prize)}</p>
-                  <p className="text-[11px] text-mint/70" suppressHydrationWarning>{ago(w.drawnAt)}</p>
+                  <p dir="ltr" className="font-display tnum text-lg font-bold text-foil">+${money(w.prize, locale)}</p>
+                  <p className="text-[11px] text-mint/70">{ago(w.drawnAt)}</p>
                   <a href={href("/verify")} className="text-[11px] text-neon-2/80 underline-offset-4 hover:underline">
                     {d.board.verify}
                   </a>
@@ -261,7 +266,7 @@ export function Leaderboard() {
             ))}
             {winners.length === 0 ? (
               <p role={dataUnavailable ? "alert" : "status"} className="rounded-2xl border border-rule px-5 py-8 text-center text-sm text-mint">
-                {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : d.board.noDraws}
+                {dataUnavailable ? d.errors.unavailable : loading ? d.vaultChart.loading : t(d.board.noDraws, payout)}
               </p>
             ) : null}
           </div>
@@ -275,7 +280,7 @@ export function Leaderboard() {
 
 export function Invite() {
   const { state, setToast } = useApp();
-  const { d, t } = useI18n();
+  const { d, t, locale } = useI18n();
   const code = state?.user?.referralCode ?? null;
   const bot = state?.config.botUsername;
   const origin = useSyncExternalStore(subscribeToLocation, getLocationOrigin, getServerLocationOrigin);
@@ -309,8 +314,16 @@ export function Invite() {
                 <span className="gold-text">{d.invite.titleGold}</span>
               </h2>
               <p className="mt-5 max-w-[52ch] text-[15px] leading-9 text-mint">
-                {t(d.invite.body, { bonus: `$${money(state?.config.referralDepositBonus ?? 0.5)}` })}
+                {t(d.invite.body, { bonus: `$${money(state?.config.referralDepositBonus ?? 0.5, locale)}` })}
               </p>
+
+              <div className="mt-5 rounded-2xl border border-foil/30 bg-foil/[0.06] px-4 py-3">
+                <p className="micro text-neon-2">
+                  {d.phase2.referral.kicker} · {d.phase2.referral.title}
+                </p>
+                <p className="mt-2 text-[12px] leading-7 text-mint">{d.phase2.referral.body}</p>
+                <p className="mt-2 text-[10px] font-bold text-foil">{d.phase2.referral.condition}</p>
+              </div>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <div dir="ltr" className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-rule bg-black/35 px-5 py-4">
@@ -336,10 +349,10 @@ export function Invite() {
               <TicketArtwork className="absolute inset-0 h-full w-full" label={d.invite.ticketAlt} />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,10,9,0.15),rgba(6,10,9,0.88))]" />
               <div className="absolute inset-x-0 bottom-0 p-6">
-                <p className="micro text-foil">GOLDEN TICKET · $1</p>
+                <p className="micro text-foil">{d.ui.ticketBadge}</p>
                 <p className="mt-2 text-xl font-black leading-8 text-white">{d.invite.quote}</p>
-                <p dir="ltr" className="font-display mt-2 text-start text-[11px] tracking-[0.24em] text-neon-2">
-                  SMALL ENTRY. MASSIVE JACKPOT.
+                <p dir="auto" className="font-display mt-2 text-[11px] tracking-[0.18em] text-neon-2">
+                  {d.ui.ticketTagline}
                 </p>
               </div>
             </div>
@@ -353,7 +366,8 @@ export function Invite() {
 /* ---------------------------------------------------------------------- faq */
 
 export function Faq() {
-  const { d } = useI18n();
+  const { d, t } = useI18n();
+  const payout = useSelectedPayoutVars();
   return (
     <section id="faq" className="relative py-20 lg:py-24">
       <div className="mx-auto grid max-w-[1240px] gap-12 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] [&>*]:min-w-0">
@@ -362,8 +376,8 @@ export function Faq() {
           <h2 className="mt-4 text-[clamp(1.9rem,4.4vw,3rem)] font-black leading-[1.15] text-white">{d.faq.title}</h2>
           <p className="mt-5 max-w-[38ch] text-[15px] leading-8 text-mint">{d.faq.body}</p>
           <div className="mt-8 flex flex-wrap gap-2.5">
-            {["Play Smart. Win Instant.", "Pure Luck. Zero Delays.", "Your Ticket to Instant USDC."].map((s) => (
-              <span key={s} dir="ltr" className="micro rounded-full border border-rule px-3.5 py-2 text-mint">{s}</span>
+            {d.ui.faqTags.map((s) => (
+              <span key={s} dir="auto" className="micro rounded-full border border-rule px-3.5 py-2 text-mint">{s}</span>
             ))}
           </div>
         </div>
@@ -371,10 +385,10 @@ export function Faq() {
           {d.faq.items.map((f) => (
             <details key={f.q} className="group rounded-2xl border border-rule bg-white/[0.02] px-6 py-5 transition-colors hover:border-mint/30">
               <summary className="flex items-center justify-between gap-4">
-                <span className="text-[15px] font-bold text-white">{f.q}</span>
+                <span className="text-[15px] font-bold text-white">{t(f.q, payout)}</span>
                 <span className="faq-plus shrink-0 text-2xl leading-none text-foil transition-transform duration-300">+</span>
               </summary>
-              <p className="mt-4 text-[14px] leading-8 text-mint">{f.a}</p>
+              <p className="mt-4 text-[14px] leading-8 text-mint">{t(f.a, payout)}</p>
             </details>
           ))}
         </div>
@@ -385,10 +399,11 @@ export function Faq() {
 
 /* -------------------------------------------------------------------- footer */
 
-export function SiteFooter() {
+export function SiteFooter({ year }: { year: number }) {
   const { state, dataUnavailable, demoEnabled } = useApp();
-  const { d, t, n, href } = useI18n();
+  const { d, t, n, href, locale } = useI18n();
   const cfg = state?.config;
+  const payout = useSelectedPayoutVars();
   return (
     <footer className="relative overflow-hidden border-t border-rule bg-[#07110e]">
       <div className="guilloche pointer-events-none absolute inset-0 opacity-60" />
@@ -398,7 +413,7 @@ export function SiteFooter() {
             <span dir="ltr" className="inline-block">
               <Logo />
             </span>
-            <p className="mt-6 max-w-[42ch] text-[15px] leading-8 text-mint">{d.footer.about}</p>
+            <p className="mt-6 max-w-[42ch] text-[15px] leading-8 text-mint">{t(d.footer.about, payout)}</p>
             <a
               href={href("/install")}
               className="btn-neon focus-ring mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold"
@@ -417,7 +432,7 @@ export function SiteFooter() {
             </div>
             <div className="mt-6 flex items-center gap-3">
               <span dir="ltr" className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-foil/70 font-display text-sm font-bold text-foil">
-                18+
+                 {n(18)}+
               </span>
               <p className="max-w-[36ch] text-[12px] leading-6 text-mint/80">
                 {d.footer.help}{" "}
@@ -455,7 +470,7 @@ export function SiteFooter() {
             <div>
               <p className="micro text-foil">{d.footer.vault}</p>
               <p dir="ltr" className="font-display tnum mt-4 text-start text-2xl font-bold text-white">
-                {state ? `$${money(state.vault.balance)}` : "—"}
+                {state ? `$${money(state.vault.balance, locale)}` : d.ui.noData}
               </p>
               <p className="mt-1 text-[12px] text-mint">
                 {state
@@ -474,11 +489,11 @@ export function SiteFooter() {
         <div className="mt-8 flex flex-col items-start justify-between gap-4 text-[12px] leading-6 text-mint/70 sm:flex-row sm:items-center">
           <div>
             <p>
-              © {new Date().getFullYear()} {cfg?.company ?? "BETX"} — {d.footer.rights} {cfg?.live ? d.footer.live : d.footer.demo}
+              © {n(year)} {cfg?.company ?? "BETX"} — {d.footer.rights} {cfg?.live ? d.footer.live : d.footer.demo}
             </p>
             {cfg?.license ? <p dir="ltr" className="mt-1 text-start">{cfg.license}</p> : null}
           </div>
-          <p dir="ltr" className="font-display tracking-[0.22em]">PURE LUCK. ZERO DELAYS.</p>
+          <p dir="auto" className="font-display tracking-[0.18em]">{d.ui.footerTagline}</p>
         </div>
       </div>
     </footer>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { phase2Readiness } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET() {
     } catch {
       /* table may not exist yet on first boot */
     }
-    return NextResponse.json({ ok: true, service: "betx", db: "up", automation });
+    return NextResponse.json({ ok: true, service: "betx", db: "up", automation, phase2Gate: phase2Readiness() });
   } catch {
     return NextResponse.json({ ok: false, service: "betx", db: "down" }, { status: 500 });
   }

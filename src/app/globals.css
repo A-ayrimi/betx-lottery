@@ -25,6 +25,13 @@
 html {
   background-color: #060a09;
   scroll-behavior: smooth;
+  scroll-padding-top: 112px;
+}
+
+@media (max-width: 640px) {
+  html {
+    scroll-padding-top: 136px;
+  }
 }
 
 body {

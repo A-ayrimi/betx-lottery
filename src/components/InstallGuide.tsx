@@ -8,7 +8,7 @@ import { useInstallPrompt } from "./InstallPrompt";
 
 /** Standalone install page: one guide per platform, plus the live install button. */
 export function InstallGuide() {
-  const { d, locale } = useI18n();
+  const { d, locale, n } = useI18n();
   const [tab, setTab] = useState<"ios" | "android" | "desktop">("android");
   const { install, installed, canInstall, isIos } = useInstallPrompt();
 
@@ -79,7 +79,7 @@ export function InstallGuide() {
           {active.steps.map((s, i) => (
             <li key={s} className="flex items-start gap-3 text-[14px] leading-7 text-mint">
               <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neon/15 font-display text-[12px] font-bold text-neon-2">
-                {i + 1}
+                {n(i + 1)}
               </span>
               <span>{s}</span>
             </li>

@@ -11,7 +11,8 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "@/i18n/client";
 import { intlTags } from "@/i18n/config";
-import { money } from "@/lib/format";
+import { formatCurrency, formatPercent, money } from "@/lib/format";
+import { previewVaultPayload } from "@/lib/previewCandles";
 import { OnchainTreasury } from "./OnchainTreasury";
 import { useApp } from "./AppProvider";
 
@@ -117,6 +118,7 @@ function CandleChart({
   labels: { open: string; high: string; low: string; close: string; volume: string; fees: string };
 }) {
   const { setNode, w, h } = useBox();
+  const { locale } = useI18n();
   const [hover, setHover] = useState<number | null>(null);
   const n = candles.length;
 
@@ -229,7 +231,7 @@ function CandleChart({
             <g key={`p${k}`}>
               <line x1={padL} x2={w - padR} y1={t.y} y2={t.y} stroke="rgba(143,168,160,0.12)" strokeWidth={1} />
               <text x={padL - 8} y={t.y + 4} textAnchor="end" fontSize={11} fill={C_FLAT} fontFamily="var(--font-grotesk), ui-monospace, monospace">
-                {money(t.v)}
+                {money(t.v, locale)}
               </text>
             </g>
           ))}
@@ -285,7 +287,7 @@ function CandleChart({
               <line x1={padL} x2={w - padR} y1={lastY} y2={lastY} stroke={C_UP} strokeOpacity={0.45} strokeDasharray="4 4" strokeWidth={1} />
               <rect x={w - padR + 4} y={lastY - 9} width={60} height={18} rx={5} fill={C_UP} />
               <text x={w - padR + 34} y={lastY + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#04150e" fontFamily="var(--font-grotesk), ui-monospace, monospace">
-                {money(last.c)}
+                {money(last.c, locale)}
               </text>
             </g>
           ) : null}
@@ -309,19 +311,19 @@ function CandleChart({
           <p className="font-display text-[10px] tracking-[0.12em] text-mint">{fmt.format(hc.t)}</p>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
             <span className="text-mint">{labels.open}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.o)}</span>
+            <span className="text-end font-display tnum text-white">${money(hc.o, locale)}</span>
             <span className="text-mint">{labels.high}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.h)}</span>
+            <span className="text-end font-display tnum text-white">${money(hc.h, locale)}</span>
             <span className="text-mint">{labels.low}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.l)}</span>
+            <span className="text-end font-display tnum text-white">${money(hc.l, locale)}</span>
             <span className="text-mint">{labels.close}</span>
             <span className={`text-end font-display tnum font-bold ${hc.c >= hc.o ? "text-neon-2" : "text-red-300"}`}>
-              ${money(hc.c)}
+              ${money(hc.c, locale)}
             </span>
             <span className="text-mint">{labels.volume}</span>
-            <span className="text-end font-display tnum text-white">${money(hc.volume)}</span>
+            <span className="text-end font-display tnum text-white">${money(hc.volume, locale)}</span>
             <span className="text-mint">{labels.fees}</span>
-            <span className="text-end font-display tnum text-foil">+${money(hc.fees)}</span>
+            <span className="text-end font-display tnum text-foil">+${money(hc.fees, locale)}</span>
           </div>
         </div>
       ) : null}
@@ -367,7 +369,7 @@ function IconClose() {
  * recorded vault balance (/api/vault/candles), refreshed every 30 seconds.
  */
 export function VaultCandleChart() {
-  const { state, demoEnabled, dataUnavailable } = useApp();
+  const { state, demoEnabled, dataUnavailable, isPreview } = useApp();
   const { d, t, n, locale } = useI18n();
   const tag = intlTags[locale];
   const [tf, setTf] = useState<Tf>("24h");
@@ -377,9 +379,16 @@ export function VaultCandleChart() {
   const [showMa, setShowMa] = useState(true);
   const [showVol, setShowVol] = useState(true);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const previewChart = demoEnabled || isPreview;
   // fetch on timeframe change, then poll; stale responses are ignored
   useEffect(() => {
-    if (demoEnabled) return;
+    if (previewChart) {
+      const id = window.setTimeout(() => {
+        setData(previewVaultPayload(tf));
+        setFailed(false);
+      }, 0);
+      return () => window.clearTimeout(id);
+    }
     let alive = true;
     const load = async () => {
       try {
@@ -406,7 +415,7 @@ export function VaultCandleChart() {
       alive = false;
       window.clearInterval(id);
     };
-  }, [tf, demoEnabled]);
+  }, [tf, previewChart]);
 
   // modal: lock background scroll, close on Escape, move focus into the dialog
   useEffect(() => {
@@ -428,11 +437,18 @@ export function VaultCandleChart() {
   }, [open]);
 
   const ledgerVerified = state?.vault.ledgerStatus === "verified";
-  const current = !demoEnabled && ledgerVerified && data && data.tf === tf && data.ok ? data : null;
+  const current =
+    (ledgerVerified || previewChart) &&
+    data &&
+    data.tf === tf &&
+    data.ok &&
+    data.candles.length > 0
+      ? data
+      : null;
   const sum = current?.summary ?? null;
   const up = (sum?.change ?? 0) >= 0;
   const changeText = sum
-    ? `${up ? "+" : ""}$${money(sum.change)} (${up ? "+" : ""}${sum.changePct.toFixed(2)}%)`
+    ? `${up ? "+" : ""}${formatCurrency(sum.change, locale)} (${up ? "+" : ""}${formatPercent(sum.changePct / 100, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
     : "";
   const updatedText = current
     ? new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(current.updatedAt))
@@ -499,7 +515,7 @@ export function VaultCandleChart() {
             <div className="text-end">
               <p className="micro text-mint">{d.vaultChart.now}</p>
               <p dir="ltr" className="font-display tnum text-3xl font-bold text-white">
-                {sum ? `$${money(sum.current)}` : "—"}
+                {sum ? `$${money(sum.current, locale)}` : "—"}
               </p>
               {sum ? (
                 <p dir="ltr" className={`font-display tnum text-[12px] font-bold ${up ? "text-neon-2" : "text-red-300"}`}>
@@ -631,16 +647,16 @@ export function VaultCandleChart() {
               </div>
 
               <div className="grid grid-cols-2 gap-px bg-rule/40 sm:grid-cols-7">
-                <Stat label={d.vaultChart.now} value={sum ? `$${money(sum.current)}` : "—"} />
+                <Stat label={d.vaultChart.now} value={sum ? `$${money(sum.current, locale)}` : "—"} />
                 <Stat
                   label={d.vaultChart.change}
-                  value={sum ? `${up ? "+" : ""}$${money(sum.change)} · ${up ? "+" : ""}${sum.changePct.toFixed(2)}%` : "—"}
+                  value={sum ? `${up ? "+" : ""}${formatCurrency(sum.change, locale)} · ${up ? "+" : ""}${formatPercent(sum.changePct / 100, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                   tone={up ? "up" : "down"}
                 />
-                <Stat label={d.vaultChart.high} value={sum ? `$${money(sum.high)}` : "—"} />
-                <Stat label={d.vaultChart.low} value={sum ? `$${money(sum.low)}` : "—"} />
-                <Stat label={d.vaultChart.volume} value={sum ? `$${money(sum.volume)}` : "—"} />
-                <Stat label={d.vaultChart.feesTotal} value={sum ? `$${money(sum.fees)}` : "—"} tone="foil" />
+                <Stat label={d.vaultChart.high} value={sum ? `$${money(sum.high, locale)}` : "—"} />
+                <Stat label={d.vaultChart.low} value={sum ? `$${money(sum.low, locale)}` : "—"} />
+                <Stat label={d.vaultChart.volume} value={sum ? `$${money(sum.volume, locale)}` : "—"} />
+                <Stat label={d.vaultChart.feesTotal} value={sum ? `$${money(sum.fees, locale)}` : "—"} tone="foil" />
                 <Stat label={d.vaultChart.count} value={sum ? n(sum.count) : "—"} />
               </div>
 

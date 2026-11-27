@@ -18,6 +18,11 @@ function subscribe(cb: () => void) {
 }
 
 const store = (kind: "local" | "session") => (kind === "local" ? window.localStorage : window.sessionStorage);
+const noopSubscribe = () => () => {};
+
+export function useMounted() {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false);
+}
 
 export function useStored(key: string, serverValue: string | null, kind: "local" | "session" = "local") {
   return useSyncExternalStore(

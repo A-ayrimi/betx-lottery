@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { withdrawals } from "@/db/schema";
-import { isAdmin } from "@/lib/admin";
+import { requireAdminRole } from "@/lib/admin";
+import { assertLegacyPermission } from "@/lib/phase2Policy";
 import { processWithdrawal, UserError } from "@/lib/store";
 import {
   broadcast,
@@ -11,7 +12,7 @@ import {
   isValidSolanaTxSignature,
   solanaExplorerTxUrl,
 } from "@/lib/solana";
-import { config } from "@/lib/config";
+import { config, publicConfig } from "@/lib/config";
 import { handleError } from "@/lib/api";
 import { sendMessage } from "@/lib/telegram";
 import { botStrings } from "@/i18n/bot";
@@ -26,9 +27,16 @@ export const dynamic = "force-dynamic";
  *   { step: "submit", id, signedTransaction } -> broadcast + mark paid with tx hash
  */
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const auth = requireAdminRole(req, ["ADMIN"]);
+  if (!auth) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission(auth.role, "reconciliation:write")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   if (config.maintenanceMode) {
     return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
+  }
+  if (!publicConfig().paymentsEnabled) {
+    return NextResponse.json({ ok: false, error: "paymentsDisabled" }, { status: 503 });
   }
   try {
     const body = await req.json().catch(() => ({}));
@@ -55,7 +63,7 @@ export async function POST(req: NextRequest) {
         throw new UserError("broadcastFailed", 400, { reason: r.error ?? "Invalid transaction signature" });
       }
       const txid = r.txid;
-      const { telegramId, locale } = await processWithdrawal(w.id, "paid", txid, undefined, "admin");
+      const { telegramId, locale } = await processWithdrawal(w.id, "paid", txid, undefined, auth.actor);
       if (telegramId) {
         await sendMessage(
           telegramId,

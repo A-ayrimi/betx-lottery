@@ -16,6 +16,7 @@ import {
   withdrawals,
 } from "@/db/schema";
 import { config } from "@/lib/config";
+import { REFUND_WINDOW_MS } from "@/lib/phase2Policy";
 import { autoDrawExpiredRounds, autoDrawFullRounds, refundRound } from "@/lib/store";
 import { getSolanaConfig } from "@/lib/solana";
 const solanaCfg = () => getSolanaConfig();
@@ -191,8 +192,7 @@ import { interpolate } from "@/i18n/config";
 
 const ID = "main";
 const LEASE_SECONDS = 120;
-const TRAFFIC_MIN_GAP_SECONDS = 50;
-type Trigger = "cron" | "traffic" | "admin";
+type Trigger = "cron" | "admin";
 
 const ago = (sec: number) => new Date(Date.now() - sec * 1000);
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);
@@ -202,15 +202,13 @@ async function stateRow() {
   return (await db.select().from(automationState).where(eq(automationState.id, ID)).limit(1))[0];
 }
 
-async function acquire(trigger: Trigger) {
+async function acquire(_trigger: Trigger) {
   await stateRow();
-  const gap = trigger === "traffic" ? TRAFFIC_MIN_GAP_SECONDS : 0;
   const res = await db.execute(sql`
     update automation_state
        set locked_until = now() + make_interval(secs => ${LEASE_SECONDS})
      where id = ${ID}
        and (locked_until is null or locked_until < now())
-       and (last_run_at is null or last_run_at < now() - make_interval(secs => ${gap}))
     returning id`);
   return res.rows.length > 0;
 }
@@ -236,7 +234,7 @@ export async function alert(key: string, text: string) {
   const chat = process.env.TELEGRAM_ADMIN_CHAT_ID;
   if (chat) {
     try {
-      await sendMessage(chat, `ًں¤– <b>BETX autopilot</b>\n${text}`);
+      await sendMessage(chat, `[BETX] <b>BETX autopilot</b>\n${text}`);
     } catch {
       /* best effort */
     }
@@ -296,7 +294,7 @@ async function scanIncoming() {
     }
   }
 
-  // a sender may link their wallet later â€” retry the parked transfers
+  // a sender may link their wallet later — retry the parked transfers
   const parked = await db.select().from(unmatchedTransfers).limit(50);
   for (const p of parked) {
     const owner = (await db.select({ id: users.id }).from(users).where(eq(users.walletAddress, p.fromAddress)).limit(1))[0];
@@ -306,7 +304,7 @@ async function scanIncoming() {
   }
 
   await db.update(automationState).set({ scanCursor: cursor || Date.now() }).where(eq(automationState.id, ID));
-  if (unmatched > 0) await alert("unmatched", `ًں“¥ ${unmatched} USDT transfer(s) arrived from wallets not linked to any account. See /admin.`);
+  if (unmatched > 0) await alert("unmatched", `[ALERT] ${unmatched} USDT transfer(s) arrived from wallets not linked to any account. See /admin.`);
   return { seen: incoming.length, credited, unmatched };
 }
 
@@ -320,7 +318,7 @@ async function drawFullRounds() {
   for (const o of outcomes) {
     await alert(
       `draw-${o.roundId}`,
-      `ًںژ° Round ${o.roundId} draw is awaiting administrator approval. Proposed winner: <b>${o.winnerName}</b> (${o.winningSerial}). No prize has been settled.`,
+      `Round ${o.roundId} draw is awaiting automated BETX verification. Provisional winner: <b>${o.winnerName}</b> (${o.winningSerial}). No prize has been settled.`,
     );
   }
   return { drawn: outcomes.length, rounds: outcomes.map((o) => o.roundId) };
@@ -333,7 +331,7 @@ async function settleFees() {
 
 /** Rounds that don't fill before their configured deadline are closed and refunded. */
 async function refundStaleRounds() {
-  const hours = Number(process.env.ROUND_TIMEOUT_HOURS ?? 24);
+  const hours = Number(process.env.ROUND_TIMEOUT_HOURS ?? REFUND_WINDOW_MS / 3600_000);
   if (!(hours > 0)) return { skipped: "disabled" };
   const open = await db.select().from(rounds).where(inArray(rounds.status, ["open", "OPEN"]));
   let refunded = 0, refundedTickets = 0;
@@ -360,7 +358,7 @@ async function refundStaleRounds() {
       }
     }
   }
-  return { refunded, tickets: refundedTickets };
+  return { refunded, tickets: refundedTickets, phase2WindowMs: REFUND_WINDOW_MS };
 }
 
 async function cleanup() {
@@ -407,10 +405,10 @@ export async function healthChecks(sendAlerts = true) {
     .where(and(eq(withdrawals.status, "pending"), isNotNull(withdrawals.reviewReason)));
 
   if (sendAlerts) {
-    if (mism.rows.length) await alert("ledger-mismatch", `ًںڑ¨ ${mism.rows.length} account(s) whose balance differs from the ledger. Payouts for them are held.`);
-    if (Math.abs(vaultDrift) > 0.01) await alert("vault-drift", `âڑ ï¸ڈ Vault drift of $${vaultDrift.toFixed(2)} vs. ledger.`);
+    if (mism.rows.length) await alert("ledger-mismatch", `[ALERT] ${mism.rows.length} account(s) whose balance differs from the ledger. Payouts for them are held.`);
+    if (Math.abs(vaultDrift) > 0.01) await alert("vault-drift", `[ALERT]  Vault drift of $${vaultDrift.toFixed(2)} vs. ledger.`);
     if (holdings !== null && holdings + 0.01 < liabilities) {
-      await alert("solvency", `ًںڑ¨ On-chain holdings $${holdings.toFixed(2)} are below player liabilities $${liabilities.toFixed(2)}.`);
+      await alert("solvency", `[ALERT] On-chain holdings $${holdings.toFixed(2)} are below player liabilities $${liabilities.toFixed(2)}.`);
     }
   }
   return {
@@ -463,14 +461,14 @@ async function dailyReport() {
   await sendMessage(
     chat,
     [
-      "ًں“ٹ <b>BETX â€” last 24h</b>",
+      "<b>BETX — last 24h</b>",
       `New players: <b>${u.c}</b>`,
       `Deposits: <b>$${Number(dp.s).toFixed(2)}</b> (${dp.c})`,
       `Withdrawals paid: <b>$${Number(wd.s).toFixed(2)}</b> (${wd.c})`,
-      `Tickets: <b>${tk.c}</b> آ· Rounds drawn: <b>${rd.c}</b> آ· Treasury contributions: <b>$${Number(treasury.amount).toFixed(2)}</b>`,
+      `Tickets: <b>${tk.c}</b> · Rounds drawn: <b>${rd.c}</b> · Treasury contributions: <b>$${Number(treasury.amount).toFixed(2)}</b>`,
       `Vault (verified ledger): <b>$${Number(vaultLedger.balance).toFixed(2)}</b>`,
-      `Liabilities: $${h.liabilities.toFixed(2)}${h.holdings !== null ? ` آ· On-chain: $${h.holdings.toFixed(2)} ${h.solvent ? "âœ…" : "ًںڑ¨"}` : ""}`,
-      `Review queue: ${h.reviewQueue} آ· Ledger check: ${h.ledgerMismatches === 0 ? "âœ…" : "ًںڑ¨ " + h.ledgerMismatches}`,
+      `Liabilities: $${h.liabilities.toFixed(2)}${h.holdings !== null ? ` · On-chain: $${h.holdings.toFixed(2)} ${h.solvent ? "OK" : "ALERT"}` : ""}`,
+      `Review queue: ${h.reviewQueue} · Ledger check: ${h.ledgerMismatches === 0 ? "OK" : `ALERT ${h.ledgerMismatches}`}`,
     ].join("\n"),
   );
   await db.update(automationState).set({ lastDailyReportAt: new Date() }).where(eq(automationState.id, ID));
@@ -511,17 +509,8 @@ export async function runAutomation(trigger: Trigger) {
     .set({ lockedUntil: null, lastRunAt: new Date(), lastReport: report, lastError: error })
     .where(eq(automationState.id, ID));
   await db.insert(jobRuns).values({ trigger, ok, durationMs, report, error });
-  if (!ok) await alert("job-error", `âڑ ï¸ڈ Some automation steps failed:\n${errors.join("\n")}`);
+  if (!ok) await alert("job-error", `[ALERT]  Some automation steps failed:\n${errors.join("\n")}`);
   return { skipped: false as const, ok, durationMs, report, errors };
-}
-
-/** Fire-and-forget heartbeat used by page/API traffic (cheap when not due). */
-export async function maybeRunAutomation() {
-  try {
-    await runAutomation("traffic");
-  } catch (e) {
-    console.error("automation (traffic) failed", e);
-  }
 }
 
 export async function automationStatus() {

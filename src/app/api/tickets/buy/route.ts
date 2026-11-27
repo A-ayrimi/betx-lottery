@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { limitByIp, rateLimit } from "@/lib/ratelimit";
-import { buyTickets, getSessionUser } from "@/lib/store";
+import { buyTickets, getSessionUser, UserError } from "@/lib/store";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
 import { config } from "@/lib/config";
+import { assessSensitiveAction } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ export async function POST(req: NextRequest) {
     }
     await rateLimit("buy", me.id, 30);
     await assertRegion();
+    const compliance = assessSensitiveAction(me, req.headers);
+    if (!compliance.allowed) throw new UserError("region", 403, { country: compliance.reasons.join(",") });
     const body = await req.json().catch(() => ({}));
     const selector = body.tierId ?? body.tierCode;
     const tierSelector =
@@ -30,6 +33,7 @@ export async function POST(req: NextRequest) {
       serials: result.serials,
       roundId: result.roundId,
       tierCode: result.tierCode,
+      transactionReference: result.transactionReference,
       draw: null,
     });
   } catch (e) {

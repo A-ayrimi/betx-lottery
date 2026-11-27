@@ -6,7 +6,9 @@ import {
   deposits,
   adminAuditLog,
   drawCommitments,
+  drawReveals,
   feeTransfers,
+  refundsAndRollovers,
   roundSettlements,
   vaultSnapshots,
   ledger,
@@ -23,6 +25,9 @@ import {
   type User,
 } from "@/db/schema";
 import { config, publicConfig } from "@/lib/config";
+import { isTicketSerialCollision, makeTicketSerial } from "@/lib/ticketSerial";
+import { appendAdminAuditEvent, writePhase2DrawEvidence, writePhase2SettlementProof } from "@/lib/phase2Runtime";
+import { evaluatePhase2Refund } from "@/lib/phase2Policy";
 import { WHEEL_SECTORS } from "@/lib/wheel";
 import type { Dict } from "@/i18n/dictionaries/en";
 import { regionStatus } from "@/lib/geo";
@@ -140,7 +145,7 @@ import {
   isValidSolanaTxSignature,
 } from "@/lib/solana";
 import { roundMoney } from "@/lib/tierAccounting";
-import { deriveTierAmounts, tierLockKey } from "@/lib/tierMath";
+import { deriveTierAmounts, tierLockKey, winnerAmountsForTier } from "@/lib/tierMath";
 
 export { money } from "@/lib/format";
 export { effectiveLimit } from "@/lib/responsibleGaming";
@@ -221,9 +226,6 @@ export async function selfExclude(userId: number, days: number) {
 }
 
 /* ------------------------------------------------------------------ utils */
-
-export const makeSerial = () =>
-  randomBytes(2).toString("hex").toUpperCase() + "-" + String(randomInt(1000, 10000));
 
 export function makeReferralCode(seed: string) {
   return (
@@ -355,6 +357,11 @@ export async function listActiveTiers() {
       treasuryPercentage: tier.treasuryPercentage,
       adminPercentage: tier.adminPercentage,
       prize: tier.amounts.prize,
+      winnerAmounts: winnerAmountsForTier({
+        code: tier.code,
+        prize: tier.amounts.prize,
+        rules: (tier.snapshot.rules ?? null) as Record<string, unknown> | null,
+      }),
       treasury: tier.amounts.treasury,
       admin: tier.amounts.admin,
       minimumParticipants: tier.minimumParticipants,
@@ -450,13 +457,13 @@ export function fairIndex(serverSeed: string, roundId: number, serials: string[]
 
 function verifyStoredDraw(
   row: Pick<Round, "id" | "serverSeed" | "seedHash" | "winnerId" | "winningSerial">,
-  pool: Pick<Ticket, "serial" | "userId">[],
+  pool: Pick<Ticket, "ticketSerial" | "userId">[],
   expectedTicketCount: number,
 ) {
   if (!row.serverSeed || !row.seedHash || !row.winnerId || !row.winningSerial || pool.length !== expectedTicketCount) return false;
   if (createHash("sha256").update(row.serverSeed).digest("hex") !== row.seedHash) return false;
-  const winner = pool[fairIndex(row.serverSeed, row.id, pool.map((ticket) => ticket.serial))];
-  return winner?.serial === row.winningSerial && winner.userId === row.winnerId;
+  const winner = pool[fairIndex(row.serverSeed, row.id, pool.map((ticket) => ticket.ticketSerial))];
+  return winner?.ticketSerial === row.winningSerial && winner.userId === row.winnerId;
 }
 
 async function openNewRound(q: Q, tier: TierConfig) {
@@ -540,6 +547,12 @@ export async function initializeAdminVault(actor: string) {
       entityId: created.id,
       details: { initialCapital },
     });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: "treasury.initialize",
+      subject: `vault:${created.id}`,
+      metadata: { initialCapital },
+    });
     return created;
   });
 }
@@ -567,8 +580,31 @@ export async function openAdminRound(actor: string, tierSelector?: string | numb
       entityId: round.id,
       details: { status: ROUND_STATUSES.OPEN, tierCode: tier.code },
     });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: "round.open",
+      subject: `round:${round.id}`,
+      metadata: { status: ROUND_STATUSES.OPEN, tierCode: tier.code },
+    });
     return round;
   });
+}
+
+export async function findOpenRound(tierSelector?: string | number) {
+  const tier = await resolveTierConfig(db, tierSelector);
+  return (
+    (
+      await db
+        .select()
+        .from(rounds)
+        .where(and(
+          inArray(rounds.status, [ROUND_STATUSES.OPEN, "open"]),
+          eq(rounds.tierId, tier.id),
+        ))
+        .orderBy(desc(rounds.id))
+        .limit(1)
+    )[0] ?? null
+  );
 }
 
 export async function ensureOpenRound(tierSelector?: string | number) {
@@ -609,6 +645,15 @@ export async function refundRound(roundId: number) {
     const tier = tierConfigFromRound(r);
     await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     const list = await tx.select().from(tickets).where(eq(tickets.roundId, roundId));
+    const isoDate = (value: Date | null | undefined) => (value ? value.toISOString() : null);
+    const refundDecision = evaluatePhase2Refund({
+      tier: tier.id,
+      openedAt: r.openedAt.toISOString(),
+      closedAt: isoDate(r.closesAt),
+      settledAt: isoDate(r.settledAt),
+      refundedAt: r.refundPolicy === "REFUND_100" ? isoDate(r.drawnAt) : null,
+      rolledOverAt: r.rolloverToRoundId !== null ? isoDate(r.drawnAt) : null,
+    });
     const perUser = new Map<number, { count: number; username: string }>();
     for (const t of list) {
       const cur = perUser.get(t.userId) ?? { count: 0, username: t.username };
@@ -630,6 +675,15 @@ export async function refundRound(roundId: number) {
         reference: randomUUID(),
         transactionKey: `round:${roundId}:refund:${userId}`,
       });
+      await tx.insert(refundsAndRollovers).values({
+        roundId,
+        userId,
+        policy: "REFUND_100",
+        ticketIds: list.filter((ticket) => ticket.userId === userId).map((ticket) => ticket.id),
+        amountUsd: amount.toFixed(2),
+        ledgerEventId: `round:${roundId}:refund:${userId}`,
+        status: refundDecision === "eligible" ? "COMPLETED" : "COMPLETED_EARLY",
+      }).onConflictDoNothing();
     }
     await tx.update(rounds).set({ status: ROUND_STATUSES.REFUNDED, drawnAt: new Date() }).where(eq(rounds.id, roundId));
     await tx.update(vault).set({ ticketsSold: sql`greatest(${vault.ticketsSold} - ${r.sold}, 0)`, updatedAt: new Date() });
@@ -637,6 +691,7 @@ export async function refundRound(roundId: number) {
       tickets: list.length,
       priceUsd: tier.priceUsd,
       users: [...perUser.entries()].map(([id, v]) => ({ id, count: v.count })),
+      phase2Decision: refundDecision,
     };
   });
 }
@@ -660,7 +715,7 @@ export async function recordVaultSnapshot(q: Q, reason: string, delta: number, r
 /* ---------------------------------------------------------------- session */
 
 /* Signed session token: "v1.<userId>.<expiresAt>.<hmac>" (HMAC-SHA256).
- * A raw user id is never trusted â€” editing the cookie invalidates it. */
+ * A raw user id is never trusted — editing the cookie invalidates it. */
 const SESSION_TTL_S = 60 * 60 * 24 * 30;
 
 function sessionSecret() {
@@ -891,7 +946,7 @@ async function drawRound(
   const treasuryContribution = amounts.treasury;
   const adminGrossRevenue = amounts.admin;
   const adminWallet = config.adminWallet;
-  const winner = pool[fairIndex(row.serverSeed, roundId, pool.map((t) => t.serial))];
+  const winner = pool[fairIndex(row.serverSeed, roundId, pool.map((t) => t.ticketSerial))];
   const winnerRow = (await tx.select().from(users).where(eq(users.id, winner.userId)).limit(1))[0];
   const participantCounts = new Map<number, number>();
   for (const ticket of pool) participantCounts.set(ticket.userId, (participantCounts.get(ticket.userId) ?? 0) + 1);
@@ -908,7 +963,7 @@ async function drawRound(
       status: "AWAITING_ADMIN_APPROVAL",
       winnerId: winner.userId,
       winnerName,
-      winningSerial: winner.serial,
+      winningSerial: winner.ticketSerial,
       drawnAt,
       prize: String(prize),
       fee: String(amounts.fee),
@@ -928,7 +983,7 @@ async function drawRound(
       drawNonce: 0,
       status: "REVEALED",
       winnerTicketId: winner.id,
-      winningSerial: winner.serial,
+      winningSerial: winner.ticketSerial,
       revealedServerSeed: row.serverSeed,
       committedAt: row.openedAt ?? new Date(),
       revealedAt: drawnAt,
@@ -938,24 +993,37 @@ async function drawRound(
       set: {
         status: "REVEALED",
         winnerTicketId: winner.id,
-        winningSerial: winner.serial,
+        winningSerial: winner.ticketSerial,
         revealedServerSeed: row.serverSeed,
         revealedAt: drawnAt,
       },
     });
 
+  await writePhase2DrawEvidence(tx, {
+    roundId,
+    serverSeed: row.serverSeed,
+    live: config.live,
+    winnerCount: Math.min(3, pool.length),
+    tickets: pool.map((ticket) => ({
+      id: ticket.id,
+      userId: ticket.userId,
+      ticketSerial: ticket.ticketSerial,
+      tierId: row.tierId ?? tier.id,
+    })),
+  });
+
   return {
     winnerName,
     winnerTelegramId: winnerRow?.telegramId ?? null,
     winnerLocale: winnerRow?.locale ?? "en",
-    winningSerial: winner.serial,
+    winningSerial: winner.ticketSerial,
     prize,
     fee: amounts.fee,
     roundId,
     serverSeed: row.serverSeed,
     drawnAt: drawnAt.toISOString(),
     adminWallet,
-    serials: pool.map((t) => t.serial),
+    serials: pool.map((t) => t.ticketSerial),
     youWon: winner.userId === buyerId,
     yourTickets: pool.filter((t) => t.userId === buyerId).length,
     winnerUserId: winner.userId,
@@ -972,7 +1040,7 @@ async function drawRound(
  * Safety net for full automation: draws EVERY open round whose ticket count
  * has reached capacity. Called by the buy flow (fast path) and by the
  * autopilot cron (catches crashes, manual DB edits, or any missed trigger).
- * Each round is drawn in its own locked transaction â€” never twice.
+ * Each round is drawn in its own locked transaction — never twice.
  */
 export async function autoDrawFullRounds(triggerUserId = 0): Promise<DrawOutcome[]> {
   const open = await db
@@ -1026,7 +1094,7 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
     if (current !== ROUND_STATUSES.AWAITING_ADMIN_APPROVAL) return null;
     if (approved) {
       const pool = await tx
-        .select({ serial: tickets.serial, userId: tickets.userId })
+        .select({ ticketSerial: tickets.ticketSerial, userId: tickets.userId })
         .from(tickets)
         .where(and(eq(tickets.roundId, roundId), eq(tickets.kind, "gold")))
         .orderBy(tickets.id);
@@ -1043,6 +1111,10 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
     if (!approved) {
       const list = await tx.select().from(tickets).where(eq(tickets.roundId, roundId));
       refundedTickets = list.length;
+      await tx
+        .update(tickets)
+        .set({ status: "refunded" })
+        .where(and(eq(tickets.roundId, roundId), eq(tickets.kind, "gold")));
       const perUser = new Map<number, { count: number; username: string }>();
       for (const ticket of list) {
         const cur = perUser.get(ticket.userId) ?? { count: 0, username: ticket.username };
@@ -1057,7 +1129,7 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
           username: value.username,
           type: "ticket_refund",
           amount: String(amount),
-          note: `Refund: round ${roundId} rejected by administrator`,
+          note: `Refund: round ${roundId} rejected by automated BETX verification`,
           account: "user",
           roundId,
           tierId: tier.id,
@@ -1086,6 +1158,12 @@ export async function approveRoundResult(roundId: number, approved: boolean, act
       entityId: roundId,
       details: { from: current, to: next, refundedTickets },
     });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: approved ? "round.approve" : "round.reject_and_refund",
+      subject: `round:${roundId}`,
+      metadata: { from: current, to: next, refundedTickets },
+    });
     return { roundId, approved, status: next };
   });
 }
@@ -1104,7 +1182,7 @@ export async function settleApprovedRound(roundId: number, actor: string) {
       throw new Error(`Round ${roundId} is missing approved winner data`);
     }
     const roundTickets = await tx
-      .select({ serial: tickets.serial, userId: tickets.userId })
+      .select({ ticketSerial: tickets.ticketSerial, userId: tickets.userId })
       .from(tickets)
       .where(and(eq(tickets.roundId, roundId), eq(tickets.kind, "gold")))
       .orderBy(tickets.id);
@@ -1309,6 +1387,34 @@ export async function settleApprovedRound(roundId: number, actor: string) {
         adminGrossRevenue,
       },
     });
+    const chainEvent = await appendAdminAuditEvent(tx, {
+      actor,
+      action: "round.settle",
+      subject: `round:${roundId}`,
+      metadata: { tierCode: tier.code, ticketRevenue: amounts.totalPool, prize, treasuryContribution, adminGrossRevenue },
+    });
+    const reveal = (
+      await tx
+        .select({ proofPayload: drawReveals.proofPayload })
+        .from(drawReveals)
+        .where(eq(drawReveals.roundId, roundId))
+        .limit(1)
+    )[0];
+    const proofPayload = (reveal?.proofPayload ?? {}) as { proofHash?: string; ticketSnapshotHash?: string };
+    await writePhase2SettlementProof(tx, {
+      roundId,
+      plan: {
+        grossUsd: amounts.totalPool,
+        ticketCount: roundTickets.length,
+        settled: true,
+        directReferral: Boolean(winner.referredBy),
+        kycApproved: winner.kycStatus === "APPROVED",
+        refunded: false,
+      },
+      drawProofHash: proofPayload.proofHash ?? "0".repeat(64),
+      ticketSnapshotHash: proofPayload.ticketSnapshotHash ?? "0".repeat(64),
+      auditHeadHash: chainEvent.hash,
+    });
     return { roundId, status: "SETTLED" };
   });
 }
@@ -1352,7 +1458,7 @@ export async function getDrawHistory(limit = 20, offset = 0) {
     draws: rows.map(({ round: w, displayName, username }) => ({
       roundId: w.id,
       winnerName: displayName ?? username ?? "Unknown User",
-      winningSerial: w.winningSerial ?? "â€”",
+      winningSerial: w.winningSerial ?? "-",
       prize: Number(w.prize),
       fee: Number(w.fee),
       capacity: w.capacity,
@@ -1369,8 +1475,11 @@ export async function getDrawHistory(limit = 20, offset = 0) {
 
 export async function buyTickets(userId: number, requested: number, tierSelector?: string | number) {
   const count = Math.min(10, Math.max(1, Math.floor(requested) || 1));
+  const serialRetryLimit = 5;
 
-  return db.transaction(async (tx) => {
+  for (let attempt = 1; attempt <= serialRetryLimit; attempt += 1) {
+    try {
+      return await db.transaction(async (tx) => {
     const tier = await resolveTierConfig(tx, tierSelector);
     await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
     const me = (await tx.select().from(users).where(eq(users.id, userId)).for("update"))[0];
@@ -1416,6 +1525,7 @@ export async function buyTickets(userId: number, requested: number, tierSelector
       firstGoldenTicket = (previousTickets?.count ?? 0) === 0;
     }
 
+    const transactionSignature = randomUUID();
     const created = await tx
       .insert(tickets)
       .values(
@@ -1426,7 +1536,10 @@ export async function buyTickets(userId: number, requested: number, tierSelector
           kind: "gold",
           tierId: tier.id,
           amountUsd: String(tier.priceUsd),
-          serial: makeSerial(),
+          ticketSerial: makeTicketSerial(round.id),
+          walletAddress: me.walletAddress,
+          transactionSignature,
+          status: "active",
         })),
       )
       .returning();
@@ -1449,12 +1562,12 @@ export async function buyTickets(userId: number, requested: number, tierSelector
       username: me.username,
       type: "ticket_buy",
       amount: String(-cost),
-      note: `${take} golden tickets آ· round ${round.id}`,
+      note: `${take} golden tickets · round ${round.id}`,
       account: "user",
       roundId: round.id,
       tierId: tier.id,
-      reference: randomUUID(),
-      transactionKey: `ticket-purchase:${randomUUID()}`,
+      reference: transactionSignature,
+      transactionKey: `ticket-purchase:${transactionSignature}`,
     });
 
     if (firstGoldenTicket && me.referredBy) {
@@ -1479,8 +1592,20 @@ export async function buyTickets(userId: number, requested: number, tierSelector
       }
     }
 
-    return { serials: created.map((t) => t.serial), roundId: round.id, tierCode: tier.code, draw: null };
-  });
+      return {
+        serials: created.map((t) => t.ticketSerial),
+        roundId: round.id,
+        tierCode: tier.code,
+        transactionReference: transactionSignature,
+        draw: null,
+      };
+      });
+    } catch (error) {
+      if (isTicketSerialCollision(error) && attempt < serialRetryLimit) continue;
+      throw error;
+    }
+  }
+  throw new Error("ticket serial generation failed");
 }
 
 /* --------------------------------------------------------------- deposits */
@@ -1541,7 +1666,7 @@ export async function creditDeposit(depositId: number, status = "finished") {
       transactionKey: `deposit:${dep.id}:credit`,
     });
 
-    // referral cash bonus on the invitee's first deposit â€” paid from vault profit only
+    // referral cash bonus on the invitee's first deposit — paid from vault profit only
     let inviter: User | null = null;
     if (firstDeposit && me.referredBy && dep.provider !== "demo") {
       const bonus = config.limits.referralDepositBonus;
@@ -1674,7 +1799,7 @@ export async function processWithdrawal(
         username: w.username,
         type: "withdraw_paid",
         amount: String(-Number(w.amount)),
-        note: `Verified withdrawal #${w.id} آ· tx ${verifiedTxHash}`,
+        note: `Verified withdrawal #${w.id}  · tx ${verifiedTxHash}`,
         account: "withdrawal_settlement",
         reference: randomUUID(),
         transactionKey: `withdrawal:${w.id}:paid`,
@@ -1687,6 +1812,12 @@ export async function processWithdrawal(
       entityId: w.id,
       details: { status: action, txHash: verifiedTxHash, note: note ?? null },
     });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: action === "paid" ? "withdrawal.pay" : "withdrawal.reject",
+      subject: `withdrawal:${w.id}`,
+      metadata: { status: action, txHash: verifiedTxHash, note: note ?? null },
+    });
     const u = (await tx.select().from(users).where(eq(users.id, w.userId)).limit(1))[0];
     return { withdrawal: { ...w, status: action }, telegramId: u?.telegramId ?? null, locale: u?.locale ?? "en" };
   });
@@ -1698,7 +1829,7 @@ export async function getState(tierSelector?: string | number) {
   const me = await getSessionUser();
   const region = regionStatus(await headers());
 
-  const round = await ensureOpenRound(tierSelector);
+  const round = await findOpenRound(tierSelector);
   const tiers = await listActiveTiers();
   const v = (await db.select().from(vault).limit(1))[0];
   const settledRoundEntry = sql`exists (
@@ -1860,18 +1991,21 @@ export async function getState(tierSelector?: string | number) {
       tickets: myTickets.map(({ ticket, round: ticketRound }) => ({
         id: ticket.id,
         roundId: ticket.roundId,
-        serial: ticket.serial,
+        serial: ticket.ticketSerial,
         kind: ticket.kind,
         createdAt: new Date(ticket.createdAt).toISOString(),
+        walletAddress: ticket.walletAddress,
+        transactionReference: ticket.transactionSignature,
+        ticketStatus: ticket.status,
         status:
           normalizeRoundStatus(ticketRound.status) === ROUND_STATUSES.REFUNDED
             ? "refunded"
             : normalizeRoundStatus(ticketRound.status) !== ROUND_STATUSES.SETTLED
               ? "pending"
-              : ticket.serial === ticketRound.winningSerial
+              : ticket.ticketSerial === ticketRound.winningSerial
                 ? "winner"
                 : "lost",
-        prize: ticket.serial === ticketRound.winningSerial ? Number(ticketRound.prize) : 0,
+        prize: ticket.ticketSerial === ticketRound.winningSerial ? Number(ticketRound.prize) : 0,
         winningSerial: ticketRound.winningSerial,
       })),
       locale: me.locale,
@@ -1907,6 +2041,15 @@ export async function getState(tierSelector?: string | number) {
       })),
     };
   }
+
+  const roundTier = tiers.find((tier) => tier.id === round?.tierId);
+  const snapshotTierCode =
+    round?.tierSnapshot && typeof round.tierSnapshot === "object" && !Array.isArray(round.tierSnapshot)
+      ? String((round.tierSnapshot as Record<string, unknown>).code ?? "")
+      : "";
+  const roundTierCode =
+    roundTier?.code ??
+    (tiers.some((tier) => tier.code === snapshotTierCode) ? snapshotTierCode : "usd_1");
 
   return {
     config: {
@@ -1944,9 +2087,7 @@ export async function getState(tierSelector?: string | number) {
     round: round ? {
       id: round.id,
       tierId: round.tierId,
-      tierCode: round.tierSnapshot && typeof round.tierSnapshot === "object" && !Array.isArray(round.tierSnapshot)
-        ? String((round.tierSnapshot as Record<string, unknown>).code ?? "usd_1")
-        : "usd_1",
+      tierCode: roundTierCode,
       closesAt: round.closesAt ? new Date(round.closesAt).toISOString() : null,
       status: normalizeRoundStatus(round.status),
       capacity: round.capacity,
@@ -1959,7 +2100,7 @@ export async function getState(tierSelector?: string | number) {
       seedHash: round.seedHash,
       tickets: roundTickets.map(({ ticket, displayName, username }) => ({
         id: ticket.id,
-        serial: ticket.serial,
+        serial: ticket.ticketSerial,
         username: displayName ?? username ?? "Unknown User",
         kind: ticket.kind,
         mine: me ? ticket.userId === me.id : false,
@@ -1968,7 +2109,7 @@ export async function getState(tierSelector?: string | number) {
     winners: winners.map(({ round: w, displayName, username }) => ({
       roundId: w.id,
       winnerName: displayName ?? username ?? "Unknown User",
-      winningSerial: w.winningSerial ?? "â€”",
+      winningSerial: w.winningSerial ?? "-",
       prize: Number(w.prize),
       fee: Number(w.fee),
       capacity: w.capacity,

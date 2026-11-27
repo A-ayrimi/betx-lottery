@@ -174,7 +174,7 @@ export function WalletList({
   const { state, refresh, setToast, pendingRef, demoEnabled, startDemoSession } =
     useApp();
   const { wallets, ready, connect, connectDemo, signMessage } = useWallet();
-  const { d, t } = useI18n();
+  const { d, t, locale } = useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [step, setStep] = useState<"" | "connect" | "sign">("");
   const linking = Boolean(state?.user);
@@ -229,7 +229,7 @@ export function WalletList({
     try {
       const address = connectDemo();
       startDemoSession(address);
-      setToast(t(d.wc.demoConnected, { address, balance: "100.00" }));
+      setToast(t(d.wc.demoConnected, { address, balance: money(100, locale) }));
       onDone?.();
     } catch (e) {
       setToast(walletErrorMessage(e));
@@ -342,10 +342,11 @@ export function AddressChip({
   demo?: boolean;
   onClick?: () => void;
 }) {
+  const { locale } = useI18n();
   const resolvedUsdc = usdc !== undefined ? usdc : (usdt ?? null);
   const resolvedSol = sol !== undefined ? sol : (trx ?? null);
-  const usdcText = resolvedUsdc === null ? "—" : money(resolvedUsdc);
-  const solText = resolvedSol === null ? "—" : money(resolvedSol);
+  const usdcText = resolvedUsdc === null ? "—" : money(resolvedUsdc, locale);
+  const solText = resolvedSol === null ? "—" : money(resolvedSol, locale);
 
   return (
     <button

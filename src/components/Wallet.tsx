@@ -6,11 +6,12 @@ import { useApp } from "./AppProvider";
 import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import { DepositCard } from "./DepositCard";
+import { TicketSerialRow } from "./TicketDetails";
 
 
 export function Wallet() {
   const { state, withdraw, setToast, isDemoSession, loading, dataUnavailable, demoEnabled } = useApp();
-  const { d, t, n, ago, date } = useI18n();
+  const { d, t, n, ago, date, locale } = useI18n();
   const [busy, setBusy] = useState<"dep" | "wd" | null>(null);
   const [wd, setWd] = useState({ amount: "", address: "" });
 
@@ -51,7 +52,7 @@ export function Wallet() {
         </div>
 
         {excluded ? (
-          <p className="mt-6 rounded-xl border border-foil/40 bg-foil/10 px-5 py-3 text-sm text-foil" suppressHydrationWarning>
+          <p className="mt-6 rounded-xl border border-foil/40 bg-foil/10 px-5 py-3 text-sm text-foil">
             {t(d.rg.excludedUntil, { date: date(excluded) })}
           </p>
         ) : null}
@@ -62,7 +63,7 @@ export function Wallet() {
             <div className="relative">
               <p className="micro text-mint">{d.wallet.balance}</p>
               <p dir="ltr" className="font-display tnum mt-3 text-start text-5xl font-bold text-white">
-                {user ? `$${money(user.balance)}` : "—"}
+                {user ? `$${money(user.balance, locale)}` : "—"}
               </p>
               <p className="mt-2 text-sm text-mint">
                 {user
@@ -81,7 +82,7 @@ export function Wallet() {
               <div className="space-y-2 text-[13px] text-mint">
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.totalDeposited}</span>
-                  <span dir="ltr" className="font-display tnum text-white">{user ? `$${money(user.totalDeposited)}` : "—"}</span>
+                  <span dir="ltr" className="font-display tnum text-white">{user ? `$${money(user.totalDeposited, locale)}` : "—"}</span>
                 </p>
                 <p className="flex justify-between gap-3">
                   <span>{d.wallet.bonusSpins}</span>
@@ -103,7 +104,7 @@ export function Wallet() {
             <p className="micro text-foil">{d.wallet.withdrawKicker}</p>
             <h3 className="mt-2 text-xl font-black text-white">{d.wallet.withdrawTitle}</h3>
             <label className="mt-5 block">
-              <span className="micro text-mint">{t(d.wallet.amountMin, { min: `$${cfg?.minWithdraw ?? 5}` })}</span>
+              <span className="micro text-mint">{t(d.wallet.amountMin, { min: `$${money(cfg?.minWithdraw ?? 5, locale)}` })}</span>
               <input
                 dir="ltr"
                 inputMode="decimal"
@@ -130,7 +131,7 @@ export function Wallet() {
                 dir="ltr"
                 value={wd.address}
                 onChange={(e) => setWd({ ...wd, address: e.target.value })}
-                placeholder={user?.payoutAddress || "Solana address"}
+                placeholder={user?.payoutAddress || d.wallet.address}
                 className="focus-ring mt-2 w-full rounded-xl border border-rule bg-black/30 px-4 py-3 font-display text-[13px] text-white placeholder:text-mint/40"
               />
             </label>
@@ -157,7 +158,6 @@ export function Wallet() {
               {user.tickets.map((ticket) => (
                 <article key={ticket.id} className="rounded-xl border border-foil/25 bg-foil/[0.05] p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="micro text-mint">#{ticket.roundId}</span>
                     <span className={`text-[11px] font-bold ${ticket.status === "winner" ? "text-neon-2" : ticket.status === "pending" ? "text-foil" : "text-mint"}`}>
                       {ticket.status === "winner"
                         ? d.wallet.ticketWon
@@ -167,13 +167,21 @@ export function Wallet() {
                             ? d.wallet.ticketRefunded
                             : d.wallet.ticketLost}
                     </span>
+                    {ticket.status === "winner" ? <span dir="ltr" className="font-display text-sm text-foil">${money(ticket.prize, locale)}</span> : null}
                   </div>
-                  <p dir="ltr" className="font-display mt-3 break-all text-sm font-bold tracking-[0.12em] text-white">
-                    {ticket.serial}
-                  </p>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-mint/70">
-                    <span>{ticket.kind.toUpperCase()}</span>
-                    {ticket.status === "winner" ? <span dir="ltr">${money(ticket.prize)}</span> : null}
+                  <div className="mt-3">
+                    <TicketSerialRow
+                      ticket={{
+                        serial: ticket.serial,
+                        roundId: ticket.roundId,
+                        status: ticket.status,
+                        kind: ticket.kind,
+                        createdAt: ticket.createdAt,
+                        prize: ticket.prize,
+                        walletAddress: ticket.walletAddress,
+                        transactionReference: ticket.transactionReference,
+                      }}
+                    />
                   </div>
                 </article>
               ))}
@@ -225,7 +233,7 @@ export function Wallet() {
                 <div key={r.key} className="grid grid-cols-[96px_1fr_auto] items-center gap-4 border-b border-rule/50 px-6 py-3.5 text-[13px] last:border-b-0">
                   <span className="text-white">{r.kind}</span>
                   <span className="text-mint">
-                    {statusLabel(r.status)} · <span suppressHydrationWarning>{ago(r.at)}</span>
+                    {statusLabel(r.status)} · <span>{ago(r.at)}</span>
                     {r.link ? (
                       <a href={r.link} target="_blank" rel="noopener noreferrer" className="ms-2 text-neon-2 underline-offset-4 hover:underline">
                         {r.linkLabel}
@@ -233,7 +241,7 @@ export function Wallet() {
                     ) : null}
                   </span>
                   <span dir="ltr" className={`font-display tnum font-bold ${r.sign === "+" ? "text-neon-2" : "text-foil"}`}>
-                    {r.sign}${money(r.amount)}
+                    {r.sign}${money(r.amount, locale)}
                   </span>
                 </div>
               ))}
@@ -248,7 +256,7 @@ export function Wallet() {
 
 function ResponsiblePanel() {
   const { state, account, setToast } = useApp();
-  const { d, t, date, href } = useI18n();
+  const { d, t, date, href, locale } = useI18n();
   const [limit, setLimit] = useState("");
   const user = state?.user;
   if (!user) return null;
@@ -272,12 +280,12 @@ function ResponsiblePanel() {
         <h3 className="mt-2 text-xl font-black text-white">{d.rg.title}</h3>
         <p className="mt-2 text-[13px] leading-7 text-mint">{d.rg.body}</p>
         <p className="mt-4 text-sm text-white">
-          {user.depositLimit === null ? d.rg.none : t(d.rg.current, { limit: `$${money(user.depositLimit)}` })}
+          {user.depositLimit === null ? d.rg.none : t(d.rg.current, { limit: `$${money(user.depositLimit, locale)}` })}
         </p>
         {user.pendingLimit ? (
-          <p className="mt-1 text-[12px] text-foil" suppressHydrationWarning>
+          <p className="mt-1 text-[12px] text-foil">
             {t(d.rg.pending, {
-              limit: user.pendingLimit.amount === null ? d.rg.none : `$${money(user.pendingLimit.amount)}`,
+              limit: user.pendingLimit.amount === null ? d.rg.none : `$${money(user.pendingLimit.amount, locale)}`,
               time: date(user.pendingLimit.at),
             })}
           </p>
@@ -308,11 +316,11 @@ function ResponsiblePanel() {
       </div>
 
       <div className="panel rounded-2xl p-6">
-        <p className="micro text-foil">SELF-EXCLUSION</p>
+        <p className="micro text-foil">{d.ui.selfExclusion}</p>
         <h3 className="mt-2 text-xl font-black text-white">{d.rg.excludeTitle}</h3>
         <p className="mt-2 text-[13px] leading-7 text-mint">{d.rg.excludeBody}</p>
         {user.selfExcludedUntil ? (
-          <p className="mt-4 text-sm text-foil" suppressHydrationWarning>{t(d.rg.excludedUntil, { date: date(user.selfExcludedUntil) })}</p>
+          <p className="mt-4 text-sm text-foil">{t(d.rg.excludedUntil, { date: date(user.selfExcludedUntil) })}</p>
         ) : null}
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[

@@ -7,9 +7,10 @@ import { useApp } from "./AppProvider";
 import { money } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import type { DrawResult } from "@/lib/types";
+import { PurchaseReceipt } from "./TicketDetails";
 
 export function Toasts() {
-  const { toast, draw, setDraw } = useApp();
+  const { toast, draw, setDraw, lastPurchase, clearLastPurchase } = useApp();
   const { dir } = useI18n();
 
   return (
@@ -43,6 +44,15 @@ export function Toasts() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      {lastPurchase && !draw ? (
+        <PurchaseReceipt
+          serials={lastPurchase.serials}
+          roundId={lastPurchase.roundId}
+          transactionReference={lastPurchase.transactionReference}
+          onClose={clearLastPurchase}
+        />
+      ) : null}
     </>
   );
 }
@@ -53,7 +63,7 @@ export function Toasts() {
  * already final and verifiable. No near-miss framing, no "so close!".
  */
 function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }) {
-  const { d, t, href } = useI18n();
+  const { d, t, href, n, locale } = useI18n();
   const serials = useMemo(() => (draw.serials?.length ? draw.serials : [draw.winningSerial]), [draw.serials, draw.winningSerial]);
   const [instant] = useState(
     () => serials.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -103,7 +113,7 @@ function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }
       <div className="guilloche pointer-events-none absolute inset-0 opacity-70" />
       <div className="relative">
         <p className="micro text-foil">{d.draw.kicker}</p>
-        <h3 className="mt-4 text-2xl font-black leading-tight text-white">{t(d.draw.title, { n: draw.roundId })}</h3>
+        <h3 className="mt-4 text-2xl font-black leading-tight text-white">{t(d.draw.title, { n: n(draw.roundId) })}</h3>
 
         {/* the ticket slot */}
         <div ref={slotRef} className="perf stub-fill mx-auto mt-7 w-[78%] rounded-xl px-5 py-5 text-[#161206]">
@@ -125,7 +135,7 @@ function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }
               {participated && !draw.youWon ? (
                 <div className="mt-4 rounded-xl border border-rule bg-black/25 px-4 py-3 text-start">
                   <p className="text-sm font-bold text-white">{d.draw.lost}</p>
-                  <p className="mt-1 text-[13px] leading-6 text-mint">{t(d.draw.lostBody, { n: draw.yourTickets ?? 0 })}</p>
+                  <p className="mt-1 text-[13px] leading-6 text-mint">{t(d.draw.lostBody, { n: n(draw.yourTickets ?? 0) })}</p>
                 </div>
               ) : null}
 
@@ -137,17 +147,17 @@ function DrawReveal({ draw, onClose }: { draw: DrawResult; onClose: () => void }
 
               <div className="mt-6 grid grid-cols-2 gap-3 text-start">
                 <div className="panel rounded-xl p-4">
-                  <p className="micro text-mint">PRIZE</p>
-                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-white">${money(draw.prize)}</p>
+                  <p className="micro text-mint">{d.pool.prize}</p>
+                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-white">${money(draw.prize, locale)}</p>
                 </div>
                 <div className="panel rounded-xl p-4">
-                  <p className="micro text-mint">HOUSE EDGE</p>
-                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-foil">${money(draw.fee)}</p>
+                  <p className="micro text-mint">{d.ui.houseEdge}</p>
+                  <p dir="ltr" className="font-display tnum mt-1 text-start text-2xl text-foil">${money(draw.fee, locale)}</p>
                 </div>
               </div>
 
               <button onClick={onClose} className="btn-neon focus-ring mt-7 w-full rounded-xl px-6 py-3.5 text-base font-bold">
-                OK
+                {d.ui.ok}
               </button>
               {!draw.demo ? (
                 <a href={href(`/verify/${draw.roundId}`)} className="mt-3 inline-block text-[12px] text-neon-2 hover:underline">

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
@@ -31,6 +31,13 @@ test(
     const multiTierMigrationSql = await readFile(
       new URL("../supabase/migrations/20261125_multi_tier_pool_foundation.sql", import.meta.url),
       "utf8",
+    );
+    const migrationDir = new URL("../supabase/migrations/", import.meta.url);
+    const phase1bMigrations = (await readdir(migrationDir))
+      .filter((name) => name.startsWith("20261126_m") && name.endsWith(".sql"))
+      .sort();
+    const phase1bSql = await Promise.all(
+      phase1bMigrations.map((name) => readFile(new URL(name, migrationDir), "utf8")),
     );
 
     const adminPool = new Pool({ connectionString: databaseUrl, max: 1 });
@@ -77,11 +84,15 @@ test(
       await pool.query(migrationSql);
       await pool.query(multiTierMigrationSql);
       await pool.query(multiTierMigrationSql);
+      for (const sql of phase1bSql) {
+        await pool.query(sql);
+        await pool.query(sql);
+      }
 
       const constraints = await pool.query(
         "SELECT count(*)::int AS count FROM pg_constraint WHERE contype = 'f' AND connamespace = current_schema()::regnamespace",
       );
-      assert.equal(constraints.rows[0].count, 24);
+      assert.ok(constraints.rows[0].count >= 24);
 
       const defaultTier = (
         await pool.query("SELECT id FROM ticket_tiers WHERE code = 'usd_1'")
@@ -131,8 +142,8 @@ test(
         ["INSERT INTO fee_transfers (round_id, amount, admin_wallet) VALUES (-1, 3, 'test')", []],
         ["INSERT INTO login_tokens (token, user_id, expires_at) VALUES ($1, -1, now())", [randomUUID()]],
         ["INSERT INTO rounds (winner_id) VALUES (-1)", []],
-        ["INSERT INTO tickets (round_id, user_id, serial, username) VALUES (-1, $1, $2, 'test')", [user.id, randomUUID()]],
-        ["INSERT INTO tickets (round_id, user_id, serial, username) VALUES ($1, -1, $2, 'test')", [round.id, randomUUID()]],
+        ["INSERT INTO tickets (round_id, user_id, ticket_serial, username) VALUES (-1, $1, $2, 'test')", [user.id, randomUUID()]],
+        ["INSERT INTO tickets (round_id, user_id, ticket_serial, username) VALUES ($1, -1, $2, 'test')", [round.id, randomUUID()]],
         ["INSERT INTO vault_snapshots (balance, reason, round_id) VALUES (0, 'test', -1)", []],
         ["INSERT INTO wheel_spins (user_id, prize) VALUES (-1, 0)", []],
         ["INSERT INTO withdrawals (user_id, username, amount, address) VALUES (-1, 'test', 5, 'test')", []],

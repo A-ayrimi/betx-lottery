@@ -47,7 +47,7 @@ export async function evaluate(w: W, cfg = payoutConfig()): Promise<Verdict> {
     .from(ledger)
     .where(eq(ledger.userId, u.id));
   if (Number(agg.spent) < deposited * cfg.minPlayRatio) {
-    return { ok: false, reason: `low play-through (${Number(agg.spent).toFixed(2)} of ${deposited.toFixed(2)} deposited) â€” AML check` };
+    return { ok: false, reason: `low play-through (${Number(agg.spent).toFixed(2)} of ${deposited.toFixed(2)} deposited) — AML check` };
   }
   if (Math.abs(Number(u.balance) - Number(agg.total)) > 0.009) {
     return { ok: false, reason: "balance does not match ledger" };

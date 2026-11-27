@@ -10,7 +10,7 @@ type BotStrings = {
   balance: string;
   webLogin: string;
   inviteJoined: string; // {name} {count}
-  inviteText: string; // {link} {bonus} {count}
+  inviteText: string; // {link} {count}
   share: string;
   shareText: string;
   balanceText: string; // {balance} {spins}
@@ -30,7 +30,7 @@ type BotStrings = {
 
 const S: Record<Locale, BotStrings> = {
   en: {
-    welcomeNew: "🎟 <b>Welcome to BETX, {name}!</b>\n\nOne ticket. One chance. Round prizes are paid after administrator approval.\n\n• A <b>free wheel spin</b> every 24 hours\n• 20-ticket pool, <b>$15</b> allocated to the winner after approval\n• A friend's first golden-ticket purchase unlocks <b>+1 bonus spin</b>",
+    welcomeNew: "🎟 <b>Welcome to BETX, {name}!</b>\n\nOne ticket. One chance. Round prizes are paid after automated BETX verification.\n\n• A <b>free wheel spin</b> every 24 hours\n• Current tiers, capacities, and prize splits are shown in the app\n• A friend's first golden-ticket purchase unlocks <b>+1 bonus spin</b>",
     welcomeBack: "👋 Welcome back, <b>{name}</b>!",
     viaInvite: "\n\n✅ You joined with a friend's invite.",
     terms: "\n\n<i>18+ only. By continuing you accept the Terms: {url}</i>",
@@ -39,7 +39,7 @@ const S: Record<Locale, BotStrings> = {
     balance: "💰 Balance",
     webLogin: "🌐 Log in on the web",
     inviteJoined: "🎉 <b>{name}</b> joined with your invite link!\nTheir first golden-ticket purchase unlocks +1 bonus spin for you.\nInvited so far: <b>{count}</b>",
-    inviteText: "🔗 <b>Your personal invite link:</b>\n<code>{link}</code>\n\n• Each referred member's first golden-ticket purchase: +1 bonus spin\n• Their first deposit: +{bonus} cash\n\nInvited so far: <b>{count}</b>",
+    inviteText: "🔗 <b>Your personal invite link:</b>\n<code>{link}</code>\n\n• Each referred member's first golden-ticket purchase: +1 bonus spin\n• Their first deposit: a referral cash reward\n\nInvited so far: <b>{count}</b>",
     share: "📤 Share with friends",
     shareText: "Join BETX with this link and get a free spin 🎟",
     balanceText: "💰 Balance: <b>{balance}</b>\n🎡 Bonus spins: <b>{spins}</b>",
@@ -57,7 +57,7 @@ const S: Record<Locale, BotStrings> = {
     roundRefund: "↩️ Round {round} didn't fill within {hours}h, so it was closed and your {n} ticket(s) were refunded: <b>{amount}</b> is back in your balance.",
   },
   es: {
-    welcomeNew: "🎟 <b>¡Bienvenido a BETX, {name}!</b>\n\nUn boleto. Una oportunidad. Los premios de ronda se asignan tras la aprobación del administrador.\n\n• Un <b>giro gratis</b> cada 24 horas\n• Pozo de 20 boletos, <b>$15</b> para el ganador tras la aprobación\n• La primera compra de boleto dorado de un amigo desbloquea <b>+1 giro extra</b>",
+    welcomeNew: "🎟 <b>¡Bienvenido a BETX, {name}!</b>\n\nUn boleto. Una oportunidad. Los premios de ronda se asignan tras la verificación automática de BETX.\n\n• Un <b>giro gratis</b> cada 24 horas\n• Los niveles, capacidades y repartos actuales se muestran en la app\n• La primera compra de boleto dorado de un amigo desbloquea <b>+1 giro extra</b>",
     welcomeBack: "👋 ¡Bienvenido de nuevo, <b>{name}</b>!",
     viaInvite: "\n\n✅ Te uniste con la invitación de un amigo.",
     terms: "\n\n<i>Solo 18+. Al continuar aceptas los Términos: {url}</i>",
@@ -66,7 +66,7 @@ const S: Record<Locale, BotStrings> = {
     balance: "💰 Saldo",
     webLogin: "🌐 Entrar en la web",
     inviteJoined: "🎉 ¡<b>{name}</b> se unió con tu enlace!\nSu primera compra de boleto dorado desbloquea +1 giro para ti.\nInvitados: <b>{count}</b>",
-    inviteText: "🔗 <b>Tu enlace personal:</b>\n<code>{link}</code>\n\n• Primera compra de boleto dorado de cada invitado: +1 giro\n• Su primer depósito: +{bonus} en efectivo\n\nInvitados: <b>{count}</b>",
+    inviteText: "🔗 <b>Tu enlace personal:</b>\n<code>{link}</code>\n\n• Primera compra de boleto dorado de cada invitado: +1 giro\n• Su primer depósito: una recompensa en efectivo por referido\n\nInvitados: <b>{count}</b>",
     share: "📤 Compartir",
     shareText: "Únete a BETX con este enlace y gana un giro gratis 🎟",
     balanceText: "💰 Saldo: <b>{balance}</b>\n🎡 Giros extra: <b>{spins}</b>",
@@ -84,7 +84,7 @@ const S: Record<Locale, BotStrings> = {
     roundRefund: "↩️ La ronda {round} no se llenó en {hours} h, así que se cerró y tus {n} boleto(s) fueron reembolsados: <b>{amount}</b> volvió a tu saldo.",
   },
   fa: {
-    welcomeNew: "🎟 <b>به BETX خوش آمدی، {name}!</b>\n\nیک بلیط، یک شانس. جایزهٔ هر دور پس از تأیید مدیر تخصیص داده می‌شود.\n\n• یک <b>چرخاندن رایگان</b> هر ۲۴ ساعت\n• استخر ۲۰ بلیطی، <b>$15</b> برای برنده پس از تأیید\n• اولین خرید بلیط طلاییِ دوست دعوت‌شده، <b>+۱ چرخش اضافه</b> آزاد می‌کند",
+    welcomeNew: "🎟 <b>به BETX خوش آمدی، {name}!</b>\n\nیک بلیط، یک شانس. جایزهٔ هر دور پس از تأیید خودکار سیستم BETX تخصیص داده می‌شود.\n\n• یک <b>چرخاندن رایگان</b> هر ۲۴ ساعت\n• سطوح، ظرفیت‌ها و تقسیم جایزهٔ فعلی در برنامه نمایش داده می‌شود\n• اولین خرید بلیط طلاییِ دوست دعوت‌شده، <b>+۱ چرخش اضافه</b> آزاد می‌کند",
     welcomeBack: "👋 خوش برگشتی <b>{name}</b>!",
     viaInvite: "\n\n✅ با کد دعوت دوستت عضو شدی.",
     terms: "\n\n<i>فقط ۱۸+. با ادامه، قوانین را می‌پذیری: {url}</i>",
@@ -93,7 +93,7 @@ const S: Record<Locale, BotStrings> = {
     balance: "💰 موجودی",
     webLogin: "🌐 ورود در مرورگر",
     inviteJoined: "🎉 <b>{name}</b> با لینک تو عضو شد!\nاولین خرید بلیط طلایی او، یک چرخش اضافه برایت آزاد می‌کند.\nدعوت‌شده‌ها: <b>{count}</b>",
-    inviteText: "🔗 <b>لینک دعوت اختصاصی تو:</b>\n<code>{link}</code>\n\n• اولین خرید بلیط طلایی هر دعوت‌شده: +۱ چرخش\n• اولین واریز دوستت: +{bonus} نقدی\n\nدعوت‌شده‌ها: <b>{count}</b>",
+    inviteText: "🔗 <b>لینک دعوت اختصاصی تو:</b>\n<code>{link}</code>\n\n• اولین خرید بلیط طلایی هر دعوت‌شده: +۱ چرخش\n• اولین واریز دوستت: پاداش نقدی دعوت\n\nدعوت‌شده‌ها: <b>{count}</b>",
     share: "📤 ارسال برای دوستان",
     shareText: "با این لینک وارد BETX شو و شانس رایگان بگیر 🎟",
     balanceText: "💰 موجودی: <b>{balance}</b>\n🎡 چرخش اضافه: <b>{spins}</b>",
@@ -111,7 +111,7 @@ const S: Record<Locale, BotStrings> = {
     roundRefund: "↩️ دور {round} در {hours} ساعت تکمیل نشد، پس بسته شد و {n} بلیط تو بازپرداخت شد: <b>{amount}</b> به موجودی‌ات برگشت.",
   },
   ar: {
-    welcomeNew: "🎟 <b>مرحباً بك في BETX يا {name}!</b>\n\nتذكرة واحدة. فرصة واحدة. تُخصص جائزة الجولة بعد موافقة المسؤول.\n\n• <b>دورة مجانية</b> كل 24 ساعة\n• مجمّع من 20 تذكرة، <b>$15</b> للفائز بعد الموافقة\n• أول شراء لتذكرة ذهبية من صديق مدعو يفتح <b>+1 دورة إضافية</b>",
+    welcomeNew: "🎟 <b>مرحباً بك في BETX يا {name}!</b>\n\nتذكرة واحدة. فرصة واحدة. تُخصص جائزة الجولة بعد التحقق الآلي من BETX.\n\n• <b>دورة مجانية</b> كل 24 ساعة\n• تُعرض مستويات التذاكر والسعات وتقسيم الجوائز الحالية في التطبيق\n• أول شراء لتذكرة ذهبية من صديق مدعو يفتح <b>+1 دورة إضافية</b>",
     welcomeBack: "👋 مرحباً بعودتك يا <b>{name}</b>!",
     viaInvite: "\n\n✅ انضممت بدعوة من صديق.",
     terms: "\n\n<i>18+ فقط. بالمتابعة توافق على الشروط: {url}</i>",
@@ -120,7 +120,7 @@ const S: Record<Locale, BotStrings> = {
     balance: "💰 الرصيد",
     webLogin: "🌐 الدخول من المتصفح",
     inviteJoined: "🎉 انضم <b>{name}</b> عبر رابطك!\nأول شراء لتذكرة ذهبية منه يفتح لك دورة إضافية.\nالمدعوون: <b>{count}</b>",
-    inviteText: "🔗 <b>رابط دعوتك الشخصي:</b>\n<code>{link}</code>\n\n• أول شراء لتذكرة ذهبية من كل مدعو: +1 دورة\n• أول إيداع له: +{bonus} نقداً\n\nالمدعوون: <b>{count}</b>",
+    inviteText: "🔗 <b>رابط دعوتك الشخصي:</b>\n<code>{link}</code>\n\n• أول شراء لتذكرة ذهبية من كل مدعو: +1 دورة\n• أول إيداع له: مكافأة إحالة نقدية\n\nالمدعوون: <b>{count}</b>",
     share: "📤 شارك مع الأصدقاء",
     shareText: "انضم إلى BETX بهذا الرابط واحصل على دورة مجانية 🎟",
     balanceText: "💰 الرصيد: <b>{balance}</b>\n🎡 دورات إضافية: <b>{spins}</b>",
@@ -138,7 +138,7 @@ const S: Record<Locale, BotStrings> = {
     roundRefund: "↩️ لم تمتلئ الجولة {round} خلال {hours} ساعة، فأُغلقت وأُعيد ثمن تذاكرك ({n}): عاد <b>{amount}</b> إلى رصيدك.",
   },
   tr: {
-    welcomeNew: "🎟 <b>BETX'e hoş geldin, {name}!</b>\n\nTek bilet. Tek şans. Tur ödülleri yönetici onayından sonra tahsis edilir.\n\n• Her 24 saatte bir <b>ücretsiz çark</b>\n• 20 biletlik havuz, onaydan sonra kazanana <b>$15</b>\n• Davet edilen arkadaşının ilk altın bilet alımı <b>+1 bonus çevirme</b> açar",
+    welcomeNew: "🎟 <b>BETX'e hoş geldin, {name}!</b>\n\nTek bilet. Tek şans. Tur ödülleri BETX otomatik doğrulamasından sonra tahsis edilir.\n\n• Her 24 saatte bir <b>ücretsiz çark</b>\n• Güncel bilet seviyeleri, kapasiteler ve ödül dağılımı uygulamada gösterilir\n• Davet edilen arkadaşının ilk altın bilet alımı <b>+1 bonus çevirme</b> açar",
     welcomeBack: "👋 Tekrar hoş geldin, <b>{name}</b>!",
     viaInvite: "\n\n✅ Bir arkadaşının davetiyle katıldın.",
     terms: "\n\n<i>Yalnızca 18+. Devam ederek Şartları kabul edersin: {url}</i>",
@@ -147,7 +147,7 @@ const S: Record<Locale, BotStrings> = {
     balance: "💰 Bakiye",
     webLogin: "🌐 Web'de giriş yap",
     inviteJoined: "🎉 <b>{name}</b> davet bağlantınla katıldı!\nİlk altın bilet alımı sana +1 bonus çevirme açar.\nDavet edilen: <b>{count}</b>",
-    inviteText: "🔗 <b>Kişisel davet bağlantın:</b>\n<code>{link}</code>\n\n• Her davetlinin ilk altın bilet alımı: +1 bonus çevirme\n• İlk yatırımı: +{bonus} nakit\n\nDavet edilen: <b>{count}</b>",
+    inviteText: "🔗 <b>Kişisel davet bağlantın:</b>\n<code>{link}</code>\n\n• Her davetlinin ilk altın bilet alımı: +1 bonus çevirme\n• İlk yatırımı: davet nakit ödülü\n\nDavet edilen: <b>{count}</b>",
     share: "📤 Arkadaşlarla paylaş",
     shareText: "Bu bağlantıyla BETX'e katıl ve ücretsiz çevirme kazan 🎟",
     balanceText: "💰 Bakiye: <b>{balance}</b>\n🎡 Bonus çevirme: <b>{spins}</b>",
@@ -165,7 +165,7 @@ const S: Record<Locale, BotStrings> = {
     roundRefund: "↩️ {round}. tur {hours} saat içinde dolmadığı için kapatıldı ve {n} biletin iade edildi: <b>{amount}</b> bakiyene döndü.",
   },
   ru: {
-    welcomeNew: "🎟 <b>Добро пожаловать в BETX, {name}!</b>\n\nОдин билет. Один шанс. Приз раунда распределяется после одобрения администратора.\n\n• <b>Бесплатное вращение</b> каждые 24 часа\n• Пул на 20 билетов, <b>$15</b> победителю после одобрения\n• Первая покупка золотого билета приглашённым другом открывает <b>+1 бонусное вращение</b>",
+    welcomeNew: "🎟 <b>Добро пожаловать в BETX, {name}!</b>\n\nОдин билет. Один шанс. Приз раунда распределяется после автоматической проверки BETX.\n\n• <b>Бесплатное вращение</b> каждые 24 часа\n• Активные уровни билетов, лимиты и распределение призов показаны в приложении\n• Первая покупка золотого билета приглашённым другом открывает <b>+1 бонусное вращение</b>",
     welcomeBack: "👋 С возвращением, <b>{name}</b>!",
     viaInvite: "\n\n✅ Ты присоединился по приглашению друга.",
     terms: "\n\n<i>Только 18+. Продолжая, ты принимаешь Условия: {url}</i>",
@@ -174,7 +174,7 @@ const S: Record<Locale, BotStrings> = {
     balance: "💰 Баланс",
     webLogin: "🌐 Войти на сайте",
     inviteJoined: "🎉 <b>{name}</b> присоединился по твоей ссылке!\nПервая покупка золотого билета откроет тебе +1 бонусное вращение.\nПриглашено: <b>{count}</b>",
-    inviteText: "🔗 <b>Твоя личная ссылка:</b>\n<code>{link}</code>\n\n• Первая покупка золотого билета каждым приглашённым: +1 вращение\n• Его первое пополнение: +{bonus} наличными\n\nПриглашено: <b>{count}</b>",
+    inviteText: "🔗 <b>Твоя личная ссылка:</b>\n<code>{link}</code>\n\n• Первая покупка золотого билета каждым приглашённым: +1 вращение\n• Его первое пополнение: бонус за приглашение\n\nПриглашено: <b>{count}</b>",
     share: "📤 Поделиться",
     shareText: "Заходи в BETX по этой ссылке и получи бесплатное вращение 🎟",
     balanceText: "💰 Баланс: <b>{balance}</b>\n🎡 Бонусные вращения: <b>{spins}</b>",

@@ -3,6 +3,8 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { Dict } from "./dictionaries/en";
 import { dirOf, interpolate, intlTags, type Locale } from "./config";
+import { useMounted } from "@/lib/useStored";
+import { formatNumber } from "@/lib/format";
 
 interface I18nCtx {
   locale: Locale;
@@ -10,6 +12,7 @@ interface I18nCtx {
   d: Dict;
   t: (template: string, vars?: Record<string, string | number>) => string;
   n: (value: number) => string;
+  format: (value: number | string, options?: Intl.NumberFormatOptions) => string;
   ago: (iso: string | null) => string;
   date: (iso: string | null) => string;
   href: (path: string) => string;
@@ -18,9 +21,9 @@ interface I18nCtx {
 const Ctx = createContext<I18nCtx | null>(null);
 
 export function I18nProvider({ locale, dict, children }: { locale: Locale; dict: Dict; children: ReactNode }) {
+  const mounted = useMounted();
   const value = useMemo<I18nCtx>(() => {
     const tag = intlTags[locale];
-    const nf = new Intl.NumberFormat(tag);
     const rtf = new Intl.RelativeTimeFormat(tag, { numeric: "auto" });
     const df = new Intl.DateTimeFormat(tag, { dateStyle: "medium", timeStyle: "short" });
     return {
@@ -28,9 +31,10 @@ export function I18nProvider({ locale, dict, children }: { locale: Locale; dict:
       dir: dirOf(locale),
       d: dict,
       t: interpolate,
-      n: (v) => nf.format(v),
+      n: (v) => formatNumber(v, locale),
+      format: (v, options) => formatNumber(v, locale, options),
       ago: (iso) => {
-        if (!iso) return "";
+        if (!mounted || !iso) return "";
         const sec = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
         const abs = Math.abs(sec);
         // under a minute: stable localized "now" so server and browser render identical text
@@ -39,10 +43,10 @@ export function I18nProvider({ locale, dict, children }: { locale: Locale; dict:
         if (abs < 86400) return rtf.format(Math.round(sec / 3600), "hour");
         return rtf.format(Math.round(sec / 86400), "day");
       },
-      date: (iso) => (iso ? df.format(new Date(iso)) : ""),
+      date: (iso) => (mounted && iso ? df.format(new Date(iso)) : ""),
       href: (path) => `/${locale}${path.startsWith("/") ? path : `/${path}`}`,
     };
-  }, [locale, dict]);
+  }, [locale, dict, mounted]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

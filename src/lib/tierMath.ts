@@ -39,6 +39,35 @@ export function deriveTierAmounts(input: TierAllocationInput): TierAmounts {
   return { totalPool, prize, treasury, admin, fee: roundMoney(treasury + admin) };
 }
 
+export const WINNER_AMOUNTS_BY_CODE: Readonly<Record<string, readonly [number, number, number]>> = {
+  starter_1: [30, 5, 2.5],
+  bronze_5: [120, 20, 10],
+  silver_10: [180, 30, 15],
+  gold_25: [300, 50, 25],
+  platinum_50: [650, 100, 50],
+  diamond_100: [975, 150, 75],
+  vip_whale_200: [1300, 200, 100],
+};
+
+export function winnerAmountsForTier(input: {
+  code: string;
+  prize?: number;
+  rules?: Record<string, unknown> | null;
+}): [number, number, number] {
+  const fromRules = input.rules?.winnerAmountsUsd;
+  if (Array.isArray(fromRules) && fromRules.length >= 3) {
+    const parsed = fromRules.slice(0, 3).map((value) => Number(value));
+    if (parsed.every((value) => Number.isFinite(value) && value >= 0)) return parsed as [number, number, number];
+  }
+  const mapped = WINNER_AMOUNTS_BY_CODE[input.code];
+  if (mapped) return [mapped[0], mapped[1], mapped[2]];
+  const prize = Number(input.prize ?? 0);
+  if (!Number.isFinite(prize) || prize <= 0) return [0, 0, 0];
+  const first = roundMoney(prize * 0.8);
+  const second = roundMoney(prize * 0.1333333333);
+  return [first, second, roundMoney(prize - first - second)];
+}
+
 export function tierLockKey(tierId: number): number {
   return 900000 + Math.floor(tierId);
 }

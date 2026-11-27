@@ -4,6 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
 import { money } from "@/lib/format";
+import { payoutVars } from "@/lib/payoutCopy";
 import { AnimatedMoney } from "./AnimatedMoney";
 import { GoldDollars3D } from "./GoldDollars3D";
 import { OnchainTreasury } from "./OnchainTreasury";
@@ -19,18 +20,26 @@ const fade = {
 };
 
 export function Hero() {
-  const { state, loading, dataUnavailable, demoEnabled, setToast } = useApp();
-  const { d, t, n } = useI18n();
+  const { state, loading, dataUnavailable, demoEnabled, isDemoSession, setToast } = useApp();
+  const { d, t, n, locale } = useI18n();
   const v = state?.vault;
   const tier = state?.tiers[0];
   const profit = v ? v.balance - v.initialCapital : null;
-  const unavailableText = dataUnavailable
-    ? d.errors.unavailable
+  const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
+  const demo = demoEnabled || isDemoSession || (state ? !state.config.live : false);
+  const statusLabel = dataUnavailable
+    ? d.ui.statusUnavailable
     : loading
-      ? d.vaultChart.loading
-      : demoEnabled
-        ? d.wc.demoBadge
-        : d.errors.unavailable;
+      ? d.ui.statusLoading
+      : maintenance
+        ? d.ui.statusMaintenance
+        : demo
+          ? d.ui.statusDemo
+          : state
+            ? d.ui.statusOnline
+            : d.ui.statusUnavailable;
+  const statusOnline = !dataUnavailable && !loading && !maintenance && !demo && Boolean(state);
+  const payout = payoutVars(tier ?? null, locale);
 
   return (
     <section id="top" className="relative overflow-hidden">
@@ -60,7 +69,7 @@ export function Hero() {
             dir="ltr"
             className="micro inline-flex items-center gap-2 rounded-full border border-foil/30 bg-foil/[0.08] px-3.5 py-2 text-foil"
           >
-            PLAY SMART · ADMIN-REVIEWED DRAWS <span className="text-neon-2">◆</span> USDC
+            {d.ui.heroBadge}
           </motion.p>
 
           <motion.h1
@@ -76,7 +85,7 @@ export function Hero() {
           </motion.h1>
 
           <motion.p custom={2} variants={fade} initial="hidden" animate="show" className="mt-6 max-w-[54ch] text-[17px] leading-9 text-mint">
-            {t(d.hero.body, { prize: "$15" })}
+            {t(d.hero.body, payout)}
           </motion.p>
 
           <motion.div custom={3} variants={fade} initial="hidden" animate="show" className="mt-9 flex flex-wrap items-center gap-3">
@@ -87,7 +96,7 @@ export function Hero() {
               {d.hero.ctaTicket}
             </a>
             <button
-              onClick={() => setToast(d.hero.howToast)}
+              onClick={() => setToast(t(d.hero.howToast, payout))}
               className="focus-ring rounded-2xl border border-rule px-5 py-4 text-sm text-mint transition-colors hover:border-mint/50 hover:text-white"
             >
               {d.hero.ctaHow}
@@ -95,15 +104,15 @@ export function Hero() {
           </motion.div>
 
           <motion.div custom={4} variants={fade} initial="hidden" animate="show" className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <Stat label="INITIAL CAPITAL" value={v ? `$${money(v.initialCapital)}` : "—"} note={d.hero.statInitial} />
+            <Stat label={d.ui.statInitialLabel} value={v ? `$${money(v.initialCapital, locale)}` : d.ui.noData} note={d.hero.statInitial} />
             <Stat
-              label="LEDGER CHANGE"
-              value={profit === null ? "—" : `${profit > 0 ? "+" : ""}$${money(profit)}`}
+              label={d.ui.statProfitLabel}
+              value={profit === null ? d.ui.noData : `${profit > 0 ? "+" : ""}$${money(profit, locale)}`}
               note={d.hero.statProfit}
               tone="foil"
             />
-            <Stat label="ROUNDS SETTLED" value={v ? n(v.roundsCompleted) : "—"} note={d.hero.statRounds} />
-            <Stat label="REGISTERED USERS" value={state ? n(state.stats.players) : "—"} note={d.hero.statPlayers} />
+            <Stat label={d.ui.statRoundsLabel} value={v ? n(v.roundsCompleted) : d.ui.noData} note={d.hero.statRounds} />
+            <Stat label={d.ui.statPlayersLabel} value={state ? n(state.stats.players) : d.ui.noData} note={d.hero.statPlayers} />
           </motion.div>
         </div>
 
@@ -117,17 +126,17 @@ export function Hero() {
           <div className="relative">
             <div className="flex items-center justify-between">
               <p className="micro text-mint">{d.hero.liveVault}</p>
-              <span className="flex items-center gap-2">
-                <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
-                <span dir="ltr" className="font-display text-[11px] tracking-[0.22em] text-neon-2">ONLINE</span>
+              <span className="flex items-center gap-2" aria-live="polite">
+                <span className={`h-2 w-2 rounded-full ${statusOnline ? "live-dot bg-neon-2" : "bg-foil"}`} />
+                <span dir="auto" className="font-display text-[11px] tracking-[0.14em] text-neon-2">{statusLabel}</span>
               </span>
             </div>
 
             <p dir="ltr" className="font-display tnum mt-5 text-[clamp(2.8rem,7vw,4.1rem)] font-bold leading-none text-white">
-              {v ? <AnimatedMoney value={v.balance} /> : "—"}
+              {v ? <AnimatedMoney value={v.balance} /> : d.ui.noData}
             </p>
             <p role={dataUnavailable ? "alert" : undefined} className="mt-2 text-sm text-mint">
-              {v ? d.hero.cashNote : unavailableText}
+              {v ? d.hero.cashNote : statusLabel}
             </p>
 
             <div className="mt-4 rounded-xl border border-foil/25 bg-foil/[0.06] px-4 py-3">
@@ -136,23 +145,23 @@ export function Hero() {
                 <span className="live-dot h-1.5 w-1.5 rounded-full bg-foil" />
               </div>
               <p dir="ltr" className="font-display mt-2 truncate text-start text-[12px] tracking-[0.06em] text-foil">
-                {v?.adminWallet ?? state?.config.adminWallet ?? ""}
+                {v?.adminWallet ?? state?.config.adminWallet ?? d.ui.noData}
               </p>
               <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-mint">
                 <span>
                   {d.hero.treasuryAllocation}:{" "}
                   <span dir="ltr" className="font-display tnum font-bold text-white">
-                    {v ? `$${money(v.totalFees)}` : "—"}
+                    {v ? `$${money(v.totalFees, locale)}` : d.ui.noData}
                   </span>
                 </span>
                 <span className="text-foil/80">
                   {d.hero.adminEarnings}:{" "}
                   <span dir="ltr" className="font-display tnum font-bold text-white">
-                    {v ? `$${money(v.adminEarnings)}` : "—"}
+                    {v ? `$${money(v.adminEarnings, locale)}` : d.ui.noData}
                   </span>
                 </span>
               </div>
-              <p className="mt-1 text-[10px] text-mint/60">{d.hero.treasuryNote}</p>
+              <p className="mt-1 text-[10px] text-mint/60">{t(d.hero.treasuryNote, payout)}</p>
             </div>
 
             <div className="mt-3">
@@ -162,17 +171,17 @@ export function Hero() {
             <div className="mt-7 grid grid-cols-2 gap-3">
               <Cell
                 label={d.hero.cellFee}
-                value={tier ? `$${money(tier.treasury)} + $${money(tier.admin)}` : state ? `$${money(state.config.treasuryContributionPerRound)} + $${money(state.config.adminGrossRevenuePerRound)}` : "—"}
-                note={d.hero.cellFeeNote}
+                value={tier ? `$${money(tier.treasury, locale)} + $${money(tier.admin, locale)}` : state ? `$${money(state.config.treasuryContributionPerRound, locale)} + $${money(state.config.adminGrossRevenuePerRound, locale)}` : d.ui.noData}
+                note={t(d.hero.cellFeeNote, payout)}
               />
-              <Cell label={d.hero.cellPrize} value={tier ? `$${money(tier.prize)}` : state ? `$${money(state.config.prizePerRound)}` : "—"} note={d.hero.cellPrizeNote} />
-              <Cell label={d.hero.cellOdds} value={tier ? `1/${tier.capacity}` : state ? `1/${state.config.roundCapacity}` : "—"} note={d.hero.cellOddsNote} />
-              <Cell label={d.hero.cellCap} value={tier ? n(tier.capacity) : state ? n(state.config.roundCapacity) : "—"} note={d.hero.cellCapNote} />
+              <Cell label={d.hero.cellPrize} value={tier ? `$${money(tier.prize, locale)}` : state ? `$${money(state.config.prizePerRound, locale)}` : d.ui.noData} note={t(d.hero.cellPrizeNote, payout)} />
+              <Cell label={d.hero.cellOdds} value={tier ? `1/${n(tier.capacity)}` : state ? `1/${n(state.config.roundCapacity)}` : d.ui.noData} note={t(d.hero.cellOddsNote, payout)} />
+              <Cell label={d.hero.cellCap} value={tier ? n(tier.capacity) : state ? n(state.config.roundCapacity) : d.ui.noData} note={t(d.hero.cellCapNote, payout)} />
             </div>
 
             {v ? (
               <p className="mt-6 rounded-xl border border-neon/20 bg-neon/[0.06] px-4 py-3 text-[13px] leading-7 text-mint">
-                <span className="text-neon-2">◆</span> {t(d.hero.floor, { amount: `$${money(v.initialCapital)}` })}
+                <span className="text-neon-2">◆</span> {t(d.hero.floor, { amount: `$${money(v.initialCapital, locale)}` })}
               </p>
             ) : null}
           </div>

@@ -10,7 +10,7 @@ const buildId = fs.readFileSync(path.join(root, ".next", "BUILD_ID"), "utf8").tr
 const shell = ["/", "/en", "/en/install", "/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/maskable-512.png", "/icons/apple-touch-icon.png", "/og.png"];
 
 const sw = `/* BETX service worker — generated at build time (build ${buildId}) */
-const VERSION = "betx-${buildId}";
+const VERSION = "betx-${buildId}-r2";
 const SHELL = ${JSON.stringify(shell)};
 
 self.addEventListener("install", (event) => {
@@ -39,8 +39,20 @@ self.addEventListener("fetch", (event) => {
   // never cache money: API, wallet, cron, admin and RSC/payload requests stay network-only
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin") || url.searchParams.has("_rsc")) return;
 
-  // immutable hashed assets: cache-first
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/og.png") {
+  // app bundles: network-first so dev/HMR and new builds never serve stale chunks
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => undefined);
+        return res;
+      }).catch(async () => (await caches.match(req)) || Response.error())
+    );
+    return;
+  }
+
+  // immutable brand assets: cache-first
+  if (url.pathname.startsWith("/icons/") || url.pathname === "/og.png") {
     event.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
         const copy = res.clone();

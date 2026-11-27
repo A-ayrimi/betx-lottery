@@ -79,7 +79,7 @@ export function useInstallPrompt() {
  * for 14 days, and never shows when running as an installed app.
  */
 export function InstallBanner() {
-  const { d, locale } = useI18n();
+  const { d, locale, n } = useI18n();
   const { canInstall, install, installed, isIos } = useInstallPrompt();
   const [show, setShow] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
@@ -164,7 +164,7 @@ export function InstallBanner() {
               >
                 {steps.map((s, i) => (
                   <li key={s} className="flex gap-2 text-[12px] leading-6 text-mint">
-                    <span className="font-display font-bold text-neon-2">{i + 1}.</span> {s}
+                    <span className="font-display font-bold text-neon-2">{n(i + 1)}.</span> {s}
                   </li>
                 ))}
               </motion.ol>

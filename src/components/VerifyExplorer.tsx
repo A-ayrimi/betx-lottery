@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { money } from "@/lib/format";
+import { formatNumber, money } from "@/lib/format";
+import { payoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 
 export interface VerifyRow {
@@ -24,7 +25,8 @@ export interface VerifyRow {
 
 /** Public, crawlable proof-of-fairness index: every draw links to its verifier. */
 export function VerifyExplorer({ rows, dataUnavailable = false }: { rows: VerifyRow[]; dataUnavailable?: boolean }) {
-  const { d, locale, date } = useI18n();
+  const { d, t, locale, date } = useI18n();
+  const payout = payoutVars(null, locale);
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-12 sm:px-6">
       <div className="flex items-center justify-between gap-4">
@@ -58,24 +60,24 @@ export function VerifyExplorer({ rows, dataUnavailable = false }: { rows: Verify
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={6} role={dataUnavailable ? "alert" : "status"} className="px-5 py-10 text-center text-sm text-mint">
-                    {dataUnavailable ? d.errors.unavailable : d.board.noDraws}
+                    {dataUnavailable ? d.errors.unavailable : t(d.board.noDraws, payout)}
                   </td>
                 </tr>
               ) : (
                 rows.map((w) => (
                   <tr key={w.roundId} className="border-b border-rule/50 last:border-b-0 hover:bg-white/[0.03]">
                     <td className="px-5 py-4 font-display text-sm font-bold text-foil" dir="ltr">
-                      #{w.roundId}
+                      #{formatNumber(w.roundId, locale)}
                     </td>
                     <td className="px-5 py-4 text-[14px] font-bold text-white">{w.winnerName}</td>
                     <td className="px-5 py-4 font-display text-[12px] tracking-[0.1em] text-neon-2" dir="ltr">
                       {w.winningSerial}
                     </td>
                     <td className="px-5 py-4 font-display text-[14px] font-bold text-foil" dir="ltr">
-                      +${money(w.prize)}
+                      +${money(w.prize, locale)}
                     </td>
                     <td className="px-5 py-4 text-[12px] text-mint">
-                      <time dateTime={w.drawnAt ?? undefined} suppressHydrationWarning>{date(w.drawnAt)}</time>
+                      <time dateTime={w.drawnAt ?? undefined}>{date(w.drawnAt)}</time>
                     </td>
                     <td className="px-5 py-4">
                       <Link
@@ -94,7 +96,7 @@ export function VerifyExplorer({ rows, dataUnavailable = false }: { rows: Verify
       </div>
 
       <p className="mt-4 text-[12px] leading-6 text-mint/70">
-        {d.board.autoDrawNote} {d.board.treasuryNote}
+        {t(d.board.autoDrawNote, payout)} {t(d.board.treasuryNote, payout)}
       </p>
     </main>
   );

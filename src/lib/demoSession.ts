@@ -1,30 +1,127 @@
-﻿import type { AppState, DrawResult, UserState } from "@/lib/types";
-import { WHEEL_SECTORS } from "@/lib/wheel";
+﻿import type { AppState, DrawResult, UserState } from "./types.ts";
+import type { VaultCandle } from "./vaultCandles.ts";
+import { previewVaultCandles } from "./previewCandles.ts";
+import { winnerAmountsForTier } from "./tierMath.ts";
+import { WHEEL_SECTORS } from "./wheel.ts";
 
 export const DEMO_WALLET_ADDRESS = "SOL_DEMO_WALLET_9999";
 export const DEMO_TREASURY_ADDRESS = "SOL_DEMO_TREASURY_9999";
 export const DEMO_SESSION_KEY = "betx_demo_session_v1";
 export const DEMO_STARTING_BALANCE = 100;
 
-const DEMO_TIERS = [{
-  id: 1,
-  code: "usd_1",
-  name: "$1 Tier",
+const DEMO_TIER_CONFIG = [
+  { id: 1, code: "starter_1", name: "Starter $1", displayOrder: 1, priceUsd: 1, capacity: 50, prizePercentage: 75, treasuryPercentage: 15, adminPercentage: 10, prize: 37.5, treasury: 7.5, admin: 5 },
+  { id: 2, code: "bronze_5", name: "Bronze $5", displayOrder: 2, priceUsd: 5, capacity: 40, prizePercentage: 75, treasuryPercentage: 15, adminPercentage: 10, prize: 150, treasury: 30, admin: 20 },
+  { id: 3, code: "silver_10", name: "Silver $10", displayOrder: 3, priceUsd: 10, capacity: 30, prizePercentage: 75, treasuryPercentage: 15, adminPercentage: 10, prize: 225, treasury: 45, admin: 30 },
+  { id: 4, code: "gold_25", name: "Gold $25", displayOrder: 4, priceUsd: 25, capacity: 20, prizePercentage: 75, treasuryPercentage: 15, adminPercentage: 10, prize: 375, treasury: 75, admin: 50 },
+  { id: 5, code: "platinum_50", name: "Platinum $50", displayOrder: 5, priceUsd: 50, capacity: 20, prizePercentage: 80, treasuryPercentage: 12, adminPercentage: 8, prize: 800, treasury: 120, admin: 80 },
+  { id: 6, code: "diamond_100", name: "Diamond $100", displayOrder: 6, priceUsd: 100, capacity: 15, prizePercentage: 80, treasuryPercentage: 12, adminPercentage: 8, prize: 1200, treasury: 180, admin: 120 },
+  { id: 7, code: "vip_whale_200", name: "VIP Whale $200", displayOrder: 7, priceUsd: 200, capacity: 10, prizePercentage: 80, treasuryPercentage: 12, adminPercentage: 8, prize: 1600, treasury: 240, admin: 160 },
+] as const;
+
+const DEMO_STARTER_TIER = DEMO_TIER_CONFIG[0];
+
+const DEMO_TIERS = DEMO_TIER_CONFIG.map((tier) => ({
+  ...tier,
   status: "ACTIVE" as const,
-  displayOrder: 0,
-  priceUsd: 1,
-  capacity: 20,
-  drawDurationMinutes: 1440,
-  prizePercentage: 75,
-  treasuryPercentage: 15,
-  adminPercentage: 10,
-  prize: 15,
-  treasury: 3,
-  admin: 2,
+  drawDurationMinutes: 4320,
   minimumParticipants: 1,
-  maximumParticipants: 20,
+  maximumParticipants: tier.capacity,
+  winnerAmounts: winnerAmountsForTier({ code: tier.code, prize: tier.prize }),
   rules: {},
-}];
+}));
+
+export const PREVIEW_TIER_SALES: Readonly<Record<string, number>> = {
+  starter_1: 18,
+  bronze_5: 12,
+  silver_10: 9,
+  gold_25: 6,
+  platinum_50: 7,
+  diamond_100: 5,
+  vip_whale_200: 4,
+};
+
+const PREVIEW_BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+export function previewTicketSerial(roundId: number, index: number) {
+  const randomPart = Array.from(
+    { length: 12 },
+    (_, position) => PREVIEW_BASE58[(roundId * 7 + index * 31 + position * 17) % PREVIEW_BASE58.length],
+  ).join("");
+  const checksum = PREVIEW_BASE58[(roundId + index) % PREVIEW_BASE58.length];
+  return `BTX-R${roundId}-${randomPart}-${checksum}`;
+}
+
+export function previewTicketsForTier(tierCode: string, sold: number) {
+  const tier = DEMO_TIER_CONFIG.find((item) => item.code === tierCode);
+  const capacity = tier?.capacity ?? sold;
+  const count = Math.max(0, Math.min(capacity, Math.floor(sold)));
+  return Array.from({ length: count }, (_, index) => ({
+    id: -(index + 1),
+    serial: previewTicketSerial(tier?.id ?? 1, index + 1),
+    username: "Preview User",
+    kind: "paid" as const,
+    mine: false,
+  }));
+}
+
+export function previewWinners(nowMs = Date.now()) {
+  return [
+    {
+      roundId: 101,
+      winnerName: "Preview Winner",
+      winningSerial: previewTicketSerial(101, 3),
+      prize: 37.5,
+      fee: 12.5,
+      capacity: 50,
+      sold: 50,
+      drawnAt: new Date(nowMs - 2 * 3_600_000).toISOString(),
+      openedAt: new Date(nowMs - 3 * 3_600_000).toISOString(),
+      seedHash: "PREVIEW-ONLY",
+      serverSeed: null,
+      feeStatus: "verified",
+      feeTxHash: null,
+    },
+    {
+      roundId: 100,
+      winnerName: "Preview Player",
+      winningSerial: previewTicketSerial(100, 7),
+      prize: 150,
+      fee: 30,
+      capacity: 40,
+      sold: 40,
+      drawnAt: new Date(nowMs - 9 * 3_600_000).toISOString(),
+      openedAt: new Date(nowMs - 10 * 3_600_000).toISOString(),
+      seedHash: "PREVIEW-ONLY",
+      serverSeed: null,
+      feeStatus: "verified",
+      feeTxHash: null,
+    },
+    {
+      roundId: 99,
+      winnerName: "Preview Member",
+      winningSerial: previewTicketSerial(99, 5),
+      prize: 225,
+      fee: 45,
+      capacity: 30,
+      sold: 30,
+      drawnAt: new Date(nowMs - 26 * 3_600_000).toISOString(),
+      openedAt: new Date(nowMs - 27 * 3_600_000).toISOString(),
+      seedHash: "PREVIEW-ONLY",
+      serverSeed: null,
+      feeStatus: "verified",
+      feeTxHash: null,
+    },
+  ];
+}
+
+export function previewActivity(nowMs = Date.now()) {
+  return [
+    { id: -1, type: "ticket_buy" as const, user: "Preview User", amount: 25, at: new Date(nowMs - 4 * 60_000).toISOString() },
+    { id: -2, type: "prize" as const, user: "Preview Winner", amount: 37.5, at: new Date(nowMs - 2 * 3_600_000).toISOString() },
+    { id: -3, type: "ticket_buy" as const, user: "Preview Player", amount: 10, at: new Date(nowMs - 5 * 3_600_000).toISOString() },
+  ];
+}
 
 interface StoredDemoSession {
   version: 1;
@@ -55,6 +152,15 @@ function isDemoState(value: unknown): value is DemoAppState {
 
 export function isDemoAppState(state: AppState): state is DemoAppState {
   return state.config.live === false && state.round !== null && state.user?.walletAddress === DEMO_WALLET_ADDRESS;
+}
+
+export function isPreviewAppState(state: AppState | null | undefined): boolean {
+  return Boolean(
+    state &&
+      !state.config.live &&
+      state.round?.seedHash === "PREVIEW-ONLY" &&
+      state.vault.ledgerStatus === "demo",
+  );
 }
 
 export function loadDemoSession(): StoredDemoSession | null {
@@ -92,8 +198,8 @@ export function clearDemoSession() {
   window.localStorage.removeItem(DEMO_SESSION_KEY);
 }
 
-export function createDemoState(walletAddress: string | null = null, locale = "en"): DemoAppState {
-  const now = new Date().toISOString();
+export function createDemoState(walletAddress: string | null = null, locale = "en", nowMs = Date.now()): DemoAppState {
+  const now = new Date(nowMs).toISOString();
   const user: UserState | null = walletAddress
     ? {
         id: 0,
@@ -146,12 +252,12 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
       referralDepositBonus: 0.5,
       adminWallet: DEMO_TREASURY_ADDRESS,
       solanaOnly: true,
-      totalRoundRevenue: 20,
-      prizePerRound: 15,
-      treasuryContributionPerRound: 3,
-      adminGrossRevenuePerRound: 2,
-      roundCapacity: 20,
-      ticketPrice: 1,
+      totalRoundRevenue: DEMO_STARTER_TIER.priceUsd * DEMO_STARTER_TIER.capacity,
+      prizePerRound: DEMO_STARTER_TIER.prize,
+      treasuryContributionPerRound: DEMO_STARTER_TIER.treasury,
+      adminGrossRevenuePerRound: DEMO_STARTER_TIER.admin,
+      roundCapacity: DEMO_STARTER_TIER.capacity,
+      ticketPrice: DEMO_STARTER_TIER.priceUsd,
       solana: {
         enabled: false,
         network: "mainnet-beta",
@@ -182,16 +288,16 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
     round: {
       id: 1,
       tierId: 1,
-      tierCode: "usd_1",
-      closesAt: null,
+      tierCode: "starter_1",
+      closesAt: new Date(nowMs + 72 * 3600 * 1000).toISOString(),
       status: "OPEN",
-      capacity: 20,
+      capacity: 50,
       sold: 0,
-      remaining: 20,
-      prize: 15,
-      fee: 5,
-      treasuryContribution: 3,
-      adminGrossRevenue: 2,
+      remaining: 50,
+      prize: 37.5,
+      fee: 7.5,
+      treasuryContribution: 7.5,
+      adminGrossRevenue: 5,
       seedHash: "DEMO-ONLY",
       tickets: [],
     },
@@ -205,31 +311,95 @@ export function createDemoState(walletAddress: string | null = null, locale = "e
   };
 }
 
+export function createPreviewState(locale = "en", nowMs = Date.now()): DemoAppState & { candles: VaultCandle[] } {
+  const base = createDemoState(null, locale, nowMs);
+  const sold = PREVIEW_TIER_SALES.starter_1 ?? 0;
+  return {
+    ...base,
+    candles: previewVaultCandles("24h", nowMs),
+    config: {
+      ...base.config,
+      live: false,
+      maintenance: true,
+      maintenanceMode: true,
+      paymentsEnabled: false,
+    },
+    vault: {
+      ...base.vault,
+      balance: 12840,
+      initialCapital: 20,
+      totalFees: 6420,
+      totalPaid: 0,
+      treasuryPaid: 0,
+      roundsCompleted: 148,
+      ticketsSold: 1840,
+      adminEarnings: 1284,
+      adminPaid: 0,
+      ledgerStatus: "demo",
+      feePending: 0,
+      feePendingCount: 0,
+    },
+    round: {
+      ...base.round,
+      sold,
+      remaining: Math.max(0, base.round.capacity - sold),
+      seedHash: "PREVIEW-ONLY",
+      tickets: previewTicketsForTier(base.round.tierCode, sold),
+    },
+    stats: { players: 61, ticketsLast24: 184 },
+    winners: previewWinners(nowMs),
+    activity: previewActivity(nowMs),
+  };
+}
+
+export function previewProgress(nowMs = Date.now()) {
+  const state = createPreviewState("en", nowMs);
+  return state.tiers.map((tier) => {
+    const capacity = tier.capacity;
+    const sold = Math.max(0, Math.min(capacity, PREVIEW_TIER_SALES[tier.code] ?? 0));
+    return {
+      code: tier.code,
+      tierNumber: tier.displayOrder,
+      roundId: tier.id,
+      sold,
+      capacity,
+      remaining: capacity - sold,
+      seedHash: state.round.seedHash,
+      closesAt: state.round.closesAt,
+    };
+  });
+}
+
+export const previewTierProgress = previewProgress;
+
 function randomUnit() {
   return Math.random();
 }
 
 export function buyDemoTickets(state: DemoAppState, requested: number) {
   const user = state.user;
-  if (!user) return { state, serials: [], roundId: state.round.id, draw: null, error: "login" as const };
+  if (!user) return { state, serials: [], roundId: state.round.id, transactionReference: null, draw: null, error: "login" as const };
   if (user.selfExcludedUntil && new Date(user.selfExcludedUntil).getTime() > Date.now()) {
-    return { state, serials: [], roundId: state.round.id, draw: null, error: "excluded" as const };
+    return { state, serials: [], roundId: state.round.id, transactionReference: null, draw: null, error: "excluded" as const };
   }
 
   const take = Math.min(10, Math.max(1, Math.floor(requested) || 1), state.round.remaining);
-  if (take < 1) return { state, serials: [], roundId: state.round.id, draw: null, error: "roundFull" as const };
+  if (take < 1) return { state, serials: [], roundId: state.round.id, transactionReference: null, draw: null, error: "roundFull" as const };
   const cost = take * state.config.ticketPrice;
-  if (user.balance < cost) return { state, serials: [], roundId: state.round.id, draw: null, error: "insufficient" as const };
+  if (user.balance < cost) return { state, serials: [], roundId: state.round.id, transactionReference: null, draw: null, error: "insufficient" as const };
 
   const createdAt = new Date().toISOString();
   const tickets = Array.from({ length: take }, (_, index) => {
-    const serial = `DX-${String(state.round.id).padStart(3, "0")}-${String(state.vault.ticketsSold + index + 1).padStart(6, "0")}`;
+    const serial = previewTicketSerial(state.round.id, state.vault.ticketsSold + index + 1);
     return {
       id: state.vault.ticketsSold + index + 1,
       roundId: state.round.id,
       serial,
       kind: "gold" as const,
       createdAt,
+      walletAddress: user.walletAddress ?? null,
+      transactionReference: `DEMO-${state.round.id}-${state.vault.ticketsSold + index + 1}`,
+      ticketStatus: "active" as const,
       status: "pending" as const,
       prize: 0,
       winningSerial: null,
@@ -279,7 +449,14 @@ export function buyDemoTickets(state: DemoAppState, requested: number) {
   };
 
   if (sold < state.round.capacity) {
-    return { state: nextState, serials, roundId: state.round.id, draw: null, error: null };
+    return {
+      state: nextState,
+      serials,
+      roundId: state.round.id,
+      transactionReference: tickets[0]?.transactionReference ?? null,
+      draw: null,
+      error: null,
+    };
   }
 
   const pool = nextState.round.tickets;
@@ -365,7 +542,14 @@ export function buyDemoTickets(state: DemoAppState, requested: number) {
     winners: [history, ...nextState.winners].slice(0, 20),
     activity: [prizeActivity, ...nextState.activity].slice(0, 20),
   };
-  return { state: nextState, serials, roundId: history.roundId, draw: result, error: null };
+  return {
+    state: nextState,
+    serials,
+    roundId: history.roundId,
+    transactionReference: tickets[0]?.transactionReference ?? null,
+    draw: result,
+    error: null,
+  };
 }
 
 function pickDemoSector() {

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
 import { deposits } from "@/db/schema";
-import { config } from "@/lib/config";
+import { config, publicConfig } from "@/lib/config";
 import { assertCanPlay, creditDeposit, getSessionUser, UserError } from "@/lib/store";
 import {
   DepositReservationError,
@@ -20,6 +20,7 @@ import {
   verifySolanaUsdcDepositOnChain,
 } from "@/lib/solana";
 import { assertRegion, handleError, unauthorized } from "@/lib/api";
+import { assessSensitiveAction } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,12 @@ export async function POST(req: NextRequest) {
     if (config.maintenanceMode) {
       return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
     }
+    if (!publicConfig().paymentsEnabled) {
+      return NextResponse.json({ ok: false, error: "paymentsDisabled" }, { status: 503 });
+    }
     await rateLimit("wdeposit", me.id, 20);
+    const compliance = assessSensitiveAction(me, req.headers);
+    if (!compliance.allowed) throw new UserError("region", 403, { country: compliance.reasons.join(",") });
     if (!me.walletAddress) throw new UserError("walletRequired");
 
     const solCfg = getSolanaConfig();
@@ -207,7 +213,12 @@ export async function GET(req: NextRequest) {
     if (config.maintenanceMode) {
       return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
     }
+    if (!publicConfig().paymentsEnabled) {
+      return NextResponse.json({ ok: false, error: "paymentsDisabled" }, { status: 503 });
+    }
     await rateLimit("wstatus", me.id, 40);
+    const compliance = assessSensitiveAction(me, req.headers);
+    if (!compliance.allowed) throw new UserError("region", 403, { country: compliance.reasons.join(",") });
     const id = Number(req.nextUrl.searchParams.get("id"));
     let dep = (
       await db.select().from(deposits).where(eq(deposits.id, id)).limit(1)

@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdmin } from "@/lib/admin";
+import { requireAdminRole } from "@/lib/admin";
 import { handleError } from "@/lib/api";
 import { approveRoundResult } from "@/lib/store";
+import { assertLegacyPermission } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  const auth = requireAdminRole(req, ["ADMIN"]);
+  if (!auth) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission(auth.role, "rounds:settle")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   try {
     const { id } = await params;
     const roundId = Number(id);
@@ -17,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (typeof body.approved !== "boolean") {
       return NextResponse.json({ ok: false, error: "approved must be a boolean." }, { status: 400 });
     }
-    const result = await approveRoundResult(roundId, body.approved, "admin");
+    const result = await approveRoundResult(roundId, body.approved, auth.actor);
     if (!result) return NextResponse.json({ ok: false, error: "Round is not awaiting review." }, { status: 409 });
     return NextResponse.json({ ok: true, result });
   } catch (error) {

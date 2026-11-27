@@ -1,5 +1,6 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
+import { appendAdminAuditEvent } from "@/lib/phase2Runtime";
 import { adminAuditLog, ticketTiers } from "@/db/schema";
 import { ValidationError } from "@/lib/errors";
 import { roundMoney } from "@/lib/tierAccounting";
@@ -148,6 +149,12 @@ export async function createTier(input: TierInput, actor: string) {
       entityId: created.id,
       details: values,
     });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: "tier.create",
+      subject: `tier:${created.id}`,
+      metadata: values,
+    });
     return created;
   });
 }
@@ -192,6 +199,12 @@ export async function updateTier(id: number, input: Partial<TierInput>, actor: s
       entityId: id,
       details: { before, after: updated },
     });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: "tier.update",
+      subject: `tier:${id}`,
+      metadata: { before, after: updated },
+    });
     return updated;
   });
 }
@@ -213,6 +226,12 @@ export async function setTierStatus(id: number, status: TierStatus, actor: strin
       entity: "tier",
       entityId: id,
       details: { from: before.status, to: status },
+    });
+    await appendAdminAuditEvent(tx, {
+      actor,
+      action: "tier.status",
+      subject: `tier:${id}`,
+      metadata: { from: before.status, to: status },
     });
     return updated;
   });

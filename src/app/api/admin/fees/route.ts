@@ -5,11 +5,15 @@ import { feeTransfers } from "@/db/schema";
 import { isAdmin } from "@/lib/admin";
 import { feeConfig, feeQueue } from "@/lib/fees";
 import { config } from "@/lib/config";
+import { assertLegacyPermission } from "@/lib/phase2Policy";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission("ADMIN", "vault:read")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   const [q, cfg, recent] = await Promise.all([
     feeQueue(),
     Promise.resolve(feeConfig()),
@@ -43,6 +47,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!assertLegacyPermission("ADMIN", "vault:write")) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
   if (config.maintenanceMode) {
     return NextResponse.json({ ok: false, error: "maintenance" }, { status: 503 });
   }

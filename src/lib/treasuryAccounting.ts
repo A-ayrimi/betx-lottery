@@ -256,7 +256,7 @@ export async function getTreasuryReconciliation(options?: {
     {
       key: "SETTLEMENT_ALLOCATIONS_BALANCED",
       ok: tiers.every((tier) => tier.balanced),
-      detail: "Each settled pool must equal prize + treasury + administrator allocation.",
+      detail: "Each settled pool must equal prize + treasury + BETX platform fee.",
     },
     {
       key: "LEDGER_PROVENANCE_COMPLETE",

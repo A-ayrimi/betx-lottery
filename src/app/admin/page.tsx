@@ -47,7 +47,7 @@ function AdminInner() {
       const res = await fetch("/api/admin/withdrawals", { headers: { "x-admin-token": t }, cache: "no-store" });
       const json = await res.json();
       if (res.status === 403) {
-        setErr("Invalid admin token.");
+        setErr("Invalid operations token.");
         setData(null);
         return;
       }
@@ -108,7 +108,7 @@ function AdminInner() {
       );
       const signed = await wallet.signTransaction(transaction);
       const sent = await call({ step: "submit", id, signedTransaction: signed });
-      setErr(`Paid âœ“ ${sent.txid}`);
+      setErr(`Paid OK ${sent.txid}`);
       await load(token);
     } catch (e) {
       setErr(walletErrorMessage(e));
@@ -120,7 +120,7 @@ function AdminInner() {
   return (
     <main dir="ltr" lang="en" className="mx-auto min-h-screen max-w-5xl px-4 py-10 text-left sm:px-6">
       <Logo />
-      <h1 className="mt-8 text-3xl font-black text-white">Admin آ· Withdrawals</h1>
+      <h1 className="mt-8 text-3xl font-black text-white">Operations · Withdrawals</h1>
 
       <form
         onSubmit={(e) => {
@@ -153,7 +153,7 @@ function AdminInner() {
               <p dir="ltr" className="font-display mt-1 text-2xl text-foil">${data.vault.totalFees.toFixed(2)}</p>
             </div>
             <div className="panel rounded-2xl p-5">
-              <p className="micro text-mint">ADMIN GROSS REVENUE</p>
+              <p className="micro text-mint">BETX PLATFORM FEES</p>
               <p dir="ltr" className="font-display mt-1 text-2xl text-foil">${data.vault.adminEarnings.toFixed(2)}</p>
             </div>
           </div>
@@ -203,14 +203,14 @@ function AdminInner() {
               <div key={w.id} className="border-b border-rule/60 p-5 last:border-b-0">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-white">
-                    #{w.id} آ· {w.username} آ·{" "}
+                    #{w.id}  · {w.username}  ·{" "}
                     <span dir="ltr" className="font-display text-foil">${Number(w.amount).toFixed(2)}</span>
                   </p>
                   <span className="micro text-mint">{w.status}</span>
                 </div>
                 <p dir="ltr" className="font-display mt-2 break-all text-[12px] text-neon-2">{w.address}</p>
                 {w.reviewReason ? <p className="mt-1 text-[12px] text-foil">Review: {w.reviewReason}</p> : null}
-                {w.status === "processing" ? <p className="mt-1 text-[12px] text-neon-2">Auto payout in flight â€” confirming on-chainâ€¦</p> : null}
+                {w.status === "processing" ? <p className="mt-1 text-[12px] text-neon-2">Auto payout in flight — confirming on-chain…</p> : null}
                 {w.status === "pending" ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
@@ -218,7 +218,7 @@ function AdminInner() {
                       disabled={!wallet.address || paying !== null}
                       className="btn-foil rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
                     >
-                      {paying === w.id ? "Confirm in walletâ€¦" : "Pay with wallet"}
+                      {paying === w.id ? "Confirm in wallet…" : "Pay with wallet"}
                     </button>
                     <button onClick={() => act(w.id, "rejected")} className="rounded-lg border border-rule px-4 py-2 text-sm text-mint">
                       Reject & refund
@@ -235,8 +235,8 @@ function AdminInner() {
           <div className="panel mt-4 overflow-hidden rounded-2xl text-[13px]">
             {data.deposits.map((d) => (
               <div key={d.id} className="flex justify-between border-b border-rule/50 px-5 py-3 last:border-b-0">
-                <span className="text-mint">#{d.id} آ· user {d.userId} آ· {d.provider}</span>
-                <span className="text-mint">{d.status}{d.credited ? " âœ“" : ""}</span>
+                <span className="text-mint">#{d.id}  · user {d.userId}  · {d.provider}</span>
+                <span className="text-mint">{d.status}{d.credited ? " OK" : ""}</span>
                 <span dir="ltr" className="font-display text-white">${Number(d.amountUsd).toFixed(2)}</span>
               </div>
             ))}
@@ -307,7 +307,7 @@ function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: 
   if (!r) {
     return (
       <div role={unavailable ? "alert" : "status"} className="panel mt-6 rounded-2xl px-5 py-8 text-sm text-mint">
-        {unavailable ? "Data temporarily unavailable." : "Loading readiness dataâ€¦"}
+        {unavailable ? "Data temporarily unavailable." : "Loading readiness data…"}
       </div>
     );
   }
@@ -319,13 +319,13 @@ function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-lg font-black text-white">Launch readiness</p>
         <span className={`rounded-full px-3 py-1 text-xs font-bold ${r.readiness.ready ? "bg-neon/15 text-neon-2" : "bg-red-500/15 text-red-300"}`}>
-          {r.readiness.ready ? "READY FOR LIVE" : "NOT READY â€” fix critical items"}
+          {r.readiness.ready ? "READY FOR LIVE" : "NOT READY — fix critical items"}
         </span>
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-2">
         {r.readiness.checks.map((c) => (
           <p key={c.key} className="flex items-start gap-2 rounded-lg border border-rule bg-black/25 px-3 py-2 text-xs">
-            <span className={c.ok ? "text-neon-2" : c.level === "critical" ? "text-red-300" : "text-foil"}>{c.ok ? "âœ“" : c.level === "critical" ? "âœ—" : "!"}</span>
+            <span className={c.ok ? "text-neon-2" : c.level === "critical" ? "text-red-300" : "text-foil"}>{c.ok ? "OK" : c.level === "critical" ? "FAIL" : "!"}</span>
             <span className="min-w-0">
               <span className="font-bold text-white">{c.key}</span> <span className="break-all text-mint">{c.detail}</span>
             </span>
@@ -334,12 +334,12 @@ function ReadinessPanel({ token, vaultBalance }: { token: string; vaultBalance: 
       </div>
       <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
         <Stat k="LEDGER VAULT" v={`$${vaultBalance.toFixed(2)}`} />
-        <Stat k="ON-CHAIN TREASURY (USDC)" v={oc && onchainBalance !== null ? `$${onchainBalance.toFixed(2)} آ· ${oc.status}` : oc ? oc.status : "n/a"} bad={!oc || oc.status === "unavailable" || oc.status === "invalid"} />
-        <Stat k="ON-CHAIN âˆ’ LEDGER" v={diff === null ? "n/a" : `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)}`} bad={diff !== null && diff < 0} />
+        <Stat k="ON-CHAIN TREASURY (USDC)" v={oc && onchainBalance !== null ? `$${onchainBalance.toFixed(2)}  · ${oc.status}` : oc ? oc.status : "n/a"} bad={!oc || oc.status === "unavailable" || oc.status === "invalid"} />
+        <Stat k="ON-CHAIN - LEDGER" v={diff === null ? "n/a" : `${diff >= 0 ? "+" : ""}$${diff.toFixed(2)}`} bad={diff !== null && diff < 0} />
       </div>
       {oc ? (
         <p className="mt-2 break-all text-xs text-mint">
-          <a href={oc.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-neon-2 hover:underline">{oc.address} â†—</a> آ· checked {new Date(oc.fetchedAt).toLocaleTimeString()}
+          <a href={oc.explorerUrl} target="_blank" rel="noopener noreferrer" className="text-neon-2 hover:underline">{oc.address} ↗</a>  · checked {new Date(oc.fetchedAt).toLocaleTimeString()}
         </p>
       ) : null}
     </div>
@@ -397,7 +397,7 @@ function FeesPanel({ token }: { token: string }) {
   if (!data) {
     return (
       <div role={unavailable ? "alert" : "status"} className="panel mt-6 rounded-2xl px-5 py-8 text-sm text-mint">
-        {unavailable ? "Data temporarily unavailable." : "Loading treasury dataâ€¦"}
+        {unavailable ? "Data temporarily unavailable." : "Loading treasury data…"}
       </div>
     );
   }
@@ -407,11 +407,11 @@ function FeesPanel({ token }: { token: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-lg font-black text-white">Treasury transfers</p>
         <span className="micro text-mint">
-          TRANSFERS PAUSED آ· HISTORICAL RECONCILIATION REQUIRED
+          TRANSFERS PAUSED  · HISTORICAL RECONCILIATION REQUIRED
         </span>
       </div>
       <p className="mt-2 break-all text-xs text-mint">
-        Admin wallet: <code className="text-neon-2">{data.config.adminWallet}</code>
+        BETX fee wallet: <code className="text-neon-2">{data.config.adminWallet}</code>
       </p>
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
         <Stat k="ACCRUED PENDING" v={`$${data.pending.toFixed(2)}`} bad={data.pending > 0} />
@@ -424,7 +424,7 @@ function FeesPanel({ token }: { token: string }) {
           <div key={f.id} className="border-b border-rule/50 px-4 py-3 last:border-b-0">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-white">
-                Round #{f.roundId} آ· <span className="font-display text-foil">${f.amount.toFixed(2)}</span>
+                Round #{f.roundId}  · <span className="font-display text-foil">${f.amount.toFixed(2)}</span>
               </span>
               <span className={f.status === "paid" ? "text-neon-2" : "text-foil"}>{f.status}</span>
             </div>
@@ -505,7 +505,7 @@ function AutomationPanel({ token }: { token: string }) {
   if (!auto) {
     return (
       <div role={unavailable ? "alert" : "status"} className="panel mt-6 rounded-2xl px-5 py-8 text-sm text-mint">
-        {unavailable ? "Data temporarily unavailable." : "Loading automation dataâ€¦"}
+        {unavailable ? "Data temporarily unavailable." : "Loading automation data…"}
       </div>
     );
   }
@@ -519,7 +519,7 @@ function AutomationPanel({ token }: { token: string }) {
           <span className={`h-3 w-3 rounded-full ${healthy ? "bg-neon-2 shadow-[0_0_12px_rgba(53,255,176,0.8)]" : "bg-foil"}`} />
           <p className="text-lg font-black text-white">Autopilot</p>
           <p className="text-xs text-mint">
-            {st.lastRunAt ? `last run ${st.ageSeconds}s ago` : "never ran"} آ· round timeout {st.roundTimeoutHours}h آ· Solana {st.tron.network}
+            {st.lastRunAt ? `last run ${st.ageSeconds}s ago` : "never ran"}  · round timeout {st.roundTimeoutHours}h  · Solana {st.tron.network}
             {st.tron.enabled ? "" : " (direct deposits off)"}
           </p>
         </div>
@@ -528,7 +528,7 @@ function AutomationPanel({ token }: { token: string }) {
             Preview payout decisions
           </button>
           <button disabled={busy} onClick={() => call("run")} className="btn-neon rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-50">
-            {busy ? "Runningâ€¦" : "Run now"}
+            {busy ? "Running…" : "Run now"}
           </button>
         </div>
       </div>
@@ -542,7 +542,7 @@ function AutomationPanel({ token }: { token: string }) {
         <Stat k="ON-CHAIN" v={h.holdings === null ? "n/a" : `$${h.holdings.toFixed(2)}`} bad={h.solvent === false} />
         <Stat k="PENDING WD" v={String(h.pendingWithdrawals)} />
         <Stat k="REVIEW QUEUE" v={String(h.reviewQueue)} bad={h.reviewQueue > 0} />
-        <Stat k="AUTO PAYOUT" v={st.payout.enabled ? `ON â‰¤$${st.payout.maxPerTx}` : st.payout.keyConfigured && !st.payout.keyValid ? "BAD KEY" : "OFF"} bad={st.payout.keyConfigured && !st.payout.keyValid} />
+        <Stat k="AUTO PAYOUT" v={st.payout.enabled ? `ON <=$${st.payout.maxPerTx}` : st.payout.keyConfigured && !st.payout.keyValid ? "BAD KEY" : "OFF"} bad={st.payout.keyConfigured && !st.payout.keyValid} />
         <Stat k="DAILY CAP" v={`$${st.payout.dailyMax}`} />
       </div>
       {st.payout.hotWallet ? <p className="mt-2 text-xs text-mint">Hot wallet: <code className="text-neon-2">{st.payout.hotWallet}</code></p> : null}
@@ -553,7 +553,7 @@ function AutomationPanel({ token }: { token: string }) {
           {preview.length === 0 ? <p className="px-4 py-3 text-xs text-mint">No pending withdrawals.</p> : null}
           {preview.map((p) => (
             <p key={p.id} className="border-b border-rule/50 px-4 py-2 text-xs last:border-b-0">
-              #{p.id} {p.user} ${p.amount.toFixed(2)} â†’ <span className={p.ok ? "text-neon-2" : "text-foil"}>{p.ok ? "auto-pay" : `review: ${p.reason}`}</span>
+              #{p.id} {p.user} ${p.amount.toFixed(2)} {"->"} <span className={p.ok ? "text-neon-2" : "text-foil"}>{p.ok ? "auto-pay" : `review: ${p.reason}`}</span>
             </p>
           ))}
         </div>
@@ -565,7 +565,7 @@ function AutomationPanel({ token }: { token: string }) {
           {st.alerts.length === 0 ? <p className="px-4 py-3 text-xs text-mint">No alerts. All good.</p> : null}
           {st.alerts.slice(0, 8).map((a) => (
             <p key={a.key} className="border-b border-rule/50 px-4 py-2 text-xs text-white last:border-b-0">
-              <span className="text-mint">{new Date(a.at).toLocaleString()} آ· </span>
+              <span className="text-mint">{new Date(a.at).toLocaleString()}  · </span>
               {a.text}
             </p>
           ))}
@@ -574,8 +574,8 @@ function AutomationPanel({ token }: { token: string }) {
           <p className="micro border-b border-rule px-4 py-2 text-mint">RECENT RUNS</p>
           {st.runs.slice(0, 8).map((r) => (
             <p key={r.id} className="flex justify-between gap-3 border-b border-rule/50 px-4 py-2 text-xs last:border-b-0">
-              <span className={r.ok ? "text-neon-2" : "text-red-300"}>{r.ok ? "âœ“" : "âœ—"} {r.trigger}</span>
-              <span className="text-mint">{r.durationMs} ms آ· {new Date(r.createdAt).toLocaleTimeString()}</span>
+              <span className={r.ok ? "text-neon-2" : "text-red-300"}>{r.ok ? "OK" : "FAIL"} {r.trigger}</span>
+              <span className="text-mint">{r.durationMs} ms  · {new Date(r.createdAt).toLocaleTimeString()}</span>
             </p>
           ))}
         </div>
@@ -586,7 +586,7 @@ function AutomationPanel({ token }: { token: string }) {
           <p className="micro border-b border-rule px-4 py-2 text-foil">UNMATCHED TRANSFERS (sender wallet not linked to any account)</p>
           {st.unmatched.map((u) => (
             <p key={u.txHash} className="border-b border-rule/50 px-4 py-2 text-xs last:border-b-0">
-              ${Number(u.amount).toFixed(2)} from <code className="text-neon-2">{u.fromAddress}</code> آ· {new Date(u.blockTime).toLocaleString()}
+              ${Number(u.amount).toFixed(2)} from <code className="text-neon-2">{u.fromAddress}</code>  · {new Date(u.blockTime).toLocaleString()}
             </p>
           ))}
         </div>
@@ -646,7 +646,7 @@ const TIER_FIELDS: Array<[keyof TierForm, string]> = [
   ["drawDurationMinutes", "DRAW MINUTES"],
   ["prizePercentage", "PRIZE %"],
   ["treasuryPercentage", "TREASURY %"],
-  ["adminPercentage", "ADMIN %"],
+  ["adminPercentage", "BETX FEE %"],
   ["minimumParticipants", "MIN PLAYERS"],
   ["maximumParticipants", "MAX PLAYERS"],
   ["status", "STATUS"],
@@ -876,7 +876,7 @@ function TierReportsPanel({ token }: { token: string }) {
               <th className="px-4 py-2">Revenue</th>
               <th className="px-4 py-2">Prize</th>
               <th className="px-4 py-2">Treasury</th>
-              <th className="px-4 py-2">Admin</th>
+              <th className="px-4 py-2">BETX Fee</th>
             </tr>
           </thead>
           <tbody>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { money } from "@/lib/format";
+import { formatCurrency, formatPadded } from "@/lib/format";
 import { useI18n } from "@/i18n/client";
 import { WHEEL_SECTORS } from "@/lib/wheel";
 import { burstFrom } from "@/lib/dollarFx";
@@ -12,8 +12,8 @@ const GUEST_SPIN_KEY = "betx_guest_wheel_at";
 const SPIN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export function Wheel() {
-  const { state, spin, setToast, refresh, loading, dataUnavailable } = useApp();
-  const { d, t, n } = useI18n();
+  const { state, spin, setToast, refresh, loading, dataUnavailable, isPreview } = useApp();
+  const { d, t, n, locale } = useI18n();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [prize, setPrize] = useState<number | null>(null);
@@ -24,7 +24,7 @@ export function Wheel() {
   const wheelRef = useRef<HTMLDivElement>(null);
 
   const user = state?.user;
-  const maintenance = Boolean(
+  const maintenance = !isPreview && Boolean(
     state?.config?.maintenanceMode ?? state?.config?.maintenance,
   );
 
@@ -36,12 +36,16 @@ export function Wheel() {
   }, []);
 
   useEffect(() => {
+    if (isPreview) {
+      const id = window.setTimeout(() => setGuestCanSpin(true), 0);
+      return () => window.clearTimeout(id);
+    }
     const timer = window.setTimeout(() => {
       const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
       setGuestCanSpin(!last || Date.now() - last >= SPIN_COOLDOWN_MS);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [isPreview]);
 
   const target = user?.nextSpinAt ? new Date(user.nextSpinAt).getTime() : 0;
 
@@ -62,13 +66,13 @@ export function Wheel() {
     const h = Math.floor(ms / 3600000);
     const m = Math.floor((ms % 3600000) / 60000);
     const s2 = Math.floor((ms % 60000) / 1000);
-    return [h, m, s2].map((x) => String(x).padStart(2, "0")).join(":");
+    return [h, m, s2].map((x) => formatPadded(x, locale)).join(":");
   })();
 
   const freeSpinReady = !target || (now > 0 && now >= target);
-  const canSpin = user
+  const canSpin = isPreview || (user
     ? Boolean(user.canSpin || user.bonusSpins > 0 || freeSpinReady)
-    : guestCanSpin;
+    : guestCanSpin);
 
   const sectors = WHEEL_SECTORS;
 
@@ -91,11 +95,28 @@ export function Wheel() {
   };
 
   const doSpin = async () => {
+    if (spinning) return;
+
+    if (isPreview) {
+      setSpinning(true);
+      setPrize(null);
+      const idx = Math.floor(Math.random() * sectors.length);
+      setRotation(calcNextRotation(idx));
+      const timer = window.setTimeout(() => {
+        setSpinning(false);
+        setToast(`${d.wheel.guestPractice} · ${formatCurrency(sectors[idx]?.value ?? 0, locale)}`.trim());
+        setConfetti(Array.from({ length: 18 }, (_, k) => k));
+        const clear = window.setTimeout(() => setConfetti([]), 2600);
+        timers.current.push(clear);
+      }, 4300);
+      timers.current.push(timer);
+      return;
+    }
+
     if (maintenance || loading || dataUnavailable) {
       setToast(d.errors.unavailable);
       return;
     }
-    if (spinning) return;
 
     if (!user) {
       const last = Number(localStorage.getItem(GUEST_SPIN_KEY) || 0);
@@ -156,7 +177,7 @@ export function Wheel() {
     timers.current.push(t1);
   };
 
-  const isDisabled = spinning || loading || dataUnavailable || maintenance;
+  const isDisabled = spinning || (!isPreview && (loading || dataUnavailable || maintenance));
 
   return (
     <section id="wheel" className="relative overflow-hidden py-20 lg:py-28">
@@ -241,12 +262,13 @@ export function Wheel() {
                         x={cx}
                         y={cy - 66}
                         textAnchor="middle"
-                        fontSize="15"
+                        direction="ltr"
+                        fontSize="12"
                         fontWeight="700"
                         fill={gold ? "#12100A" : "#8FA8A0"}
                         fontFamily="var(--font-display)"
                       >
-                        {s.label}
+                        {formatCurrency(s.value, locale)}
                       </text>
                     </g>
                   </g>
@@ -296,7 +318,9 @@ export function Wheel() {
 
         {/* copy */}
         <div>
-          <p className="micro text-neon-2">DAILY LUCKY WHEEL · FREE</p>
+          <p className="micro text-neon-2">
+            {isPreview ? `${d.wheel.kicker} · ${d.wc.demoBadge}` : d.wheel.kicker}
+          </p>
           <h2 className="mt-4 text-[clamp(2.1rem,5.2vw,3.7rem)] font-black leading-[1.1] text-white">
             {d.wheel.title1}
             <br />
@@ -313,10 +337,10 @@ export function Wheel() {
 
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { v: "$0.05", l: d.wheel.tierBase },
-              { v: "$0.10", l: d.wheel.tierSilver },
-              { v: "$0.25", l: d.wheel.tierGold },
-              { v: "$1.00", l: d.wheel.tierJackpot },
+              { v: formatCurrency(sectors[0].value, locale), l: d.wheel.tierBase },
+              { v: formatCurrency(sectors[1].value, locale), l: d.wheel.tierSilver },
+              { v: formatCurrency(sectors[2].value, locale), l: d.wheel.tierGold },
+              { v: formatCurrency(sectors[8].value, locale), l: d.wheel.tierJackpot },
             ].map((c) => (
               <div key={c.v} className="panel rounded-2xl px-4 py-4 text-center">
                 <p
@@ -328,6 +352,12 @@ export function Wheel() {
                 <p className="mt-1 text-[11px] text-mint">{c.l}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-foil/25 bg-foil/[0.05] px-4 py-3">
+            <p className="micro text-foil">{d.phase2.wheel.consolationKicker}</p>
+            <p className="mt-2 text-[12px] leading-7 text-mint">{d.phase2.wheel.consolationBody}</p>
+            <p className="mt-1 text-[10px] font-bold text-neon-2">{d.phase2.wheel.loyalty}</p>
           </div>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -350,7 +380,7 @@ export function Wheel() {
               <p className="text-sm text-mint">
                 {d.wheel.yourBalance}{" "}
                 <span dir="ltr" className="font-display tnum text-white">
-                  ${money(user.balance)}
+                  {formatCurrency(user.balance, locale)}
                 </span>
                 {user.bonusSpins > 0 ? (
                   <span className="ms-2 rounded-full border border-foil/40 bg-foil/10 px-2.5 py-1 text-[11px] text-foil">
@@ -365,10 +395,7 @@ export function Wheel() {
 
           {user && !canSpin && left ? (
             <p className="mt-4 text-sm text-mint">
-              {t(d.wheel.nextIn, { time: "" })}
-              <span dir="ltr" className="font-display tnum ms-1 text-foil">
-                {left}
-              </span>
+              {t(d.wheel.nextIn, { time: left })}
             </p>
           ) : null}
 
@@ -381,7 +408,7 @@ export function Wheel() {
             >
               <span className="text-neon-2">◆</span>{" "}
               {t(d.wheel.floor, {
-                amount: `$${money(state.vault.initialCapital)}`,
+                amount: formatCurrency(state.vault.initialCapital, locale),
               })}
             </motion.p>
           ) : null}
@@ -394,7 +421,7 @@ export function Wheel() {
               className="mt-6 flex items-center gap-4 rounded-2xl border border-foil/40 bg-foil/[0.1] px-6 py-5"
             >
               <span className="gold-text font-display tnum text-4xl font-bold">
-                +${money(prize)}
+                +{formatCurrency(prize, locale)}
               </span>
               <p className="text-sm leading-7 text-mint">{d.wheel.won}</p>
             </motion.div>

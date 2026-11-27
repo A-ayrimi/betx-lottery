@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -24,8 +24,9 @@ export function Header() {
     isDemoSession,
   } = useApp();
   const { address: connectedAddress, disconnect } = useWallet();
-  const { d, href } = useI18n();
+  const { d, href, dir } = useI18n();
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [form, setForm] = useState({ username: "", telegram: "", referral: "", accept: false });
   const [walletBalance, setWalletBalance] = useState<{
     address: string;
@@ -34,6 +35,7 @@ export function Header() {
 
   const NAV = [
     { href: "#pool", label: d.nav.pool },
+    { href: "#transparency", label: d.nav.transparency },
     { href: "#wheel", label: d.nav.wheel },
     { href: "#wallet", label: d.nav.wallet },
     { href: "#invite", label: d.nav.invite },
@@ -51,6 +53,8 @@ export function Header() {
         ? walletBalance.balances
         : null;
   const live = state?.config.live ?? !demoEnabled;
+  const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
+  const vaultStatusOnline = Boolean(state) && live && !maintenance;
   const vaultAddress = state?.vault.adminWallet ?? state?.config.adminWallet ?? "";
   const networkName = state?.config?.solana?.network;
  const testnet = Boolean(networkName && String(networkName) !== "mainnet" && String(networkName) !== "mainnet-beta");
@@ -84,6 +88,15 @@ export function Header() {
     };
   }, [isDemoSession, walletAddress]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menuOpen]);
+
   const handleLogout = async () => {
     const wasDemo = isDemoSession;
     await logout();
@@ -105,7 +118,7 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-rule/70 bg-[#060a09]/82 backdrop-blur-xl">
+      <header className="relative border-b border-rule/70 bg-[#060a09]/82 backdrop-blur-xl">
         <div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between gap-3 px-4 sm:px-6">
           <a href="#top" className="focus-ring flex min-w-0 shrink items-center gap-2 rounded-lg" dir="ltr">
             <Logo />
@@ -121,13 +134,25 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-2.5">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? d.ui.closeMenu : d.ui.openMenu}
+              aria-controls="mobile-nav"
+              aria-expanded={menuOpen}
+              className="focus-ring rounded-full border border-rule p-2 text-mint transition-colors hover:border-mint/50 hover:text-white xl:hidden"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                {menuOpen ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+              </svg>
+            </button>
             <LanguageSwitcher />
 
             <div className="hidden items-center gap-2 rounded-full border border-rule px-3 py-2 lg:flex">
-              <span className="live-dot h-2 w-2 rounded-full bg-neon-2" />
-              <span className="micro text-mint">VAULT</span>
+              <span className={`h-2 w-2 rounded-full ${vaultStatusOnline ? "live-dot bg-neon-2" : "bg-foil"}`} />
+              <span className="micro text-mint">{d.footer.vault}</span>
               <span dir="ltr" className="font-display tnum text-sm font-bold text-neon-2">
-                {state ? <AnimatedMoney value={state.vault.balance} /> : "—"}
+                {state ? <AnimatedMoney value={state.vault.balance} /> : d.ui.noData}
               </span>
               {vaultAddress ? (
                 <span dir="ltr" title={vaultAddress} className="font-display text-[9px] text-mint/60">
@@ -198,6 +223,27 @@ export function Header() {
             )}
           </div>
         </div>
+
+        <nav
+          id="mobile-nav"
+          dir={dir}
+          hidden={!menuOpen}
+          aria-label={d.ui.navigation}
+          className="border-t border-rule bg-[#060a09]/97 px-4 py-3 backdrop-blur-xl sm:px-6 xl:hidden"
+        >
+          <div className="mx-auto grid max-w-[1240px] gap-1">
+            {NAV.map((n) => (
+              <a
+                key={n.href}
+                href={n.href}
+                onClick={() => setMenuOpen(false)}
+                className="focus-ring rounded-xl px-3 py-3 text-sm font-medium text-mint transition-colors hover:bg-white/[0.04] hover:text-white"
+              >
+                {n.label}
+              </a>
+            ))}
+          </div>
+        </nav>
       </header>
 
       <AnimatePresence>

@@ -1,17 +1,31 @@
-import { NextResponse, after } from "next/server";
-import { getState } from "@/lib/store";
-import { maybeRunAutomation } from "@/lib/automation";
+import { NextResponse } from "next/server";
+import { isNonLivePreview, isPreviewFallbackEnabled, previewState, withPreviewFallback } from "@/lib/previewFallback";
 
 export const dynamic = "force-dynamic";
 
+function previewResponse() {
+  return NextResponse.json(
+    { ok: true, state: previewState() },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function GET() {
+  if (isNonLivePreview()) return previewResponse();
   try {
-    const state = await getState();
-    // heartbeat: keeps the autopilot running while anyone has the site open
-    after(maybeRunAutomation);
-    return NextResponse.json({ ok: true, state });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ ok: false, error: "Application data is unavailable." }, { status: 500 });
+    const { getState } = await import("@/lib/store");
+    const state = withPreviewFallback(await getState());
+    return NextResponse.json(
+      { ok: true, state },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    if (isNonLivePreview()) return previewResponse();
+    if (isPreviewFallbackEnabled()) return previewResponse();
+    console.error(error);
+    return NextResponse.json(
+      { ok: false, error: "Application data is unavailable." },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

@@ -12,13 +12,16 @@ import {
 } from "react";
 import type { AppState, DrawResult } from "@/lib/types";
 import { useI18n } from "@/i18n/client";
+import { money } from "@/lib/format";
 import { useStored, writeStored } from "@/lib/useStored";
 import {
   buyDemoTickets,
   clearDemoSession,
   createDemoState,
+  createPreviewState,
   depositDemoBalance,
   isDemoAppState,
+  isPreviewAppState,
   DEMO_WALLET_ADDRESS,
   loadDemoSession,
   saveDemoSession,
@@ -32,16 +35,27 @@ declare global {
   }
 }
 
+type LastPurchase = {
+  serials: string[];
+  roundId: number;
+  transactionReference?: string | null;
+};
+
 interface Ctx {
   state: AppState | null;
   loading: boolean;
   dataUnavailable: boolean;
   toast: string | null;
   draw: DrawResult | null;
+  lastPurchase: LastPurchase | null;
+  clearLastPurchase: () => void;
   pendingRef: string;
   demoEnabled: boolean;
   isDemoSession: boolean;
+  isPreview: boolean;
   walletConnectOpen: boolean;
+  selectedTierCode: string;
+  setSelectedTierCode: (code: string) => void;
   setDraw: (d: DrawResult | null) => void;
   setToast: (t: string | null) => void;
   startDemoSession: (address: string) => void;
@@ -72,24 +86,29 @@ export function AppProvider({
   children,
   initialState = null,
   demoEnabled = false,
+  previewFallbackEnabled = false,
 }: {
   children: ReactNode;
   initialState?: AppState | null;
   demoEnabled?: boolean;
+  previewFallbackEnabled?: boolean;
 }) {
   const [state, setState] = useState<AppState | null>(initialState);
   const [loading, setLoading] = useState(!initialState);
   const [dataUnavailable, setDataUnavailable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [draw, setDraw] = useState<DrawResult | null>(null);
+  const [lastPurchase, setLastPurchase] = useState<LastPurchase | null>(null);
   const [isDemoSession, setIsDemoSession] = useState(false);
   const [walletConnectOpen, setWalletConnectOpen] = useState(false);
+  const [selectedTierCode, setSelectedTierCode] = useState("");
   const refreshGeneration = useRef(0);
   const pendingRef = useStored("betx_ref", "") ?? "";
   const { d, t, locale } = useI18n();
 
   const openWalletConnect = useCallback(() => setWalletConnectOpen(true), []);
   const closeWalletConnect = useCallback(() => setWalletConnectOpen(false), []);
+  const clearLastPurchase = useCallback(() => setLastPurchase(null), []);
 
   const refresh = useCallback(async () => {
     const generation = ++refreshGeneration.current;
@@ -102,7 +121,14 @@ export function AppProvider({
         setLoading(false);
         return;
       }
-      setState(null);
+      if (initialState) {
+        setState(initialState);
+        setIsDemoSession(false);
+        setDataUnavailable(false);
+        setLoading(false);
+        return;
+      }
+      setState(createPreviewState(locale, Date.now()));
       setIsDemoSession(false);
       setDataUnavailable(false);
       setLoading(false);
@@ -113,21 +139,31 @@ export function AppProvider({
       const json = await res.json();
       if (generation !== refreshGeneration.current) return;
       if (!res.ok || !json.ok || !json.state || typeof json.state !== "object") {
-        setState(null);
-        setDataUnavailable(true);
+        if (previewFallbackEnabled) {
+          setState(createPreviewState(locale, Date.now()));
+          setDataUnavailable(false);
+        } else {
+          setState(null);
+          setDataUnavailable(true);
+        }
         return;
       }
       setState(json.state);
       setDataUnavailable(false);
     } catch {
       if (generation === refreshGeneration.current) {
-        setState(null);
-        setDataUnavailable(true);
+        if (previewFallbackEnabled) {
+          setState(createPreviewState(locale, Date.now()));
+          setDataUnavailable(false);
+        } else {
+          setState(null);
+          setDataUnavailable(true);
+        }
       }
     } finally {
       if (generation === refreshGeneration.current) setLoading(false);
     }
-  }, [demoEnabled]);
+  }, [demoEnabled, initialState, locale, previewFallbackEnabled]);
 
   const startDemoSession = useCallback(
     (address: string) => {
@@ -284,7 +320,7 @@ export function AppProvider({
   const logout = useCallback(async () => {
     if (isDemoSession) {
       clearDemoSession();
-      setState(null);
+      setState(initialState ?? createPreviewState(locale, Date.now()));
       setIsDemoSession(false);
       setDataUnavailable(false);
       setToast(d.toast.loggedOut);
@@ -293,7 +329,7 @@ export function AppProvider({
     await post("/api/auth/logout");
     await refresh();
     setToast(d.toast.loggedOut);
-  }, [refresh, d, isDemoSession]);
+  }, [refresh, d, isDemoSession, initialState, locale]);
 
   const buy = useCallback(
     async (count: number, tierCode?: string) => {
@@ -313,6 +349,11 @@ export function AppProvider({
         }
         saveDemoSession(result.state);
         setState(result.state);
+        setLastPurchase({
+          serials: result.serials,
+          roundId: result.roundId,
+          transactionReference: result.transactionReference,
+        });
         if (result.draw) {
           setDraw(result.draw);
           return result.draw;
@@ -332,6 +373,11 @@ export function AppProvider({
         return json.code === "insufficient" ? "insufficient" : null;
       }
       await refresh();
+      setLastPurchase({
+        serials: json.serials ?? [],
+        roundId: Number(json.roundId),
+        transactionReference: json.transactionReference ?? null,
+      });
       if (json.draw) {
         setDraw(json.draw);
         return json.draw as DrawResult;
@@ -385,13 +431,13 @@ export function AppProvider({
         }
         saveDemoSession(next);
         setState(next);
-        setToast(t(d.toast.demoCredited, { amount: `$${Number(amount).toFixed(2)}` }));
+        setToast(t(d.toast.demoCredited, { amount: `$${money(amount, locale)}` }));
         return true;
       }
       setToast(d.wc.comingSoonToast);
       return false;
     },
-    [d, t, isDemoSession, state, dataUnavailable],
+    [d, t, locale, isDemoSession, state, dataUnavailable],
   );
 
   const withdraw = useCallback(
@@ -423,6 +469,8 @@ export function AppProvider({
     [refresh, d, t, isDemoSession, state, dataUnavailable],
   );
 
+  const isPreview = demoEnabled || isPreviewAppState(state);
+
   const value = useMemo(
     () => ({
       state,
@@ -430,10 +478,15 @@ export function AppProvider({
       dataUnavailable,
       toast,
       draw,
+      lastPurchase,
+      clearLastPurchase,
       pendingRef,
       demoEnabled,
       isDemoSession,
+      isPreview,
       walletConnectOpen,
+      selectedTierCode,
+      setSelectedTierCode,
       setDraw,
       setToast,
       startDemoSession,
@@ -454,10 +507,15 @@ export function AppProvider({
       dataUnavailable,
       toast,
       draw,
+      lastPurchase,
+      clearLastPurchase,
       pendingRef,
       demoEnabled,
       isDemoSession,
+      isPreview,
       walletConnectOpen,
+      selectedTierCode,
+      setSelectedTierCode,
       startDemoSession,
       openWalletConnect,
       closeWalletConnect,

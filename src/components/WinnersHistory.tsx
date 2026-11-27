@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useApp } from "./AppProvider";
-import { money } from "@/lib/format";
+import { formatNumber, money } from "@/lib/format";
+import { useSelectedPayoutVars } from "@/lib/payoutCopy";
 import { useI18n } from "@/i18n/client";
 
 interface HistoryRow {
@@ -31,6 +32,7 @@ interface HistoryRow {
 export function WinnersHistory() {
   const { state, demoEnabled, loading, dataUnavailable } = useApp();
   const { d, t, n, date, href, locale } = useI18n();
+  const payout = useSelectedPayoutVars();
   const [extra, setExtra] = useState<HistoryRow[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -142,11 +144,11 @@ export function WinnersHistory() {
         </div>
 
         <div className="mt-6 rounded-2xl border border-neon/20 bg-neon/[0.05] px-5 py-4 text-[13px] leading-7 text-mint">
-          <span className="text-neon-2">◆</span> {demoEnabled ? d.draw.demoNotice : d.board.autoDrawNote}
+          <span className="text-neon-2">◆</span> {demoEnabled ? d.draw.demoNotice : t(d.board.autoDrawNote, payout)}
           {!demoEnabled ? (
             <>
               <br />
-              <span className="text-foil">◆</span> {d.board.treasuryNote}{" "}
+              <span className="text-foil">◆</span> {t(d.board.treasuryNote, payout)}{" "}
               <code dir="ltr" className="font-display text-[11px] text-neon-2">
                 {state?.config.adminWallet ?? state?.vault.adminWallet ?? ""}
               </code>
@@ -171,7 +173,7 @@ export function WinnersHistory() {
                     ? d.errors.unavailable
                     : loading
                       ? d.vaultChart.loading
-                      : d.board.noDraws}
+                      : t(d.board.noDraws, payout)}
                 </p>
               ) : (
                 unique.map((w) => {
@@ -187,7 +189,7 @@ export function WinnersHistory() {
                       className="grid grid-cols-[64px_minmax(0,1.2fr)_minmax(0,1fr)_90px_200px_110px] items-center gap-3 border-b border-rule/50 px-6 py-4 last:border-b-0 hover:bg-white/[0.03]"
                     >
                       <span dir="ltr" className="font-display tnum text-start text-sm font-bold text-foil">
-                        #{w.roundId}
+                        #{formatNumber(w.roundId, locale)}
                       </span>
                       <span className="flex min-w-0 items-center gap-2 truncate text-[14px] font-bold text-white">
                         <span className="truncate">{w.winnerName}</span>
@@ -201,14 +203,14 @@ export function WinnersHistory() {
                         {w.winningSerial}
                       </span>
                       <span dir="ltr" className="font-display tnum text-start text-[14px] font-bold text-foil">
-                        +${money(w.prize)}
+                        +${money(w.prize, locale)}
                       </span>
                       <span className="text-[12px] leading-5 text-mint">
                         {typeof e === "string" ? (
                           e
                         ) : (
                           <>
-                            <time dateTime={w.drawnAt ?? undefined} title={e.utc} suppressHydrationWarning>
+                            <time dateTime={w.drawnAt ?? undefined} title={e.utc}>
                               {e.local}
                             </time>
                             <span dir="ltr" className="block font-display text-[10px] text-mint/60">
