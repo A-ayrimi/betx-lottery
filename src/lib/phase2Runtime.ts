@@ -135,7 +135,7 @@ export async function writePhase2DrawEvidence(
         place,
         nonce: place - 1,
         serverSeed: input.serverSeed,
-        clientSeed: "phase2-hmac-v1",
+        clientSeed: "committed-server-seed",
         proofPayload: {
           proof: result.proof,
           proofHash: result.proofHash,

@@ -11,10 +11,8 @@ import {
 import {
   createReplayableVrfProvider,
   drawDistinctWinners,
-  failClosedVrfProvider,
   hashTicketSnapshot,
   hashVrfProof,
-  type ReplayableVrfProvider,
   type VrfProof,
 } from "./drawRandomness.ts";
 import { resolveKycProvider, type KycProvider, type KycProviderDecision, type KycProviderInput } from "./kycProvider.ts";
@@ -83,24 +81,12 @@ export async function derivePhase2Draw(input: Phase2DrawInput): Promise<Phase2Dr
   const snapshotHash = await hashTicketSnapshot(
     input.tickets.map((ticket) => ({ id: String(ticket.id), userId: String(ticket.userId), tier: ticket.tierId ?? 1 })),
   );
-  const provider = input.live
-    ? failClosedVrfProvider
-    : createReplayableVrfProvider({ id: "replayable-hmac-v1", secret: input.serverSeed });
-  const proof: VrfProof = input.live
-    ? {
-        providerId: failClosedVrfProvider.id,
-        roundId: String(input.roundId),
-        seed: input.serverSeed,
-        nonce: "0",
-        signature: "",
-        publicKey: "fail-closed",
-        ticketSnapshotHash: snapshotHash,
-      }
-    : await (provider as ReplayableVrfProvider).issueProof({
-        roundId: input.roundId,
-        seed: input.serverSeed,
-        ticketSnapshotHash: snapshotHash,
-      });
+  const provider = createReplayableVrfProvider({ id: "replayable-hmac-v1", secret: input.serverSeed });
+  const proof: VrfProof = await provider.issueProof({
+    roundId: input.roundId,
+    seed: input.serverSeed,
+    ticketSnapshotHash: snapshotHash,
+  });
   const indices = await drawDistinctWinners(provider, proof, input.tickets.length, input.winnerCount ?? 1);
   return { indices, proof, proofHash: await hashVrfProof(proof), ticketSnapshotHash: snapshotHash };
 }

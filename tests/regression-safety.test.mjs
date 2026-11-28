@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import bs58 from "bs58";
 import { buildPostgresConfig } from "../src/lib/postgresConfig.ts";
+import { isMaintenanceMode } from "../src/lib/gameConfig.ts";
 import { DepositReservationError, isValidDepositIdempotencyKey } from "../src/lib/depositReservations.ts";
 import {
   broadcast,
@@ -104,6 +105,26 @@ test("payments, automatic sweep, and maintenance defaults remain fail-closed", (
   assert.match(config, /get maintenanceMode\(\)\s*\{\s*return isMaintenanceMode\(\);\s*\}/);
   assert.match(config, /BETX_MODE must be explicitly set to live or demo/);
   assert.match(gameConfig, /return raw !== "false";/);
+  assert.match(gameConfig, /process\.env\.MAINTENANCE_MODE \?\? process\.env\.NEXT_PUBLIC_MAINTENANCE_MODE/);
+});
+
+test("server maintenance mode overrides the public client fallback", () => {
+  const previousServer = process.env.MAINTENANCE_MODE;
+  const previousPublic = process.env.NEXT_PUBLIC_MAINTENANCE_MODE;
+  try {
+    process.env.MAINTENANCE_MODE = "false";
+    process.env.NEXT_PUBLIC_MAINTENANCE_MODE = "true";
+    assert.equal(isMaintenanceMode(), false);
+
+    process.env.MAINTENANCE_MODE = "true";
+    process.env.NEXT_PUBLIC_MAINTENANCE_MODE = "false";
+    assert.equal(isMaintenanceMode(), true);
+  } finally {
+    if (previousServer === undefined) delete process.env.MAINTENANCE_MODE;
+    else process.env.MAINTENANCE_MODE = previousServer;
+    if (previousPublic === undefined) delete process.env.NEXT_PUBLIC_MAINTENANCE_MODE;
+    else process.env.NEXT_PUBLIC_MAINTENANCE_MODE = previousPublic;
+  }
 });
 
 test("deposit reservation keys are UUIDs and duplicate reservations have an explicit error", () => {

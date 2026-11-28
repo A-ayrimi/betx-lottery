@@ -515,6 +515,8 @@ async function openNewRound(q: Q, tier: TierConfig) {
     serverSeedHash: seedHash,
     drawNonce: 0,
     status: "COMMITTED",
+    clientSeedSource: "COMMITTED_SERVER_SEED",
+    algorithmVersion: "HMAC-SHA256-COMMIT-REVEAL-v1",
   });
   return created;
 }
@@ -1008,6 +1010,8 @@ async function drawRound(
       winnerTicketId: winner.id,
       winningSerial: winner.ticketSerial,
       revealedServerSeed: row.serverSeed,
+      clientSeedSource: "COMMITTED_SERVER_SEED",
+      algorithmVersion: "HMAC-SHA256-COMMIT-REVEAL-v1",
       committedAt: row.openedAt ?? new Date(),
       revealedAt: drawnAt,
     })
@@ -1018,6 +1022,8 @@ async function drawRound(
         winnerTicketId: winner.id,
         winningSerial: winner.ticketSerial,
         revealedServerSeed: row.serverSeed,
+        clientSeedSource: "COMMITTED_SERVER_SEED",
+        algorithmVersion: "HMAC-SHA256-COMMIT-REVEAL-v1",
         revealedAt: drawnAt,
       },
     });
@@ -1066,14 +1072,17 @@ async function drawRound(
  * Each round is drawn in its own locked transaction — never twice.
  */
 export async function autoDrawFullRounds(triggerUserId = 0): Promise<DrawOutcome[]> {
+  assertMutationsOpen();
   const open = await db
     .select()
     .from(rounds)
-    .where(inArray(rounds.status, [ROUND_STATUSES.OPEN, ROUND_STATUSES.FULL, "open", "full"]))
+    .where(and(
+      inArray(rounds.status, [ROUND_STATUSES.OPEN, ROUND_STATUSES.FULL, "open", "full"]),
+      eq(rounds.sold, rounds.capacity),
+    ))
     .orderBy(rounds.id);
   const outcomes: DrawOutcome[] = [];
   for (const r of open) {
-    if ((!r.serverSeed || !r.seedHash) && r.sold < r.capacity) continue;
     const outcome = await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(r.tierId ?? 1)})`);
       return drawRound(tx, r.id, triggerUserId);
@@ -1084,11 +1093,13 @@ export async function autoDrawFullRounds(triggerUserId = 0): Promise<DrawOutcome
 }
 
 export async function autoDrawExpiredRounds(triggerUserId = 0): Promise<DrawOutcome[]> {
+  assertMutationsOpen();
   const open = await db
     .select()
     .from(rounds)
     .where(and(
       inArray(rounds.status, [ROUND_STATUSES.OPEN, ROUND_STATUSES.FULL, "open", "full"]),
+      eq(rounds.sold, rounds.capacity),
       isNotNull(rounds.closesAt),
       lt(rounds.closesAt, new Date()),
     ))

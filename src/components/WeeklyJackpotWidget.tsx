@@ -56,7 +56,7 @@ export function WeeklyJackpotWidget() {
               <span className="gold-text">{c.titleGold}</span>
             </h2>
             <p className="mt-4 max-w-[58ch] text-[14px] leading-8 text-mint">{c.body}</p>
-            <p className="mt-4 text-[11px] leading-6 text-mint/70">{c.note}</p>
+            <p id="jackpot-estimate-note" className="mt-4 text-[11px] leading-6 text-mint/70">{c.note}</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -70,7 +70,7 @@ export function WeeklyJackpotWidget() {
               <p className="micro text-foil">{t(c.resetIn, { time: left })}</p>
               <p dir="ltr" className="mt-2 font-display tnum text-xl font-black text-foil">{left}</p>
             </div>
-            <div className="rounded-2xl border border-rule bg-black/25 p-4 sm:col-span-2">
+            <div className="rounded-2xl border border-rule bg-black/25 p-4 sm:col-span-2" aria-describedby="jackpot-estimate-note">
               <p className="flex flex-wrap items-center gap-2 text-foil">
                 {c.potEstimate}
                 <BalanceBadge kind={demoEnabled || isPreview ? "demo" : "ledger"} />

@@ -229,7 +229,12 @@ test("Phase 2 integration policy wires RBAC, compliance, draw and settlement con
   const draw = await derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: false, winnerCount: 1 });
   assert.equal(draw.indices.length, 1);
   assert.equal(new Set(draw.indices).size, 1);
-  await assert.rejects(() => derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: true, winnerCount: 1 }));
+  const liveDraw = await derivePhase2Draw({ roundId: 1, serverSeed: "seed", tickets, live: true, winnerCount: 1 });
+  assert.deepEqual(liveDraw.indices, draw.indices);
+  assert.equal(liveDraw.proofHash, draw.proofHash);
+  const policySource = await readFile(new URL("../src/lib/phase2Policy.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(policySource, /failClosedVrfProvider/);
+  assert.match(policySource, /createReplayableVrfProvider/);
 
   const plan = buildPhase2SettlementPlan({
     grossUsd: 1000,

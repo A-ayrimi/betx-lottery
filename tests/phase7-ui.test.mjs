@@ -222,6 +222,39 @@ test("settlement copy no longer claims automated BETX verification", () => {
   assert.doesNotMatch(JSON.stringify(fa), /خودکار سیستم BETX|کارمزد پلتفرم BETX/);
 });
 
+test("draw proof copy describes commit-reveal HMAC without external randomness claims", () => {
+  for (const [label, dict] of Object.entries(locales)) {
+    assert.match(dict.pool.transparencyLive, /SHA-256/, `${label}.pool.transparencyLive must name SHA-256`);
+    assert.match(dict.pool.transparencyLive, /HMAC-SHA256/, `${label}.pool.transparencyLive must name HMAC-SHA256`);
+    assert.match(dict.faq.items[3].a, /SHA-256/, `${label}.faq.items[3].a must name SHA-256`);
+    assert.match(dict.faq.items[3].a, /HMAC-SHA256/, `${label}.faq.items[3].a must name HMAC-SHA256`);
+  }
+  assert.doesNotMatch(JSON.stringify(en), /Provably fair/);
+  assert.doesNotMatch(JSON.stringify(en), /external randomness is used/i);
+});
+
+test("live status and wallet copy distinguish ledger mode from enabled payments", async () => {
+  for (const [label, dict] of Object.entries(locales)) {
+    assert.ok(dict.ui.statusLedger, `${label}.ui.statusLedger is missing`);
+    assert.ok(dict.wallet.bodyPaymentsPaused, `${label}.wallet.bodyPaymentsPaused is missing`);
+    assert.ok(dict.wc.paymentsPausedBadge, `${label}.wc.paymentsPausedBadge is missing`);
+    assert.ok(dict.board.historyPending, `${label}.board.historyPending is missing`);
+    assert.match(dict.phase2.jackpot.note, /80|۸۰|٨٠/, `${label} jackpot note must name the 80 portion`);
+  }
+
+  const hero = await read("../src/components/Hero.tsx");
+  const wallet = await read("../src/components/Wallet.tsx");
+  const deposit = await read("../src/components/DepositCard.tsx");
+  const winners = await read("../src/components/WinnersHistory.tsx");
+  const jackpot = await read("../src/components/WeeklyJackpotWidget.tsx");
+  assert.match(hero, /d\.ui\.statusLedger/);
+  assert.match(wallet, /d\.wallet\.bodyPaymentsPaused/);
+  assert.match(wallet, /d\.wc\.paymentsPausedBadge/);
+  assert.match(deposit, /cfg\?\.paymentsEnabled === false/);
+  assert.match(winners, /d\.board\.historyPending/);
+  assert.match(jackpot, /aria-describedby="jackpot-estimate-note"/);
+});
+
 test("og image is generated instead of referencing a missing asset", async () => {
   const route = await read("../src/app/og.png/route.tsx");
   assert.match(route, /ImageResponse/);

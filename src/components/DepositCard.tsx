@@ -54,6 +54,9 @@ export function DepositCard() {
     <div className="panel min-w-0 rounded-2xl p-6">
       <p className="micro text-neon-2">{d.wallet.depositKicker}</p>
       <h3 className="mt-2 text-xl font-black text-white">{d.wallet.depositTitle}</h3>
+      {cfg?.paymentsEnabled === false ? (
+        <p className="mt-2 text-[11px] font-bold tracking-[0.14em] text-foil">{d.wc.paymentsPausedBadge}</p>
+      ) : null}
 
       <div dir={direction} className="mt-4 grid grid-cols-4 gap-2">
         {AMOUNTS.map((a) => (

@@ -23,13 +23,13 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
           "One account per person. Accounts are personal and non-transferable.",
         ] },
         { h: "3. The games", p: [
-          "Lucky pool: published tiers define each round's ticket price, capacity and allocation. A completed round receives a provisional random result that must be verified by the BETX automated system before settlement; winner, treasury and BETX platform fee amounts are published for the selected tier and recorded separately. Withdrawals are processed by the BETX automated system after security checks.",
+          "Lucky pool: published tiers define each round's ticket price, capacity and allocation. A completed round receives a provisional result that is settled only after admin review and approval; winner, treasury and BETX platform fee amounts are published for the selected tier and recorded separately. Withdrawals are available only when the published payments switch is enabled and after security checks.",
           "Daily wheel: one free spin every 24 hours plus one bonus spin after each referred user's first golden-ticket purchase. Guest spins are previews only and cannot win prizes or receive balance.",
-          "Draws are provably fair: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so results can be independently verified.",
+          "Draws use commit-reveal HMAC-SHA256: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so the winner can be independently recomputed. No client or external randomness source is used.",
         ] },
         { h: "4. Deposits and withdrawals", p: [
-          "Deposits are accepted in SPL-USDC on the Solana network. Funds sent on the wrong network or to the wrong address cannot be recovered.",
-          "Withdrawals are processed to a Solana address you provide after a security review. We may request identity verification (KYC) and proof of source of funds before processing withdrawals, in line with anti-money-laundering rules.",
+          "When payments are enabled, deposits are accepted in SPL-USDC on the Solana network. Funds sent on the wrong network or to the wrong address cannot be recovered.",
+          "When payments are enabled, withdrawals are processed to a Solana address you provide after a security review. We may request identity verification (KYC) and proof of source of funds before processing withdrawals, in line with anti-money-laundering rules.",
           "Bonus spins and referral rewards have no cash value until converted into balance by a prize.",
         ] },
         { h: "5. Prohibited conduct", p: [

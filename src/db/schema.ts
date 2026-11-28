@@ -98,7 +98,7 @@ export const rounds = pgTable("rounds", {
   winnerId: integer("winner_id").references(() => users.id, { onDelete: "restrict" }),
   winnerName: text("winner_name"),
   winningSerial: text("winning_serial"),
-  // Provably fair seed data remains public after a draw, but the winner must be reviewed and approved by an administrator.
+  // Commit-reveal seed data remains public after a draw, but the winner must be reviewed and approved by an administrator.
   seedHash: text("seed_hash"),
   serverSeed: text("server_seed"),
   feeStatus: text("fee_status").notNull().default("pending"), // pending | accrued | queued | paid | failed

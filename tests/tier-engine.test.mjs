@@ -68,6 +68,12 @@ test("lottery engine uses tier-aware locks, pricing, and settlement records", as
   assert.match(source, /insert\(roundSettlements\)/);
   assert.match(source, /insert\(treasuryTransactions\)/);
   assert.match(source, /autoDrawExpiredRounds/);
+  assert.match(source, /export async function autoDrawFullRounds[\s\S]{0,160}assertMutationsOpen\(\);/);
+  assert.match(source, /export async function autoDrawExpiredRounds[\s\S]{0,160}assertMutationsOpen\(\);/);
+  assert.match(source, /eq\(rounds\.sold, rounds\.capacity\)/);
+  assert.match(source, /COMMITTED_SERVER_SEED/);
   assert.match(buyRoute, /buyTickets\(me\.id, Number\(body\.count\) \|\| 1, tierSelector\)/);
   assert.match(automation, /autoDrawExpiredRounds\(\)/);
+  assert.match(automation, /await step\("draws", drawFullRounds\)[\s\S]{0,200}await step\("rounds", refundStaleRounds\)/);
+  assert.match(automation, /inArray\(rounds\.status, \["open", "OPEN"\]\)/);
 });

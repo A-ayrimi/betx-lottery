@@ -45,11 +45,11 @@ export const SOLANA_MIN_DEPOSIT_USD = 1;
  * Temporary pre-launch switch. Defaults to `true` (maintenance ON) until the
  * treasury has been funded and the operator flips it to `false`.
  *
- * Server reads `MAINTENANCE_MODE`; the client bundle reads the inlined
- * `NEXT_PUBLIC_MAINTENANCE_MODE`. Set either to `"false"` to go live.
+ * Server `MAINTENANCE_MODE` is authoritative; the inlined public value is a
+ * fallback for client rendering only. Set the effective value to `"false"` to go live.
  */
 export function isMaintenanceMode(): boolean {
   const raw =
-    process.env.NEXT_PUBLIC_MAINTENANCE_MODE ?? process.env.MAINTENANCE_MODE;
+    process.env.MAINTENANCE_MODE ?? process.env.NEXT_PUBLIC_MAINTENANCE_MODE;
   return raw !== "false";
 }

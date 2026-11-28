@@ -28,6 +28,7 @@ export function Hero() {
   const profit = v ? v.balance - v.initialCapital : null;
   const maintenance = Boolean(state?.config?.maintenanceMode ?? state?.config?.maintenance);
   const demo = isPreview || isDemoSession || (state ? !state.config.live : false);
+  const paymentsPaused = Boolean(state && state.config.paymentsEnabled === false);
   const statusLabel = dataUnavailable
     ? d.ui.statusUnavailable
     : loading
@@ -37,7 +38,9 @@ export function Hero() {
         : demo
           ? d.ui.statusDemo
           : state
-            ? d.ui.statusOnline
+            ? paymentsPaused
+              ? d.ui.statusLedger
+              : d.ui.statusOnline
             : d.ui.statusUnavailable;
   const statusOnline = !dataUnavailable && !loading && !maintenance && !demo && Boolean(state);
   const payout = payoutVars(tier ?? null, locale);

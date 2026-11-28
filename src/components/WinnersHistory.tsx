@@ -89,6 +89,7 @@ export function WinnersHistory() {
   const rows = (dataUnavailable ? [] : [...live, ...extra]).sort((a, b) => b.roundId - a.roundId);
   // De-dupe by round (live refresh may overlap with fetched pages).
   const unique = rows.filter((r, i) => rows.findIndex((x) => x.roundId === r.roundId) === i);
+  const verificationPending = unique.some((w) => !w.seedHash || !w.serverSeed);
 
   const loadMore = useCallback(async () => {
     if (demoEnabled) return;
@@ -139,7 +140,13 @@ export function WinnersHistory() {
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full bg-foil ${maintenance || isPreview ? "" : "live-dot"}`} />
             <span dir="ltr" className={`font-display text-[11px] tracking-[0.22em] ${maintenance || isPreview ? "text-foil" : "text-neon-2"}`}>
-              {isPreview ? d.wc.demoBadge : maintenance ? d.ui.statusMaintenance : d.board.live}
+              {isPreview
+                ? d.wc.demoBadge
+                : maintenance
+                  ? d.ui.statusMaintenance
+                  : verificationPending
+                    ? d.board.historyPending
+                    : d.board.live}
             </span>
           </div>
         </div>
@@ -227,6 +234,8 @@ export function WinnersHistory() {
                       </span>
                       {demoEnabled ? (
                         <span className="text-[12px] text-foil">{d.wc.demoBadge}</span>
+                      ) : !w.seedHash || !w.serverSeed ? (
+                        <span className="text-[11px] leading-4 text-foil">{d.board.historyPending}</span>
                       ) : (
                         <a
                           href={href("/verify")}

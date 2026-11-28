@@ -71,10 +71,10 @@ export const PHASE2_RESIDUAL_RISKS: readonly ResidualRisk[] = [
   {
     id: "RISK-VRF-VENDOR",
     severity: "HIGH",
-    summary: "ارائهدهنده VRF واقعی هنوز انتخاب نشده و live mode به fail-closed محدود است.",
+    summary: "ارائهدهنده VRF خارجی اختیاری هنوز متصل نشده و live mode از تصادف خارجی یا مشتری استفاده نمیکند.",
     owner: "مالک / فنی",
-    mitigation: "آداپتور replayable HMAC-SHA256 اضافه شد و proof قابل replay/tamper-check است؛ در live failClosedVrfProvider باقی میماند.",
-    status: "MITIGATED — REPLAYABLE ADAPTER / LIVE FAIL-CLOSED",
+    mitigation: "قرعهکشی live و demo از همان commit-reveal HMAC-SHA256 قابل replay استفاده میکند؛ دانه سرور قبل از دور تعهد و پس از قرعهکشی افشا میشود.",
+    status: "MITIGATED — COMMIT-REVEAL HMAC / NO EXTERNAL VRF",
   },
   {
     id: "RISK-KYC-VENDOR",
@@ -222,16 +222,21 @@ export function runPhase2SecurityAudit(root: string = process.cwd()): Phase2Secu
 
   const policySource = readSource("src/lib/phase2Policy.ts");
   const randomnessSource = readSource("src/lib/drawRandomness.ts");
-  const vrfFailClosed = policySource.includes("? failClosedVrfProvider") && randomnessSource.includes("export const failClosedVrfProvider");
+  const storeSource = readSource("src/lib/store.ts");
+  const commitRevealOk =
+    policySource.includes("createReplayableVrfProvider") &&
+    !policySource.includes("failClosedVrfProvider") &&
+    storeSource.includes("seedHash") &&
+    storeSource.includes("revealedServerSeed");
   findings.push(createFinding(
     "SEC-08",
-    "live-vrf-fail-closed",
+    "live-commit-reveal-draw",
     "HIGH",
-    vrfFailClosed ? "PASS" : "BLOCKED",
-    "src/lib/phase2Policy.ts, src/lib/drawRandomness.ts",
-    vrfFailClosed
-      ? "در live بدون VRF تأییدشده، قرعهکشی fail-closed است."
-      : "مسیر fail-closed VRF یافت نشد.",
+    commitRevealOk ? "PASS" : "BLOCKED",
+    "src/lib/store.ts, src/lib/phase2Policy.ts",
+    commitRevealOk
+      ? "در live و demo از همان تعهد SHA-256 و افشای دانه سرور با HMAC-SHA256 قابل replay استفاده میشود."
+      : "مسیر commit-reveal قابل replay برای قرعهکشی یافت نشد.",
   ));
 
   const complianceSource = readSource("src/lib/complianceGuard.ts");
@@ -301,8 +306,8 @@ export function runPhase2SecurityAudit(root: string = process.cwd()): Phase2Secu
     vrfReplayOk ? "PASS" : "BLOCKED",
     "src/lib/drawRandomness.ts, src/lib/phase2Policy.ts",
     vrfReplayOk
-      ? "proof VRF قابل replay و بررسی دستکاری است و قرعهکشی از خروجی همان آداپتور استفاده میکند."
-      : "آداپتور replayable VRF یافت نشد.",
+      ? "پروتوف HMAC-SHA256 قابل replay و بررسی دستکاری است و قرعهکشی live/demo از خروجی همان آداپتور استفاده میکند."
+      : "آداپتور replayable HMAC-SHA256 یافت نشد.",
   ));
 
   const adminSource = readSource("src/lib/admin.ts");

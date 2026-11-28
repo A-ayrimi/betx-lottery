@@ -20,8 +20,21 @@ export function Wallet() {
   const cfg = state?.config;
   const live = Boolean(cfg?.live);
   const maintenance = Boolean(cfg?.maintenanceMode ?? cfg?.maintenance);
-  const bodyText = maintenance ? d.ui.maintenanceBanner : live ? d.wallet.bodyLive : d.wallet.bodyDemo;
-  const statusBadge = maintenance ? d.ui.statusMaintenance : live ? null : d.wallet.demoBadge;
+  const paymentsEnabled = Boolean(cfg?.paymentsEnabled);
+  const bodyText = maintenance
+    ? d.ui.maintenanceBanner
+    : live
+      ? paymentsEnabled
+        ? d.wallet.bodyLive
+        : d.wallet.bodyPaymentsPaused
+      : d.wallet.bodyDemo;
+  const statusBadge = maintenance
+    ? d.ui.statusMaintenance
+    : live
+      ? paymentsEnabled
+        ? null
+        : d.wc.paymentsPausedBadge
+      : d.wallet.demoBadge;
   const excluded = user?.selfExcludedUntil ?? null;
   const statusLabel = (s: string) => (d.wallet.status as Record<string, string>)[s] ?? s;
 
@@ -29,6 +42,7 @@ export function Wallet() {
     e.preventDefault();
     if (dataUnavailable) return setToast(d.errors.unavailable);
     if (!user) return setToast(d.errors.notLoggedIn);
+    if (!paymentsEnabled && !isDemoSession) return setToast(d.wc.paymentsPausedBadge);
     setBusy("wd");
     const ok = await withdraw(Number(wd.amount), wd.address.trim());
     setBusy(null);
