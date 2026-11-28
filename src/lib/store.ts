@@ -25,8 +25,8 @@ import {
   type User,
 } from "@/db/schema";
 import { config, publicConfig } from "@/lib/config";
-import { isMaintenanceMode } from "@/lib/gameConfig";
-import { MaintenanceError } from "@/lib/errors";
+import { assertMutationsOpen } from "@/lib/mutationGuard";
+import { commitRevealIndex } from "@/lib/drawFairness";
 import { isTicketSerialCollision, makeTicketSerial } from "@/lib/ticketSerial";
 import { appendAdminAuditEvent, writePhase2DrawEvidence, writePhase2SettlementProof } from "@/lib/phase2Runtime";
 import { evaluatePhase2Refund } from "@/lib/phase2Policy";
@@ -39,10 +39,6 @@ const STORE_SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL ||
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   "https://api.mainnet-beta.solana.com";
-
-function assertMutationsOpen() {
-  if (isMaintenanceMode()) throw new MaintenanceError();
-}
 
 function isSolanaAddress(addr: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test((addr || "").trim());
@@ -194,6 +190,7 @@ export function assertCanPlay(u: Pick<User, "selfExcludedUntil">) {
 }
 
 export async function setDepositLimit(userId: number, amount: number | null) {
+  assertMutationsOpen();
   if (amount !== null && (!Number.isFinite(amount) || amount < 1 || amount > 100000)) {
     throw new UserError("badLimit");
   }
@@ -221,6 +218,7 @@ export async function setDepositLimit(userId: number, amount: number | null) {
 }
 
 export async function selfExclude(userId: number, days: number) {
+  assertMutationsOpen();
   const allowed = [1, 7, 30, 36500];
   if (!allowed.includes(days)) throw new UserError("badLimit");
   const until = new Date(Date.now() + days * 86400000);
@@ -469,10 +467,7 @@ export function normalizeRoundStatus(status: string | null | undefined) {
 
 /** Deterministic, publicly verifiable winner index. */
 export function fairIndex(serverSeed: string, roundId: number, serials: string[]) {
-  const digest = createHmac("sha256", serverSeed)
-    .update(`${roundId}:${serials.join(",")}`)
-    .digest("hex");
-  return parseInt(digest.slice(0, 13), 16) % serials.length;
+  return commitRevealIndex(serverSeed, roundId, serials);
 }
 
 function verifyStoredDraw(
@@ -522,6 +517,7 @@ async function openNewRound(q: Q, tier: TierConfig) {
 }
 
 export async function initializeAdminVault(actor: string) {
+  assertMutationsOpen();
   const initialCapital = config.vaultInitial;
   const adminWallet = config.adminWallet;
   if (!adminWallet) throw new Error("ADMIN_WALLET must be configured before vault initialization");
@@ -630,6 +626,7 @@ export async function findOpenRound(tierSelector?: string | number) {
 }
 
 export async function ensureOpenRound(tierSelector?: string | number) {
+  assertMutationsOpen();
   return db.transaction(async (tx) => {
     const tier = await resolveTierConfig(tx, tierSelector);
     await tx.execute(sql`select pg_advisory_xact_lock(${tierLockKey(tier.id)})`);
@@ -724,6 +721,7 @@ export async function refundRound(roundId: number) {
  * so the candle chart always reflects committed, real balance movements.
  */
 export async function recordVaultSnapshot(q: Q, reason: string, delta: number, roundId?: number | null, at?: Date) {
+  assertMutationsOpen();
   const v = (await q.select().from(vault).limit(1))[0];
   if (!v) return;
   await q.insert(vaultSnapshots).values({
@@ -783,6 +781,7 @@ export async function getSessionUser(): Promise<User | null> {
 }
 
 export async function setSession(userId: number) {
+  assertMutationsOpen();
   const jar = await cookies();
   jar.set(SESSION_COOKIE, makeSessionToken(userId), {
     httpOnly: true,

@@ -20,6 +20,7 @@ import { REFUND_WINDOW_MS, evaluateRefundEligibility, type RefundPoolState } fro
 import { DEFAULT_RUNTIME_FLAGS, evaluateReadinessGate, type GateRow } from "./readinessGate.ts";
 import { CONSOLATION_REWARDS, weeklyJackpotSplit } from "./rewardEngine.ts";
 import { allocateVault, computeReferralCommission } from "./vaultAccounts.ts";
+import { commitRevealIndex } from "./drawFairness.ts";
 
 export { REFUND_WINDOW_MS };
 
@@ -87,7 +88,11 @@ export async function derivePhase2Draw(input: Phase2DrawInput): Promise<Phase2Dr
     seed: input.serverSeed,
     ticketSnapshotHash: snapshotHash,
   });
-  const indices = await drawDistinctWinners(provider, proof, input.tickets.length, input.winnerCount ?? 1);
+  const winnerCount = input.winnerCount ?? 1;
+  const indices =
+    winnerCount === 1
+      ? [commitRevealIndex(input.serverSeed, input.roundId, input.tickets.map((ticket) => ticket.ticketSerial))]
+      : await drawDistinctWinners(provider, proof, input.tickets.length, winnerCount);
   return { indices, proof, proofHash: await hashVrfProof(proof), ticketSnapshotHash: snapshotHash };
 }
 

@@ -21,7 +21,8 @@ function formatCountdown(ms: number, locale: Locale) {
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
   const dayLabels: Record<Locale, string> = { en: "d", es: "d", fa: "روز", ar: "يوم", tr: "g", ru: "д" };
-  return `${formatNumber(days, locale)} ${dayLabels[locale]} ${formatPadded(hours, locale)}:${formatPadded(minutes, locale)}:${formatPadded(seconds, locale)}`;
+  const clock = `${formatPadded(hours, locale)}:${formatPadded(minutes, locale)}:${formatPadded(seconds, locale)}`;
+  return locale === "fa" ? `${formatNumber(days, locale)} ${dayLabels[locale]} و ${clock}` : `${formatNumber(days, locale)} ${dayLabels[locale]} ${clock}`;
 }
 
 export function WeeklyJackpotWidget() {

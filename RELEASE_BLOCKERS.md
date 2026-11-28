@@ -9,8 +9,8 @@ real money. It is the authoritative "what's left" list for production launch on
 ## 1. Owner input required (cannot be filled by code)
 
 These are legal/business facts that only the operator can supply. Until they are
-filled in, the legal pages and footer show generic text and `LICENSE_INFO` renders
-as "not configured".
+filled in, the legal pages show the pre-launch status note and the footer uses
+generic text.
 
 | Item | Env var | Notes |
 |---|---|---|
@@ -136,5 +136,5 @@ references" goal and should be cleaned up before marketing/audit.
 3. Fund the Solana treasury and confirm `/api/vault/onchain` reads the USDC balance.
 4. Set maintenance env vars to `false`, redeploy, and run one **small** deposit →
    ticket → settle → withdraw cycle end-to-end with real money before announcing.
-5. Confirm the legal pages and footer show the real entity, licence and support
-   email from step 1.
+5. Confirm the legal pages and footer show the real entity and support email
+   from step 1.

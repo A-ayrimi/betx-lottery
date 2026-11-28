@@ -158,9 +158,9 @@ export function PoolBand() {
       <div className="relative overflow-hidden bg-[#08120f]">
         <div className="guilloche pointer-events-none absolute inset-0 opacity-70" />
         <div className="grain absolute inset-0" />
-        <GoldDollars3D count={18} seed={21} side="both" className="opacity-90" />
+        <GoldDollars3D count={18} seed={21} side="both" className="z-0 opacity-70" />
 
-        <div className="relative mx-auto max-w-[1240px] px-4 py-14 sm:px-6 lg:py-20">
+        <div className="relative z-10 mx-auto max-w-[1240px] px-4 py-14 sm:px-6 lg:py-20">
           <div className="flex flex-wrap items-end justify-between gap-8">
             <div>
               <p className="micro flex flex-wrap items-center gap-2 text-foil">
@@ -398,9 +398,7 @@ export function PoolBand() {
                     >
                       <span dir={dir} className="font-display tnum">
                         {paused
-                          ? maintenance
-                            ? d.ui.statusMaintenance
-                            : d.ui.statusDemo
+                          ? t(d.pool.boostDisabled, { n: n(c) })
                           : t(d.pool.boostLabel, { n: n(c), amount: formatCurrency(ticketPrice * c, locale) })}
                       </span>
                       {state?.user ? (
@@ -414,7 +412,7 @@ export function PoolBand() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-foil/25 bg-foil/[0.07] p-6">
+            <div className="relative z-20 overflow-hidden rounded-2xl border border-foil/25 bg-[#0c1713] p-6 shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
               <p className="micro text-foil">{d.pool.moneyKicker}</p>
               <ul className="mt-4 space-y-3 text-sm leading-7 text-mint">
                 {[d.pool.money1, d.pool.money2, d.pool.money3].map((line) => (

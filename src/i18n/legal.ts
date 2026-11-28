@@ -1,12 +1,11 @@
 /**
  * Legal documents (English is the binding version).
- * TEMPLATE — have a lawyer adapt these to your licence and jurisdiction.
+ * TEMPLATE — have a lawyer adapt these to the operating jurisdiction before launch.
  */
 export type LegalDoc = { title: string; updated: string; sections: { h: string; p: string[] }[] };
 
 const company = () => process.env.COMPANY_NAME || "BETX";
 const support = () => process.env.SUPPORT_EMAIL?.trim() || "support.betx@gmail.com";
-const licence = () => process.env.LICENSE_INFO || "Licensing information is not configured.";
 
 export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): LegalDoc {
   const c = company();
@@ -16,15 +15,15 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
       title: "Terms of Service",
       updated: "2026-01-01",
       sections: [
-        { h: "1. Operator", p: [`The service is operated by ${c}. Licence: ${licence()}. ${supportContact ? `Contact: ${supportContact}.` : "Support contact is not configured."}`] },
+        { h: "1. Operator", p: [`The service is operated by ${c}. Status: Pre-launch / Preview mode (real-money deposits and withdrawals are currently disabled). Contact: support.betx@gmail.com.`] },
         { h: "2. Eligibility", p: [
-          "You must be at least 18 years old, or the age of legal majority for gambling in your jurisdiction if higher.",
-          "You may not use the service from any jurisdiction where online gambling is prohibited or where we are not licensed, including the restricted territories listed on our website. Using VPNs or other tools to circumvent geographic restrictions is prohibited and may result in account closure and forfeiture of winnings obtained in breach.",
+          "You must be at least 18 years old, or the age of legal majority for prize draws in your jurisdiction if higher.",
+          "You may not use the service from any jurisdiction where online prize draws or the service are prohibited by local law, including the restricted territories listed on our website. Using VPNs or other tools to circumvent geographic restrictions is prohibited and may result in account closure and forfeiture of winnings obtained in breach.",
           "One account per person. Accounts are personal and non-transferable.",
         ] },
         { h: "3. The games", p: [
           "Lucky pool: published tiers define each round's ticket price, capacity and allocation. A completed round receives a provisional result that is settled only after admin review and approval; winner, treasury and BETX platform fee amounts are published for the selected tier and recorded separately. Withdrawals are available only when the published payments switch is enabled and after security checks.",
-          "Daily wheel: one free spin every 24 hours plus one bonus spin after each referred user's first golden-ticket purchase. Guest spins are previews only and cannot win prizes or receive balance.",
+          "Daily wheel: one free spin every 24 hours plus one bonus spin after each referred user's first qualifying ticket purchase. Guest spins are previews only and cannot win prizes or receive balance.",
           "Draws use commit-reveal HMAC-SHA256: a SHA-256 commitment of the server seed is published before each round and the seed is revealed after the draw so the winner can be independently recomputed. No client or external randomness source is used.",
         ] },
         { h: "4. Deposits and withdrawals", p: [
@@ -42,7 +41,7 @@ export function legalDoc(kind: "terms" | "privacy" | "responsible-gaming"): Lega
           "The service is provided “as is”. To the extent permitted by law, we are not liable for losses arising from network outages, blockchain delays, third-party processors or your failure to comply with local law.",
         ] },
         { h: "8. Changes and governing law", p: [
-          "We may update these terms; continued use after notice constitutes acceptance. These terms are governed by the law of the operator's licensing jurisdiction. Translations are provided for convenience; the English version prevails.",
+          "We may update these terms; continued use after notice constitutes acceptance. These terms are governed by applicable laws as specified by the operator, and in the event of any conflict between translations, the English version prevails.",
         ] },
       ],
     };

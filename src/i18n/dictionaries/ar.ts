@@ -109,6 +109,7 @@ export const ar: Dict = {
     topUp: "اشحن المحفظة ←",
     tickets: "{n} تذاكر ذهبية",
     boostLabel: "{n} تذاكر · {amount}",
+    boostDisabled: "{n} تذاكر (معطلة)",
     moneyKicker: "HOW THE MONEY WORKS",
     money1: "{capacity} تذكرة × {price} = {pool} لكل جولة",
     money2: "{winner} للجائزة، و{treasury} للخزينة، و{admin} إيراد منصة BETX",
@@ -512,6 +513,7 @@ export const ar: Dict = {
     restrictedTitle: "BETX غير متاح في منطقتك",
     restrictedBody: "بسبب اللوائح المحلية لا يمكننا تقديم ألعاب بأموال حقيقية في بلدك ({country}). إذا كان لديك رصيد، تواصل مع الدعم لسحبه.",
     legalNotice: "هذا المستند مقدّم باللغة الإنجليزية. في حال اختلاف الترجمات تسود النسخة الإنجليزية.",
+    legalStatus: "الحالة: ما قبل الإطلاق / وضع المعاينة (الإيداع والسحب بالمال الحقيقي معطلان حالياً). التواصل: support.betx@gmail.com.",
     back: "→ العودة إلى BETX",
   },
   errors: {

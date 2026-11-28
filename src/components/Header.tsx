@@ -23,6 +23,7 @@ export function Header() {
     closeWalletConnect,
     demoEnabled,
     isDemoSession,
+    isPreview,
   } = useApp();
   const { address: connectedAddress, disconnect } = useWallet();
   const { d, href, dir } = useI18n();
@@ -152,7 +153,7 @@ export function Header() {
             <div className="hidden items-center gap-2 rounded-full border border-rule px-3 py-2 lg:flex">
               <span className={`h-2 w-2 rounded-full ${vaultStatusOnline ? "live-dot bg-neon-2" : "bg-foil"}`} />
               <span className="micro text-mint">{d.footer.vault}</span>
-              <BalanceBadge kind={demoEnabled || isDemoSession ? "demo" : "ledger"} />
+              <BalanceBadge kind={demoEnabled || isDemoSession || isPreview ? "demo" : "ledger"} />
               <span dir="ltr" className="font-display tnum text-sm font-bold text-neon-2">
                 {state ? <AnimatedMoney value={state.vault.balance} /> : d.ui.noData}
               </span>
@@ -171,7 +172,7 @@ export function Header() {
                       <AnimatedMoney value={user.balance} />
                     </span>
                     <span className="hidden sm:inline">
-                      <BalanceBadge kind={isDemoSession ? "demo" : "ledger"} />
+                      <BalanceBadge kind={demoEnabled || isDemoSession || isPreview ? "demo" : "ledger"} />
                     </span>
                   </>
                 ) : null}

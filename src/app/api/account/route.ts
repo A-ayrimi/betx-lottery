@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getSessionUser, selfExclude, setDepositLimit, UserError } from "@/lib/store";
-import { handleError, unauthorized } from "@/lib/api";
+import { handleError, maintenanceBlocked, unauthorized } from "@/lib/api";
 import { isLocale } from "@/i18n/config";
 import { countryFrom } from "@/lib/geo";
 
@@ -19,6 +19,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   try {
+    const blocked = maintenanceBlocked();
+    if (blocked) return blocked;
     const me = await getSessionUser();
     if (!me) return unauthorized();
     await rateLimit("account", me.id, 20);

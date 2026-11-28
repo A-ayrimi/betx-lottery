@@ -1,0 +1,463 @@
+BETX LOTTERY - VERIFICATION RESULTS
+
+Generated: 2026-11-28
+Repository: F:\betx-lottery-main
+Scope: targeted remediation pass plus full automated re-verification
+
+Legend:
+[VERIFIED]  Result taken from actual command/test output in this pass.
+[CODE]      Source-level review only; not a runtime execution result.
+[SIMULATED] Demo/preview path reviewed at code level; no live financial action executed.
+[SKIPPED]   Test exists but did not run because its harness is unavailable.
+[ISSUE]     Gap, warning, or risk found during this pass.
+[FIXED]     Finding from the previous report addressed in this pass.
+
+Summary
+-------
+
+- Overall: PASS with non-fatal warnings. No failing tests, no lint errors, no type errors, and no final build failure.
+- Automated commands: npm run lint, npm run typecheck, npm test, and npm run build all exited 0 in the final verification run.
+- Tests: 13 files, 112 tests total, 110 passed, 2 skipped, 0 failed, 0 cancelled, 0 todo.
+- New tests exercise the internal reservation guard, compare Phase 2 single-winner evidence with the store commit-reveal draw, and audit every real mutating API route for maintenance enforcement.
+- No real payments were enabled. publicConfig().paymentsEnabled remains hardcoded false at src/lib/config.ts:143 and is still locked by tests.
+- No real Solana broadcast, payment, or withdrawal was executed. Demo/preview behavior was reviewed at code level only.
+- Final .env.local: BETX_MODE=live, MAINTENANCE_MODE=true, NEXT_PUBLIC_MAINTENANCE_MODE=true, GEO_BLOCK=off. These values were set in this pass; payments remain disabled in code.
+- Build initially failed when BETX_MODE=demo was tried with the configured remote DATABASE_URL; src/lib/dbSafety.ts correctly rejects demo mode with a remote database. BETX_MODE was restored to live for build compatibility while maintenance stayed ON.
+- .env.example now documents that demo requires a local database, local builds must keep maintenance ON, live mode is not approved, payments must never be enabled, and the file is a local template rather than a production rollout manifest.
+- No git commits or pushes were made. The working tree contains this remediation plus pre-existing modifications from earlier work; npm run build regenerated public/sw.js.
+
+Remediation Applied
+-------------------
+
+[FIXED] Reservation guard: reserveDeposit() now calls the shared assertMutationsOpen() before opening a transaction and throws MaintenanceError. See src/lib/depositReservations.ts:51. A runtime test verifies rejection without touching a database.
+
+[FIXED] On-chain fallback: the dev preview fallback at src/app/api/vault/onchain/route.ts:24-28 now returns ok:false, ready:false, and status:"unavailable" instead of ok:true with null balances. The existing consumer already branches on r.ok && j.ok.
+
+[FIXED] Preview badges: Wallet and Header now treat isPreview as a simulated/demo balance source rather than live internal ledger. See src/components/Wallet.tsx:14,83 and src/components/Header.tsx:26,156,175.
+
+[FIXED] Verification copy: the hardcoded "PROVABLY FAIR · COMMIT-REVEAL" line was replaced with localized d.ui.fairHashTitle at src/components/VerifyExplorer.tsx:41.
+
+[FIXED] Verification error state: malformed/empty proof data and lookup failures now render an explicit role="alert" error instead of silently falling back to pending. See src/app/[locale]/verify/[round]/page.tsx:15,52,73,100.
+
+[FIXED] Draw path consistency: a shared commitRevealIndex() helper at src/lib/drawFairness.ts:3 is used by both store.fairIndex() and Phase 2 single-winner evidence. A new test asserts equal winner indices for matching inputs.
+
+[FIXED] Local env safety: maintenance is now ON in .env.local and a safe template note was added to .env.example. BETX_MODE remains live only because the configured database is remote and demo mode is intentionally blocked for remote databases.
+
+Automated Checks & Tests
+------------------------
+
+Command results
+---------------
+
+[VERIFIED] npm run lint
+- Exit code: 0
+- Result: no lint diagnostics.
+
+[VERIFIED] npm run typecheck
+- Exit code: 0
+- Result: no TypeScript errors.
+
+[VERIFIED] npm test
+- Exit code: 0
+- Result: 111 tests, 109 pass, 0 fail, 2 skipped, 0 cancelled, 0 todo.
+- Duration: approximately 5809 ms.
+- Full output captured at C:\Users\ayrimi\AppData\Local\Temp\opencode\test.out
+
+[VERIFIED] npm run build
+- Exit code: 0
+- Next.js 16.4.6 (Turbopack), environment loaded from .env.local.
+- next.config.ts loaded in 92ms.
+- Production compile succeeded in 6.7s.
+- TypeScript check succeeded in 10.9s.
+- Static generation completed 8/8 pages in 1213ms.
+- Service worker written for build: nQN1d7DTs3wyUyM_-UNop
+- Full output captured at C:\Users\ayrimi\AppData\Local\Temp\opencode\build.out
+
+Warnings observed
+-----------------
+
+[VERIFIED] npm test emitted MODULE_TYPELESS_PACKAGE_JSON warnings for Node loading TS files without an explicit package module type:
+- src/lib/dbSafety.ts
+- src/lib/adminRbac.ts
+- src/i18n/dictionaries/en.ts
+- src/lib/rateLimitFailOpen.ts
+- src/lib/postgresConfig.ts
+- src/i18n/dictionaries/ar.ts
+- src/lib/tierAccounting.ts
+- src/lib/tierMath.ts
+- Warning text asks to add "type": "module" to F:\betx-lottery-main\package.json.
+- These are warnings only; tests still passed.
+
+[VERIFIED] bigint warning appeared during npm test and npm run build:
+- "bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)"
+- In the captured build output one instance was surfaced by PowerShell as a NonTerminatingError/RemoteException because native stderr was redirected; build still exited 0.
+
+Skipped tests
+-------------
+
+[SKIPPED] postgres-regressions.test.mjs
+- "PostgreSQL constraints, migration preflight, and concurrent deposit reservations"
+- Reason: Set BETX_TEST_DATABASE_URL to an isolated localhost betx_*test database.
+
+[SKIPPED] postgres-tls-regressions.test.mjs
+- "verified PostgreSQL TLS accepts a trusted certificate and rejects an untrusted one"
+- Reason: Requires the isolated local PostgreSQL TLS test harness.
+
+Full test case list from npm test
+---------------------------------
+
+All entries below are [VERIFIED] from actual test output unless marked [SKIPPED].
+
+legacy-payment-safety.test.mjs (3)
+- PASS legacy payment endpoints are 410 stubs with no financial path
+- PASS no runtime source imports NOWPayments modules
+- PASS legacy invoice UI paths are removed and real payments stay fail-closed
+
+multi-tier-schema.test.mjs (2)
+- PASS multi-tier migration is additive and idempotent
+- PASS baseline schema and Drizzle definitions expose the multi-tier foundation
+
+phase1-safety.test.mjs (8)
+- PASS unknown application mode fails closed
+- PASS demo and test modes reject remote database targets
+- PASS ticket capacity permits the fiftieth ticket and rejects ticket fifty-one
+- PASS settlement allocation is exactly $50 = $37.50 + $7.50 + $5 and balances
+- PASS production app url fails closed instead of using localhost
+- PASS mutation libraries block writes during maintenance
+- PASS unprotected signup and admin routes reject maintenance requests
+- PASS cron reports maintenance as a service-unavailable response
+
+phase1b-schema-parity.test.mjs (7)
+- PASS Phase 1B tables and columns are mirrored in Drizzle and SQL
+- PASS M1-M9 migrations are forward-only and idempotent
+- PASS final Phase 1A parameters are encoded in schema and migrations
+- PASS GET /api/state is pure read and public traffic cannot trigger automation
+- PASS maintenance, payments and withdrawals remain hard-disabled by guards
+- PASS single-winner migration collapses legacy splits in schema and SQL
+- PASS every mutating route rejects maintenance with an explicit status
+
+phase2-controls.test.mjs (14)
+- PASS Phase 2 row 10: admin RBAC and audit chain are fail-closed
+- PASS Phase 2 row 11: VRF proof is verified and winners are distinct
+- PASS Phase 2 VRF adapter: replay is deterministic and tampering is rejected
+- PASS Phase 2 single-winner evidence matches the store commit-reveal draw
+- PASS Phase 2 KYC adapter: thresholds are enforced and live stays fail-closed
+- PASS Phase 2 row 12: vault, referral and reward splits match approved parameters
+- PASS Phase 2 row 13: refund and rollover follow the 72h same-tier rule
+- PASS Phase 2 row 14: compliance guard is server-side and fail-closed
+- PASS Phase 2 row 15: integrity proof and readiness gate are fail-closed
+- PASS Phase 2 integration policy wires RBAC, compliance, draw and settlement controls
+- PASS Phase 2 row 17: independent static security audit passes with residual risks logged
+- PASS Phase 2 row 18: pre-Phase-2 snapshot is restorable and rollback plan is documented
+- PASS non-live preview supplies complete tier, pool and candle data
+- PASS non-live preview UI keeps purchases and spins local
+
+phase6-admin.test.mjs (13)
+- PASS admin RBAC separates full admins from read-only viewers
+- PASS tier management routes enforce role requirements
+- PASS tier mutations validate input and write audit records
+- PASS admin UI exposes tier management, tier reports, and audit log
+- PASS tier reports group performance by tier
+- PASS every admin route authorizes before reading input or causing side effects
+- PASS admin and viewer role permissions match the documented policy
+- PASS missing, invalid, and undersized admin tokens fail closed
+- PASS client-side admin UI is never treated as an authorization boundary
+- PASS automation evaluate mode is distinct from automation execution
+- PASS admin automation execution is guarded in maintenance mode
+- PASS public /api/state is a pure read and does not trigger automation heartbeat
+- PASS admin audit actor is bound to the verified operator session
+
+phase7-ui.test.mjs (26)
+- PASS all locales expose the tier copy
+- PASS public buy flow carries the selected tier
+- PASS tier-specific round state endpoint is public and sanitized
+- PASS hero and pool show active-tier economics instead of global config
+- PASS all locales expose the shared homepage UI copy
+- PASS localized wheel copy matches the wheel sectors
+- PASS wheel cards render every configured prize value
+- PASS single-winner split copy keeps approval without duplicating a 20-ticket footnote
+- PASS Persian copy uses BETX wording and localized dollar amounts
+- PASS wheel-copy guard rejects stale Turkish prize variants
+- PASS settlement copy no longer claims automated BETX verification
+- PASS legal copy states pre-launch status without unconfigured licence text
+- PASS draw proof copy describes commit-reveal HMAC without external randomness claims
+- PASS live status and wallet copy distinguish ledger mode from enabled payments
+- PASS og image is generated instead of referencing a missing asset
+- PASS homepage status banners and labels use localized copy
+- PASS all locales expose the phase 2 tier, transparency, jackpot, referral and wheel copy
+- PASS seven tier winner tables match the published policy matrix
+- PASS phase 2 UI is wired to shared tier selection without financial side effects
+- PASS tier progress endpoint is public, sanitized and rate-limited
+- PASS pool page polish uses localized labels and ignores extension-only errors
+- PASS public copy uses single-winner economics without legacy tier-one examples
+- PASS draw duration is localized instead of showing raw minutes
+- PASS maintenance preview shows a disabled empty pool with accessible controls
+- PASS homepage hierarchy follows the pool narrative before secondary modules
+- PASS form controls expose busy and pressed state
+
+postgres-regressions.test.mjs (5)
+- PASS transient TLS and network errors are recognized as rate-limit infrastructure failures
+- PASS rate limiting only fails open for transient development errors
+- PASS rate limiter uses development-only fail-open guard
+- PASS public read routes use the development preview fallback for transient DB failures
+- SKIPPED PostgreSQL constraints, migration preflight, and concurrent deposit reservations
+
+postgres-tls-regressions.test.mjs (5)
+- PASS remote pooled PostgreSQL TLS skips certificate verification in development by default
+- PASS local PostgreSQL connections stay non-TLS by default
+- PASS verified TLS remains available for CA configs, production, and explicit opt-in
+- PASS db pool cache is invalidated when PostgreSQL TLS config changes
+- SKIPPED verified PostgreSQL TLS accepts a trusted certificate and rejects an untrusted one
+
+regression-safety.test.mjs (13)
+- PASS remote PostgreSQL connections always use certificate verification
+- PASS local PostgreSQL connections require verified TLS when explicitly enabled
+- PASS DEMO mode blocks the Solana broadcast before the sender can run
+- PASS LIVE broadcast stays disabled without explicit server authorization
+- PASS Solana broadcast rejects unsigned payloads before any RPC call
+- PASS automatic payouts remain hard-disabled and expose no key
+- PASS payments, automatic sweep, and maintenance defaults remain fail-closed
+- PASS server maintenance mode overrides the public client fallback
+- PASS reserveDeposit rejects internally while maintenance mode is on
+- PASS deposit reservation keys are UUIDs and duplicate reservations have an explicit error
+- PASS Solana transaction signatures are base58, not hexadecimal
+- PASS every financial broadcast path uses the emergency kill-switch wrapper
+- PASS maintenance mode blocks payout, fee, deposit-status, and cron side effects
+
+ticket-serial.test.mjs (10)
+- PASS ticket serials are structured, unambiguous, and deterministic
+- PASS ticket collision detection is limited to serial unique violations
+- PASS purchase code retries serial collisions and persists ticket metadata
+- PASS database schema stores unique serials and verification metadata
+- PASS ticket lookup validates serials before hitting the database
+- PASS ticket cards expose copy, inspect, QR, and purchase receipt
+- PASS number formatting localizes digits, separators, and percentages
+- PASS payout copy is tokenized against the selected tier
+- PASS all locales expose tokenized ticket, verification, and payout copy
+- PASS verification page is localized and uses persisted serials
+
+tier-accounting.test.mjs (2)
+- PASS tier obligations reconcile against the configured pool
+- PASS treasury coverage treats user balances, unmatched funds, and tier obligations as liabilities
+
+tier-engine.test.mjs (3)
+- PASS tier allocation derives all four financial buckets
+- PASS tier allocation rejects invalid configuration
+- PASS lottery engine uses tier-aware locks, pricing, and settlement records
+
+Feature & Guard Verification
+----------------------------
+
+1. Maintenance mode and payments-disabled enforcement
+------------------------------------------------------
+
+[CODE] Mode validation fails closed for unknown mode: src/lib/config.ts:9-13 (only demo/live accepted).
+[CODE] Maintenance default is ON: src/lib/gameConfig.ts:42-55 returns true unless raw value is exactly the string "false".
+[CODE] Server env is authoritative; public fallback cannot override: src/lib/config.ts:105-108.
+[CODE] publicConfig().paymentsEnabled is hardcoded false: src/lib/config.ts:141-143. Demo sessions also expose false: src/lib/demoSession.ts:248 and :325.
+[CODE] Maintenance errors map to HTTP 503: src/lib/api.ts:23-28 (MaintenanceError) and :40-45 (maintenanceBlocked).
+[CODE] State mutation libraries block writes during maintenance: src/lib/store.ts:43-45, used at :664, :800, :850, :1075, :1096, :1120, :1207, :1513, :1655, :1748, :1797. Tier admin has its own guard at src/lib/tierAdmin.ts:48-49, used at :145, :169, :220.
+[FIXED] Deposit reservations now have defense-in-depth: src/lib/depositReservations.ts:52 throws MaintenanceError before any database work. Caller guards remain in place.
+[CODE] Ticket buy route applies login, maintenance, rate-limit, region, and compliance guards before purchase: src/app/api/tickets/buy/route.ts:12-38.
+[CODE] Wheel spin route and store guard purchases/spins: src/app/api/wheel/spin/route.ts:32-47 and src/lib/store.ts:1797.
+[CODE] Financial routes checked at source level and verified by tests:
+- Deposit: src/app/api/wallet/deposit/route.ts:59-68 and :209-218; store guard at src/lib/store.ts:1655.
+- Claim: src/app/api/wallet/claim/route.ts:26-35.
+- Withdraw: src/app/api/payments/withdraw/route.ts:11-20; store guards at src/lib/store.ts:1748 and :1797.
+- Admin payout: src/app/api/admin/withdrawals/pay/route.ts:30-40.
+- Fee settings: src/app/api/admin/fees/route.ts:48-59.
+- Refund: src/lib/store.ts:663-664; rollover helper at src/lib/refundRollover.ts:23-34 and :54-81.
+- Settlement/draw: src/lib/store.ts:1074-1075, :1095-1096, :1119-1142, :1206-1207; admin routes use maintenanceBlocked; cron at src/app/api/cron/route.ts:20-30; automation at src/lib/automation.ts:480-482.
+[SIMULATED] Demo/preview flows reviewed at code level: src/lib/demoSession.ts:239-270 and :314-326; AppProvider local branches; preview UI tests verified at runtime only as source assertions. No real payment or broadcast occurred.
+
+[VERIFIED] Guard coverage confirmed by these passing tests:
+- payments, automatic sweep, and maintenance defaults remain fail-closed
+- server maintenance mode overrides the public client fallback
+- reserveDeposit rejects internally while maintenance mode is on
+- maintenance mode blocks payout, fee, deposit-status, and cron side effects
+- mutation libraries block writes during maintenance
+- unprotected signup and admin routes reject maintenance requests
+- cron reports maintenance as a service-unavailable response
+- every mutating route rejects maintenance with an explicit status
+- maintenance, payments and withdrawals remain hard-disabled by guards
+- admin automation execution is guarded in maintenance mode
+- LIVE broadcast stays disabled without explicit server authorization
+- every financial broadcast path uses the emergency kill-switch wrapper
+- automatic payouts remain hard-disabled and expose no key
+
+[ISSUE] No global maintenance middleware was added; each mutating route/store path still carries its own guard. Coverage is tested, but new routes remain dependent on author discipline.
+
+2. Ticket selection and purchase flow
+-------------------------------------
+
+[CODE] Client sends selected tier via { count, tierCode }: src/components/AppProvider.tsx:366.
+[CODE] Selection UI and capacity mirroring: src/components/TierCards.tsx:21-49 and src/components/PoolBand.tsx:26-33, :94-107.
+[CODE] Server purchase path: src/app/api/tickets/buy/route.ts:12-38; store writes at src/lib/store.ts:1512-1517, :1543-1554, :1565-1608, :1632-1638.
+[CODE] Capacity clamp to remaining seats: src/lib/roundAccounting.ts:8-11 and src/lib/store.ts:1543-1554.
+[CODE] Balance deduction, vault update, and ticket_buy ledger entry: src/lib/store.ts:1584-1608.
+[CODE] Full round opens next/rollover path: src/lib/store.ts:1585-1595 and src/lib/automation.ts:317.
+[SIMULATED] Preview purchases/spins are local-only stubs; verified at source level, not executed as real purchases.
+
+[VERIFIED] Passing tests covering this flow:
+- public buy flow carries the selected tier
+- tier-specific round state endpoint is public and sanitized
+- hero and pool show active-tier economics instead of global config
+- ticket capacity permits the fiftieth ticket and rejects ticket fifty-one
+- phase 2 UI is wired to shared tier selection without financial side effects
+- ticket cards expose copy, inspect, QR, and purchase receipt
+- non-live preview UI keeps purchases and spins local
+- maintenance preview shows a disabled empty pool with accessible controls
+
+3. Unique ticket serials
+------------------------
+
+[CODE] Serial format and generation: src/lib/ticketSerial.ts:3-40 and :43-64.
+[CODE] Collision retry is limited to serial unique violations: src/lib/store.ts:1512-1517 and :1640-1645.
+[CODE] Schema enforces uniqueness and stores verification metadata: verified by ticket-serial.test.mjs.
+[VERIFIED] All 10 ticket-serial tests passed, including deterministic format, unique-violation detection, retry, schema uniqueness, lookup validation, receipt copy, localization, and verification page persistence.
+[SIMULATED] Demo serials are deterministic local values; no live DB allocation was executed.
+
+4. Pool capacity and seat states
+--------------------------------
+
+[CODE] Active tier drives displayed economics and capacity: src/components/PoolBand.tsx and src/app/api/tiers/progress route.
+[CODE] Server clamps count to remaining seats: src/lib/roundAccounting.ts:8-11 and src/lib/store.ts:1543-1554.
+[CODE] Full round advances/rolls over: src/lib/store.ts:1585-1595.
+[CODE] Preview stubs expose complete tier, pool, and candle data: src/lib/previewFallback.ts:11-86; tested in phase2-controls.test.mjs.
+[VERIFIED] Passing tests:
+- ticket capacity permits the fiftieth ticket and rejects ticket fifty-one
+- maintenance preview shows a disabled empty pool with accessible controls
+- tier progress endpoint is public, sanitized and rate-limited
+- non-live preview supplies complete tier, pool and candle data
+
+5. Commit-reveal HMAC draw and verification
+-------------------------------------------
+
+[FIXED] Store and Phase 2 single-winner evidence now share one deterministic index function: src/lib/drawFairness.ts:3 (commitRevealIndex). src/lib/store.ts:473 delegates to it; src/lib/phase2Policy.ts:93-95 uses it when winnerCount is 1. Multi-winner evidence still uses drawDistinctWinners.
+[CODE] Secret commit, reveal, and HMAC paths reviewed in src/lib/store.ts:243-247, :471-476, :489-519, :933-943, :974, :1001-1029, :1119-1142, :1206-1253.
+[CODE] Verification page recomputes proof from persisted data: src/app/[locale]/verify/[round]/page.tsx:24-58 and :85-89.
+[CODE] Phase 2 runtime evidence remains explicit and evidence-only: src/lib/phase2Runtime.ts:139-147.
+[CODE] Integrity proof and readiness gate are fail-closed: src/lib/integrityProof.ts:52, :63 and src/lib/readinessGate.ts:9, :24, :66.
+[FIXED] VerifyExplorer no longer hardcodes "PROVABLY FAIR · COMMIT-REVEAL"; it uses localized d.ui.fairHashTitle at src/components/VerifyExplorer.tsx:41.
+[FIXED] Verification failures now use an explicit error view: src/app/[locale]/verify/[round]/page.tsx:15, :52, :73, :100. Empty gold-ticket pools and thrown lookup errors no longer silently appear as pending.
+[VERIFIED] Passing tests:
+- Phase 2 single-winner evidence matches the store commit-reveal draw
+- VRF proof is verified and winners are distinct
+- VRF adapter: replay is deterministic and tampering is rejected
+- integrity proof and readiness gate are fail-closed
+- draw proof copy describes commit-reveal HMAC without external randomness claims
+- verification page is localized and uses persisted serials
+- settlement copy no longer claims automated BETX verification
+- refund and rollover follow the 72h same-tier rule
+
+[ISSUE] No live draw or on-chain reveal was executed in this pass; draw correctness is verified by local recomputation and source review only.
+
+6. Ledger vs on-chain balance separation
+----------------------------------------
+
+[CODE] Balance source labels: src/lib/balanceStatus.ts:1-18; src/components/BalanceBadge.tsx:24-48.
+[CODE] Public state is read-only and does not trigger automation: src/app/api/state/route.ts:8-32.
+[FIXED] On-chain fallback is no longer a false success: src/app/api/vault/onchain/route.ts:24-28 returns ok:false, ready:false, status:"unavailable", and null balances with no-store caching. The client at src/components/OnchainTreasury.tsx:37 checks r.ok && j.ok and shows its failed state.
+[CODE] On-chain helper and explorer URL: src/lib/onchain.ts:11-33 and :42-82.
+[FIXED] Preview/demo balances are labeled as simulated/demo instead of ledger in Wallet and Header. See src/components/Wallet.tsx:14,83 and src/components/Header.tsx:26,156,175.
+[CODE] Admin treasury audit separates ledger and on-chain views: src/app/admin/page.tsx:147-155 and :281-344.
+[CODE] Treasury coverage treats user balances, unmatched funds, and tier obligations as liabilities: src/lib/treasuryAccounting.ts:240-284.
+[CODE] Automation health uses on-chain status but does not mutate balances: src/lib/automation.ts:372-422.
+[CODE] Readiness treats live mode and PHASE1_LIVE_BLOCKER as not ready: src/lib/readiness.ts:21-22.
+[SIMULATED] Demo sessions maintain local balances/actions only: src/lib/demoSession.ts:7-10, :201-312, :379-449, :462-544, :604-656.
+[VERIFIED] Passing tests:
+- treasury coverage treats user balances, unmatched funds, and tier obligations as liabilities
+- GET /api/state is pure read and public traffic cannot trigger automation
+- live status and wallet copy distinguish ledger mode from enabled payments
+- public read routes use the development preview fallback for transient DB failures
+- db pool cache is invalidated when PostgreSQL TLS config changes
+- non-live preview UI keeps purchases and spins local
+
+[ISSUE] Two on-chain health paths still exist with different fallbacks: src/lib/readiness.ts:30-36 and src/lib/automation.ts:395-401.
+
+7. Local environment safety
+---------------------------
+
+[CODE] .env.local now has MAINTENANCE_MODE=true and NEXT_PUBLIC_MAINTENANCE_MODE=true. Server maintenance is authoritative and payments remain hardcoded false.
+[CODE] BETX_MODE remains live in .env.local because src/lib/dbSafety.ts rejects demo mode when DATABASE_URL is remote. This is intentional fail-closed behavior, not production approval.
+[CODE] .env.example now documents: demo requires a local database, local builds must keep maintenance ON, live mode is not approved, and payments must never be enabled.
+[VERIFIED] A trial build with BETX_MODE=demo and the existing remote DATABASE_URL failed at page-data collection with "Demo mode requires a local database; refusing a remote database URL". Reverting BETX_MODE to live while keeping maintenance ON produced a successful final build.
+
+Issues Found
+------------
+
+1. No final command failures. Lint, typecheck, tests, and build all exited 0 in the final verification run.
+2. [VERIFIED] Two skipped integration tests remain:
+- PostgreSQL constraints/migration preflight/concurrent deposit reservations need BETX_TEST_DATABASE_URL.
+- Verified PostgreSQL TLS needs the isolated local TLS harness.
+3. [VERIFIED] MODULE_TYPELESS_PACKAGE_JSON warnings remain for eight TS modules imported by Node tests. Non-fatal, but noisy.
+4. [VERIFIED] bigint native bindings warning remains in tests and build; pure-JS fallback is used. Non-fatal.
+5. [VERIFIED] A demo-mode build attempt failed against the remote database; this was expected fail-closed behavior and was resolved by keeping BETX_MODE=live with maintenance ON.
+6. [ISSUE] Most tests are static source assertions. There was no end-to-end HTTP+database run against a real isolated Postgres in this pass.
+7. [FIXED] Maintenance checks are centralized in src/lib/mutationGuard.ts and reused by store, tierAdmin, and depositReservations. A full mutating-route audit test now exists; a global HTTP middleware fallback is still optional.
+8. [ISSUE] Two on-chain health paths still exist with different fallbacks.
+9. [ISSUE] GEO_BLOCK=off remains in .env.local. This is a local dev setting, but it would be a deployment risk if reused unchanged.
+10. [ISSUE] PHASE1_LIVE_BLOCKER is hardcoded false (src/lib/readiness.ts:22), so live readiness cannot pass by design; this is intentional but must block production rollout.
+11. [ISSUE] .env.local still has BETX_MODE=live. Maintenance ON, hardcoded paymentsEnabled=false, and the broadcast kill-switch keep it non-production-ready, but the value must not be treated as approval.
+12. [ISSUE] Working tree contained pre-existing modifications and now also contains this remediation; public/sw.js was regenerated by the final build. No commits were made.
+
+Next Steps
+----------
+
+1. Provide an isolated localhost betx_*test database and the local PostgreSQL TLS harness, set BETX_TEST_DATABASE_URL, then rerun npm test to execute the two skipped tests.
+2. Add "type": "module" to package.json or rename Node-loaded config files to .mjs/.cjs, then re-run lint, typecheck, test, and build to confirm MODULE_TYPELESS warnings are gone.
+3. Add runtime integration tests that call the purchase, wheel, deposit, withdraw, refund, settlement, verification, and on-chain routes against the isolated database, not only static source assertions.
+4. Consider an HTTP middleware fallback in addition to the shared helper so future routes fail closed before handler bodies.
+5. Unify the two on-chain health paths or make their fallback semantics explicit in one shared helper.
+6. Set GEO_BLOCK=on for any non-local environment and keep both maintenance flags ON until explicit approval.
+7. Before any live deployment, clear the readiness blockers first. Do not enable payments or broadcast without explicit authorization.
+8. Re-run the full suite after any further fixes. Do not commit or push unless explicitly requested.
+
+Phase 2 Follow-up Remediation
+-----------------------------
+
+[VERIFIED] Final command results in this follow-up pass:
+- npm run lint: exit 0, no ESLint output.
+- npm run typecheck: exit 0, no TypeScript errors.
+- npm test: exit 0, 112 tests total, 110 passed, 0 failed, 0 cancelled, 2 skipped, 0 todo.
+- npm run build: exit 0. Final service worker hash in the last run: ZCdj86mlxlpaayVY8uzKe.
+- The first test run failed only because the new guard file used extensionless ESM imports; changing them to ./errors.ts and ./gameConfig.ts fixed it. Later runs passed.
+- No git commits or pushes were made.
+
+[FIXED] Centralized maintenance enforcement: src/lib/mutationGuard.ts now exports the only assertMutationsOpen() implementation. src/lib/store.ts, src/lib/tierAdmin.ts, and src/lib/depositReservations.ts import it instead of defining or inlining their own checks.
+
+[FIXED] Store entry-point coverage: assertMutationsOpen() was added to setDepositLimit, selfExclude, initializeAdminVault, ensureOpenRound, recordVaultSnapshot, and setSession in addition to the existing purchase/refund/settlement/withdrawal paths.
+
+[FIXED] HTTP route coverage: maintenanceBlocked() was added to POST /api/account, POST /api/wallet/nonce, POST /api/auth/logout, GET /api/auth/telegram-link, and GET /api/telegram/setup. The two payment-provider routes remain inert 410 stubs and are documented as such.
+
+[VERIFIED] Source-level audit: tests/phase1-safety.test.mjs now checks every real mutating API route and accepts only explicit maintenance enforcement, shared-library enforcement, or an inert 410 stub.
+
+[FIXED] Environment separation: .env.example explicitly states it is a local template rather than a production rollout manifest. .env.local was not changed in this pass; it remains BETX_MODE=live with both maintenance flags true, GEO_BLOCK=off, and payments disabled in code.
+
+[FIXED] Database integration harness: tests/postgres-regressions.test.mjs now sets MAINTENANCE_MODE=false only inside the skipped integration test and restores the prior value in finally, so reserveDeposit() can be exercised without weakening .env.local.
+
+[CODE] Exact PostgreSQL integration setup to unskip the first skipped test:
+1. Start an isolated localhost PostgreSQL instance and create a database whose name matches /^betx_[a-z0-9_]*test$/i, for example betx_phase3_test.
+2. Example PowerShell commands:
+   docker run --name betx-phase3-test -e POSTGRES_PASSWORD=test -p 54329:5432 -d postgres:16
+   docker exec betx-phase3-test createdb -U postgres betx_phase3_test
+   $env:BETX_TEST_DATABASE_URL="postgresql://postgres:test@127.0.0.1:54329/betx_phase3_test"
+   npm test
+3. The URL host must be localhost, 127.0.0.1, or ::1. A remote database is rejected by safeDatabaseTarget at tests/postgres-regressions.test.mjs:8-16.
+4. The test creates and drops its own temporary schema. No live database or application balance is used.
+
+[CODE] Exact PostgreSQL TLS setup to unskip the second skipped test:
+1. Start a separate localhost PostgreSQL instance with server TLS enabled and a server certificate whose SAN/CN matches 127.0.0.1.
+2. Create a database named exactly betx_phase3_test because the test asserts current_database() at tests/postgres-tls-regressions.test.mjs:70.
+3. Example PowerShell commands:
+   docker run --name betx-phase3-tls -e POSTGRES_PASSWORD=test -p 54330:5432 -v C:\betx-test-certs:/certs -d postgres:16 -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key -c ssl_ca_file=/certs/ca.crt
+   docker exec betx-phase3-tls createdb -U postgres betx_phase3_test
+   $env:BETX_TEST_TLS_DATABASE_URL="postgresql://postgres:test@127.0.0.1:54330/betx_phase3_test"
+   $env:BETX_TEST_TLS_CA="C:\betx-test-certs\ca.crt"
+   $env:BETX_TEST_TLS_WRONG_CA="C:\betx-test-certs\other-ca.crt"
+   npm test
+4. BETX_TEST_TLS_CA must be the CA that signed the server certificate. BETX_TEST_TLS_WRONG_CA must be a different valid CA so the negative TLS assertion fails verification as expected.
+5. These variables are read at tests/postgres-tls-regressions.test.mjs:6-8; the suite remains skipped until all three are provided.
+
+[SKIPPED] Both PostgreSQL integration tests were still skipped in this pass because the harnesses above were not started locally. All non-harness tests passed.
+

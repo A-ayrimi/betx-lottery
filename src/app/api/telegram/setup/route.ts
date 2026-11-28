@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { tg } from "@/lib/telegram";
 import { isAdmin } from "@/lib/admin";
+import { maintenanceBlocked } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
  * Registers the webhook, the command list and the Mini App menu button.
  */
 export async function GET(req: NextRequest) {
+  const blocked = maintenanceBlocked();
+  if (blocked) return blocked;
   if (!isAdmin(req)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   if (!config.telegram.enabled || !config.telegram.webhookSecret) {
     return NextResponse.json(

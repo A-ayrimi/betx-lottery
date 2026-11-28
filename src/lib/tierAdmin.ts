@@ -2,8 +2,8 @@ import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { appendAdminAuditEvent } from "@/lib/phase2Runtime";
 import { adminAuditLog, ticketTiers } from "@/db/schema";
-import { MaintenanceError, ValidationError } from "@/lib/errors";
-import { isMaintenanceMode } from "@/lib/gameConfig";
+import { ValidationError } from "@/lib/errors";
+import { assertMutationsOpen } from "@/lib/mutationGuard";
 import { roundMoney } from "@/lib/tierAccounting";
 import { deriveTierAmounts } from "@/lib/tierMath";
 
@@ -43,10 +43,6 @@ type ValidatedTier = {
 
 function invalid(message: string): never {
   throw new ValidationError(message);
-}
-
-function assertMutationsOpen() {
-  if (isMaintenanceMode()) throw new MaintenanceError();
 }
 
 function finite(value: unknown, label: string): number {

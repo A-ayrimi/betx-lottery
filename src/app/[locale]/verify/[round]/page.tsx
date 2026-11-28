@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 type VerifyView =
   | { kind: "notFound" }
+  | { kind: "error" }
   | { kind: "pending"; commitment?: string }
   | { kind: "verified"; commitment: string; winningSerial: string; serials: string[]; index: number; pass: boolean };
 
@@ -20,6 +21,7 @@ export default async function VerifyPage({ params }: PageProps<"/[locale]/verify
   if (!isLocale(locale)) notFound();
 
   const v = getDictionary(locale).verification;
+  const errorText = getDictionary(locale).errors.unavailable;
   const home = `/${locale}`;
   const id = Number(round);
   let view: VerifyView = { kind: "pending" };
@@ -47,6 +49,7 @@ export default async function VerifyPage({ params }: PageProps<"/[locale]/verify
             .where(and(eq(tickets.roundId, r.id), eq(tickets.kind, "gold")))
             .orderBy(tickets.id);
           const serials = list.map((t) => t.ticketSerial);
+          if (serials.length === 0) throw new Error("Round has no gold tickets");
           const serverSeed = r.serverSeed!;
           const hashOk = createHash("sha256").update(serverSeed).digest("hex") === r.seedHash;
           const index = fairIndex(serverSeed, r.id, serials);
@@ -67,11 +70,11 @@ export default async function VerifyPage({ params }: PageProps<"/[locale]/verify
         }
       }
     } catch {
-      view = { kind: "pending" };
+      view = { kind: "error" };
     }
   }
 
-  const body = renderBody(view, v, locale);
+  const body = renderBody(view, v, locale, errorText);
 
   return (
     <main dir={dirOf(locale)} lang={locale} className="mx-auto min-h-screen max-w-3xl px-4 py-12 text-start sm:px-6">
@@ -92,8 +95,9 @@ const index = parseInt(h.slice(0, 13), 16) % serials.length;`}
   );
 }
 
-function renderBody(view: VerifyView, v: Record<string, string>, locale: Locale): React.ReactNode {
+function renderBody(view: VerifyView, v: Record<string, string>, locale: Locale, errorText: string): React.ReactNode {
   if (view.kind === "notFound") return <p className="text-mint">{v.notFound}</p>;
+  if (view.kind === "error") return <p role="alert" className="text-red-400">{errorText}</p>;
   if (view.kind === "pending") {
     return (
       <div className="space-y-3 text-mint">

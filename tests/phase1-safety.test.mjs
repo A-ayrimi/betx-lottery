@@ -69,10 +69,23 @@ test("production app url fails closed instead of using localhost", () => {
   }
 });
 
-test("mutation libraries block writes during maintenance", async () => {
+test("mutation libraries use the centralized maintenance guard", async () => {
+  const guard = await read("../src/lib/mutationGuard.ts");
+  assert.match(guard, /export function assertMutationsOpen\(\)/);
+  assert.match(guard, /if \(isMaintenanceMode\(\)\) throw new MaintenanceError\(\);/);
+
+  for (const path of [
+    "../src/lib/store.ts",
+    "../src/lib/tierAdmin.ts",
+    "../src/lib/depositReservations.ts",
+  ]) {
+    const source = await read(path);
+    assert.match(source, /assertMutationsOpen/);
+    assert.doesNotMatch(source, /function assertMutationsOpen\(\)/);
+  }
+
   const store = await read("../src/lib/store.ts");
   const tierAdmin = await read("../src/lib/tierAdmin.ts");
-  assert.match(store, /function assertMutationsOpen\(\)/);
   for (const name of [
     "refundRound",
     "rewardSignupReferral",
@@ -83,10 +96,15 @@ test("mutation libraries block writes during maintenance", async () => {
     "creditDeposit",
     "requestWithdrawal",
     "processWithdrawal",
+    "setDepositLimit",
+    "selfExclude",
+    "initializeAdminVault",
+    "ensureOpenRound",
+    "recordVaultSnapshot",
+    "setSession",
   ]) {
     assert.match(store, new RegExp(`export async function ${name}\\([\\s\\S]{0,220}?assertMutationsOpen\\(\\)`));
   }
-  assert.match(tierAdmin, /function assertMutationsOpen\(\)/);
   for (const name of ["createTier", "updateTier", "setTierStatus"]) {
     assert.match(tierAdmin, new RegExp(`export async function ${name}\\([\\s\\S]{0,220}?assertMutationsOpen\\(\\)`));
   }
@@ -106,6 +124,48 @@ test("unprotected signup and admin routes reject maintenance requests", async ()
       /maintenanceBlocked\(\)/.test(route) || /handleError\(error\)/.test(route),
       `${path} must surface maintenance blocks`,
     );
+  }
+});
+
+test("every real mutating API route surfaces maintenance blocks", async () => {
+  const routes = [
+    "../src/app/api/wheel/spin/route.ts",
+    "../src/app/api/telegram/webhook/route.ts",
+    "../src/app/api/auth/telegram/route.ts",
+    "../src/app/api/tickets/buy/route.ts",
+    "../src/app/api/auth/logout/route.ts",
+    "../src/app/api/auth/connect/route.ts",
+    "../src/app/api/payments/withdraw/route.ts",
+    "../src/app/api/account/route.ts",
+    "../src/app/api/payments/ipn/route.ts",
+    "../src/app/api/wallet/deposit/route.ts",
+    "../src/app/api/wallet/verify/route.ts",
+    "../src/app/api/payments/deposit/route.ts",
+    "../src/app/api/wallet/claim/route.ts",
+    "../src/app/api/wallet/nonce/route.ts",
+    "../src/app/api/admin/automation/route.ts",
+    "../src/app/api/admin/fees/route.ts",
+    "../src/app/api/admin/withdrawals/route.ts",
+    "../src/app/api/admin/withdrawals/pay/route.ts",
+    "../src/app/api/admin/treasury/initialize/route.ts",
+    "../src/app/api/admin/tiers/route.ts",
+    "../src/app/api/admin/rounds/open/route.ts",
+    "../src/app/api/admin/tiers/[id]/route.ts",
+    "../src/app/api/admin/rounds/[id]/review/route.ts",
+    "../src/app/api/admin/rounds/[id]/settle/route.ts",
+    "../src/app/api/auth/telegram-link/route.ts",
+    "../src/app/api/telegram/setup/route.ts",
+  ];
+  for (const path of routes) {
+    const route = await read(path);
+    const inertStub = /legacy_payment_provider_disabled/.test(route);
+    const guarded =
+      /maintenanceBlocked\(\)/.test(route) ||
+      /config\.maintenanceMode/.test(route) ||
+      /isMaintenanceMode\(\)/.test(route) ||
+      /handleError\(error\)/.test(route) ||
+      /handleError\(e\)/.test(route);
+    assert.ok(guarded || inertStub, `${path} must surface maintenance blocks`);
   }
 });
 

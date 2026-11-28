@@ -21,7 +21,8 @@ export async function GET() {
     if (shouldUseDevPreviewFallback(e)) {
       return NextResponse.json(
         {
-          ok: true,
+          ok: false,
+          ready: false,
           address: config.adminWallet,
           network: "solana",
           source: balanceSources(true).onchainTreasury,

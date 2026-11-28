@@ -64,6 +64,12 @@ test("public read routes use the development preview fallback for transient DB f
     const source = await readFile(new URL(route, import.meta.url), "utf8");
     assert.match(source, /shouldUseDevPreviewFallback/);
   }
+  const onchain = await readFile(new URL("../src/app/api/vault/onchain/route.ts", import.meta.url), "utf8");
+  assert.match(onchain, /ok:\s*false/);
+  assert.match(onchain, /ready:\s*false/);
+  assert.match(onchain, /status:\s*"unavailable"/);
+  const consumer = await readFile(new URL("../src/components/OnchainTreasury.tsx", import.meta.url), "utf8");
+  assert.match(consumer, /r\.ok && j\.ok/);
 });
 
 test(
@@ -91,6 +97,8 @@ test(
     const phase1bSql = await Promise.all(
       phase1bMigrations.map((name) => readFile(new URL(name, migrationDir), "utf8")),
     );
+    const previousMaintenance = process.env.MAINTENANCE_MODE;
+    process.env.MAINTENANCE_MODE = "false";
 
     const adminPool = new Pool({ connectionString: databaseUrl, max: 1 });
     const schemaName = `betx_test_${randomUUID().replaceAll("-", "")}`;
@@ -272,6 +280,8 @@ test(
       if (pool) await pool.end();
       await adminPool.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
       await adminPool.end();
+      if (previousMaintenance === undefined) delete process.env.MAINTENANCE_MODE;
+      else process.env.MAINTENANCE_MODE = previousMaintenance;
     }
   },
 );

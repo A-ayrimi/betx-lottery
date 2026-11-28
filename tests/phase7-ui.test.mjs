@@ -222,7 +222,25 @@ test("settlement copy no longer claims automated BETX verification", () => {
   assert.doesNotMatch(JSON.stringify(fa), /خودکار سیستم BETX|کارمزد پلتفرم BETX/);
 });
 
-test("draw proof copy describes commit-reveal HMAC without external randomness claims", () => {
+test("legal copy states pre-launch status without unconfigured licence text", async () => {
+  const legal = await read("../src/i18n/legal.ts");
+  const legalPage = await read("../src/components/LegalPage.tsx");
+  const staleLicenceCopy = new RegExp(["Licensing", "information", "is not configured"].join(" "));
+  assert.doesNotMatch(legal, staleLicenceCopy);
+  assert.doesNotMatch(legal, /licensing jurisdiction|first golden-ticket purchase/);
+  assert.match(legal, /Status: Pre-launch \/ Preview mode \(real-money deposits and withdrawals are currently disabled\)/);
+  assert.match(legal, /where online prize draws or the service are prohibited by local law/);
+  assert.match(legal, /governed by applicable laws as specified by the operator/);
+  assert.match(legal, /first qualifying ticket purchase/);
+  assert.doesNotMatch(JSON.stringify(locales), staleLicenceCopy);
+  assert.match(legalPage, /d\.compliance\.legalStatus/);
+  for (const [label, dict] of Object.entries(locales)) {
+    assert.ok(dict.compliance.legalStatus, `${label}.compliance.legalStatus is missing`);
+    assert.match(dict.compliance.legalStatus, /support\.betx@gmail\.com/);
+  }
+});
+
+test("draw proof copy describes commit-reveal HMAC without external randomness claims", async () => {
   for (const [label, dict] of Object.entries(locales)) {
     assert.match(dict.pool.transparencyLive, /SHA-256/, `${label}.pool.transparencyLive must name SHA-256`);
     assert.match(dict.pool.transparencyLive, /HMAC-SHA256/, `${label}.pool.transparencyLive must name HMAC-SHA256`);
@@ -231,6 +249,9 @@ test("draw proof copy describes commit-reveal HMAC without external randomness c
   }
   assert.doesNotMatch(JSON.stringify(en), /Provably fair/);
   assert.doesNotMatch(JSON.stringify(en), /external randomness is used/i);
+  const explorer = await read("../src/components/VerifyExplorer.tsx");
+  assert.doesNotMatch(explorer, /PROVABLY FAIR/i);
+  assert.match(explorer, /d\.ui\.fairHashTitle/);
 });
 
 test("live status and wallet copy distinguish ledger mode from enabled payments", async () => {
@@ -244,12 +265,15 @@ test("live status and wallet copy distinguish ledger mode from enabled payments"
 
   const hero = await read("../src/components/Hero.tsx");
   const wallet = await read("../src/components/Wallet.tsx");
+  const header = await read("../src/components/Header.tsx");
   const deposit = await read("../src/components/DepositCard.tsx");
   const winners = await read("../src/components/WinnersHistory.tsx");
   const jackpot = await read("../src/components/WeeklyJackpotWidget.tsx");
   assert.match(hero, /d\.ui\.statusLedger/);
   assert.match(wallet, /d\.wallet\.bodyPaymentsPaused/);
   assert.match(wallet, /d\.wc\.paymentsPausedBadge/);
+  assert.match(wallet, /isPreview/);
+  assert.match(header, /isPreview/);
   assert.match(deposit, /cfg\?\.paymentsEnabled === false/);
   assert.match(winners, /d\.board\.historyPending/);
   assert.match(jackpot, /aria-describedby="jackpot-estimate-note"/);

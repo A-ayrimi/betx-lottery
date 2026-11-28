@@ -11,7 +11,7 @@ import { TicketSerialRow } from "./TicketDetails";
 
 
 export function Wallet() {
-  const { state, withdraw, setToast, isDemoSession, loading, dataUnavailable, demoEnabled } = useApp();
+  const { state, withdraw, setToast, isDemoSession, isPreview, loading, dataUnavailable, demoEnabled } = useApp();
   const { d, t, n, ago, date, dir: direction, locale } = useI18n();
   const [busy, setBusy] = useState<"dep" | "wd" | null>(null);
   const [wd, setWd] = useState({ amount: "", address: "" });
@@ -80,7 +80,7 @@ export function Wallet() {
             <div className="relative">
               <p className="micro flex flex-wrap items-center gap-2 text-mint">
                 {d.wallet.balance}
-                <BalanceBadge kind={demoEnabled || isDemoSession ? "demo" : "ledger"} />
+                <BalanceBadge kind={demoEnabled || isDemoSession || isPreview ? "demo" : "ledger"} />
               </p>
               <p dir="ltr" className="font-display tnum mt-3 text-start text-5xl font-bold text-white">
                 {user ? `${usd(user.balance, locale)}` : "—"}

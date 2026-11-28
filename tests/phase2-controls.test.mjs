@@ -4,6 +4,7 @@ import test from "node:test";
 import { evaluateAdminSession, resolveLegacyAdminRole, roleHasPermission, verifyAdminTokenHash, hashAdminToken } from "../src/lib/adminRbac.ts";
 import { auditHead, nextAuditEvent, verifyAuditChain } from "../src/lib/auditChain.ts";
 import { drawDistinctWinners, failClosedVrfProvider, randomBelow, createVrfProvider, createReplayableVrfProvider, hashTicketSnapshot } from "../src/lib/drawRandomness.ts";
+import { commitRevealIndex } from "../src/lib/drawFairness.ts";
 import { allocateVault, computeReferralCommission, validateVaultLedger } from "../src/lib/vaultAccounts.ts";
 import { consolationProbabilityTotal, drawConsolationReward, validateJackpotSplit, weeklyJackpotSplit } from "../src/lib/rewardEngine.ts";
 import { buildRefundEntry, buildRolloverEntry, evaluateRefundEligibility } from "../src/lib/refundRollover.ts";
@@ -91,6 +92,26 @@ test("Phase 2 VRF adapter: replay is deterministic and tampering is rejected", a
   const second = await derivePhase2Draw({ roundId: 9, serverSeed: "seed", tickets, live: false });
   assert.deepEqual(first.indices, second.indices);
   assert.equal(first.proofHash, second.proofHash);
+});
+
+test("Phase 2 single-winner evidence matches the store commit-reveal draw", async () => {
+  const tickets = Array.from({ length: 12 }, (_, index) => ({
+    id: index + 1,
+    userId: index + 1,
+    ticketSerial: `BTX-${index + 1}`,
+    tierId: 1,
+  }));
+  const expected = commitRevealIndex("draw-secret", 42, tickets.map((ticket) => ticket.ticketSerial));
+  const evidence = await derivePhase2Draw({
+    roundId: 42,
+    serverSeed: "draw-secret",
+    tickets,
+    live: false,
+    winnerCount: 1,
+  });
+  assert.deepEqual(evidence.indices, [expected]);
+  const store = await readFile(new URL("../src/lib/store.ts", import.meta.url), "utf8");
+  assert.match(store, /commitRevealIndex\(/);
 });
 
 test("Phase 2 KYC adapter: thresholds are enforced and live stays fail-closed", () => {

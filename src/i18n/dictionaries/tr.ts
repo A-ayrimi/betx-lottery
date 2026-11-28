@@ -120,6 +120,7 @@ export const tr: Dict = {
     topUp: "Cüzdanı yükle →",
     tickets: "{n} altın bilet",
     boostLabel: "{n} bilet · {amount}",
+    boostDisabled: "{n} bilet (devre dışı)",
     moneyKicker: "ROUND ALLOCATION",
     money1: "{capacity} bilet × {price} = tamamlanan tur başına toplam {pool}",
     money2: "Kazanana {winner}, hazineye {treasury} ve BETX platform ücreti olarak {admin}",
@@ -523,6 +524,7 @@ export const tr: Dict = {
     restrictedTitle: "BETX bölgende kullanılamıyor",
     restrictedBody: "Bölgesel kısıtlamalar nedeniyle BETX {country} ülkesinde kullanılamıyor. Mevcut hesabınla ilgili yardıma ihtiyacın varsa destekle iletişime geç.",
     legalNotice: "Bu belge İngilizce olarak sunulmuştur. Çeviriler arasında tutarsızlık olması halinde İngilizce metin esas alınır.",
+    legalStatus: "Durum: lansman öncesi / önizleme modu (gerçek para yatırma ve çekme işlemleri şu anda devre dışı). İletişim: support.betx@gmail.com.",
     back: "← BETX'e dön",
   },
   errors: {

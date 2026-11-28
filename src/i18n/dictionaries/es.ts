@@ -120,6 +120,7 @@ export const es: Dict = {
     topUp: "Recargar billetera →",
     tickets: "{n} boletos dorados",
     boostLabel: "{n} boletos · {amount}",
+    boostDisabled: "{n} boletos (desactivados)",
     moneyKicker: "HOW THE MONEY WORKS",
     money1: "{capacity} boletos × {price} = {pool} por ronda",
     money2: "{winner} de premio, {treasury} para tesorería y {admin} de comisión de la plataforma BETX",
@@ -523,6 +524,7 @@ export const es: Dict = {
     restrictedTitle: "BETX no está disponible en tu región",
     restrictedBody: "Por la normativa local no podemos ofrecer juegos con dinero real en tu país ({country}). Si tienes saldo, contacta con soporte para retirarlo.",
     legalNotice: "Este documento se ofrece en inglés. Si las traducciones difieren, prevalece la versión en inglés.",
+    legalStatus: "Estado: preventa / modo de vista previa (los depósitos y retiros con dinero real están deshabilitados actualmente). Contacto: support.betx@gmail.com.",
     back: "← Volver a BETX",
   },
   errors: {

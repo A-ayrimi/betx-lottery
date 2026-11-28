@@ -2,6 +2,7 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { deposits, users } from "../db/schema.ts";
 import { effectiveLimit } from "./responsibleGaming.ts";
+import { assertMutationsOpen } from "./mutationGuard.ts";
 
 type Database = NodePgDatabase<Record<string, never>>;
 
@@ -47,6 +48,7 @@ export async function reserveDeposit(
     payCurrency?: string;
   },
 ) {
+  assertMutationsOpen();
   return database.transaction(async (tx) => {
     const user = (
       await tx

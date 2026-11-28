@@ -38,7 +38,7 @@ export function VerifyExplorer({ rows, dataUnavailable = false }: { rows: Verify
         </Link>
       </div>
 
-      <p className="micro mt-10 text-neon-2">PROVABLY FAIR · COMMIT-REVEAL</p>
+      <p className="micro mt-10 text-neon-2">{d.ui.fairHashTitle}</p>
       <h1 className="mt-3 text-[clamp(1.9rem,5vw,3rem)] font-black leading-tight text-white">{d.board.historyTitle}</h1>
       <p className="mt-4 max-w-[64ch] text-[15px] leading-8 text-mint">{d.board.historyBody}</p>
 

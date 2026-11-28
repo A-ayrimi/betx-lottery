@@ -19,9 +19,14 @@ export function LegalPage({ locale, kind }: { locale: Locale; kind: "terms" | "p
       </div>
 
       {locale !== "en" ? (
-        <p className="mt-10 rounded-xl border border-foil/30 bg-foil/[0.08] px-4 py-3 text-[13px] leading-7 text-foil">
-          {d.compliance.legalNotice}
-        </p>
+        <div className="mt-10 space-y-3">
+          <p className="rounded-xl border border-foil/30 bg-foil/[0.08] px-4 py-3 text-[13px] leading-7 text-foil">
+            {d.compliance.legalNotice}
+          </p>
+          <p className="rounded-xl border border-foil/30 bg-foil/[0.08] px-4 py-3 text-[13px] leading-7 text-foil">
+            {d.compliance.legalStatus}
+          </p>
+        </div>
       ) : null}
 
       <article dir="ltr" lang="en" className="mt-8 text-left">

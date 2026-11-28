@@ -9,7 +9,7 @@ import {
   isValidSolanaAddress,
 } from "@/lib/solana";
 import { UserError } from "@/lib/store";
-import { handleError } from "@/lib/api";
+import { handleError, maintenanceBlocked } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,8 @@ function resolveRequestUri(req: NextRequest): string {
 /** Step 1 of Sign-In with Solana: issue a one-time message for the wallet to sign. */
 export async function POST(req: NextRequest) {
   try {
+    const blocked = maintenanceBlocked();
+    if (blocked) return blocked;
     await limitByIp("nonce", 20);
     const body = await req.json().catch(() => ({}));
     const rawAddress = String(body?.address ?? "").trim();

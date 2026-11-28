@@ -30,7 +30,7 @@ type BotStrings = {
 
 const S: Record<Locale, BotStrings> = {
   en: {
-    welcomeNew: "🎟 <b>Welcome to BETX, {name}!</b>\n\nOne ticket. One chance. Round prizes are paid after automated BETX verification.\n\n• A <b>free wheel spin</b> every 24 hours\n• Current tiers, capacities, and prize splits are shown in the app\n• A friend's first golden-ticket purchase unlocks <b>+1 bonus spin</b>",
+    welcomeNew: "🎟 <b>Welcome to BETX, {name}!</b>\n\nOne ticket. One chance. Round prizes are paid after automated BETX verification.\n\n• A <b>free wheel spin</b> every 24 hours\n• Current tiers, capacities, and prize splits are shown in the app\n• A friend's first qualifying ticket purchase unlocks <b>+1 bonus spin</b>",
     welcomeBack: "👋 Welcome back, <b>{name}</b>!",
     viaInvite: "\n\n✅ You joined with a friend's invite.",
     terms: "\n\n<i>18+ only. By continuing you accept the Terms: {url}</i>",
@@ -38,8 +38,8 @@ const S: Record<Locale, BotStrings> = {
     myLink: "🔗 My invite link",
     balance: "💰 Balance",
     webLogin: "🌐 Log in on the web",
-    inviteJoined: "🎉 <b>{name}</b> joined with your invite link!\nTheir first golden-ticket purchase unlocks +1 bonus spin for you.\nInvited so far: <b>{count}</b>",
-    inviteText: "🔗 <b>Your personal invite link:</b>\n<code>{link}</code>\n\n• Each referred member's first golden-ticket purchase: +1 bonus spin\n• Their first deposit: a referral cash reward\n\nInvited so far: <b>{count}</b>",
+    inviteJoined: "🎉 <b>{name}</b> joined with your invite link!\nTheir first qualifying ticket purchase unlocks +1 bonus spin for you.\nInvited so far: <b>{count}</b>",
+    inviteText: "🔗 <b>Your personal invite link:</b>\n<code>{link}</code>\n\n• Each referred member's first qualifying ticket purchase: +1 bonus spin\n• Their first deposit: a referral cash reward\n\nInvited so far: <b>{count}</b>",
     share: "📤 Share with friends",
     shareText: "Join BETX with this link and get a free spin 🎟",
     balanceText: "💰 Balance: <b>{balance}</b>\n🎡 Bonus spins: <b>{spins}</b>",

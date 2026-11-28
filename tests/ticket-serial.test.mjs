@@ -185,5 +185,8 @@ test("verification page is localized and uses persisted serials", async () => {
   assert.match(page, /dir=\{dirOf\(locale\)\}/);
   assert.match(page, /t\.ticketSerial/);
   assert.match(page, /formatNumber\(Number\.isInteger\(id\) \? id : 0, locale\)/);
+  assert.match(page, /kind: "error"/);
+  assert.match(page, /view = \{ kind: "error" \}/);
+  assert.match(page, /role="alert"/);
   assert.doesNotMatch(page, /dir="ltr" lang="en"/);
 });

@@ -4,7 +4,7 @@ import test from "node:test";
 import bs58 from "bs58";
 import { buildPostgresConfig } from "../src/lib/postgresConfig.ts";
 import { isMaintenanceMode } from "../src/lib/gameConfig.ts";
-import { DepositReservationError, isValidDepositIdempotencyKey } from "../src/lib/depositReservations.ts";
+import { DepositReservationError, isValidDepositIdempotencyKey, reserveDeposit } from "../src/lib/depositReservations.ts";
 import {
   broadcast,
   broadcastSolanaSignedTransaction,
@@ -106,6 +106,8 @@ test("payments, automatic sweep, and maintenance defaults remain fail-closed", (
   assert.match(config, /BETX_MODE must be explicitly set to live or demo/);
   assert.match(gameConfig, /return raw !== "false";/);
   assert.match(gameConfig, /process\.env\.MAINTENANCE_MODE \?\? process\.env\.NEXT_PUBLIC_MAINTENANCE_MODE/);
+  const reservations = readFileSync(new URL("../src/lib/depositReservations.ts", import.meta.url), "utf8");
+  assert.match(reservations, /assertMutationsOpen\(\);/);
 });
 
 test("server maintenance mode overrides the public client fallback", () => {
@@ -124,6 +126,27 @@ test("server maintenance mode overrides the public client fallback", () => {
     else process.env.MAINTENANCE_MODE = previousServer;
     if (previousPublic === undefined) delete process.env.NEXT_PUBLIC_MAINTENANCE_MODE;
     else process.env.NEXT_PUBLIC_MAINTENANCE_MODE = previousPublic;
+  }
+});
+
+test("reserveDeposit rejects internally while maintenance mode is on", async () => {
+  const previous = process.env.MAINTENANCE_MODE;
+  try {
+    process.env.MAINTENANCE_MODE = "true";
+    await assert.rejects(
+      () =>
+        reserveDeposit({}, {
+          userId: 1,
+          provider: "solana",
+          amount: 10,
+          orderId: "SOL-MAINTENANCE-TEST",
+          idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
+        }),
+      /maintenance/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.MAINTENANCE_MODE;
+    else process.env.MAINTENANCE_MODE = previous;
   }
 });
 
